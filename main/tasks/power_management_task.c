@@ -155,15 +155,16 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     auto_tune_counter = 0;
                     if (power_management->fan_perc < 80 && power_management->power < 30) {
                         if (last_hashrate_auto < sys_module->current_hashrate)
-                            last_core_voltage_auto += 2;
-                        else
                             last_asic_frequency_auto += 2;
+                        else
+                            last_core_voltage_auto += 2;
+                            
 
                     } else if (power_management->fan_perc > 80) {
                         if (last_hashrate_auto > sys_module->current_hashrate)
-                            last_core_voltage_auto -= 2;
-                        else
                             last_asic_frequency_auto -= 2;
+                        else
+                            last_core_voltage_auto -= 2;
                     }
                     ESP_LOGI(TAG, "\n######### \n       voltage:%u frequency:%u hash last/cur:%f %f \n#########",
                              last_core_voltage_auto, last_asic_frequency_auto, last_hashrate_auto, sys_module->current_hashrate);
