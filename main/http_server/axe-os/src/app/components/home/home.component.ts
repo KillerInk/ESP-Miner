@@ -22,6 +22,8 @@ export class HomeComponent {
   public dataLabel: number[] = [];
   public hashrateData: number[] = [];
   public temperatureData: number[] = [];
+  public mhzData: number[] = [];
+  public coreVoltageData: number[] = [];
   public powerData: number[] = [];
   public chartData?: any;
 
@@ -57,6 +59,8 @@ export class HomeComponent {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
+    const mhzColor = documentStyle.getPropertyValue('--surface-50');
+    const coreVoltageColor = documentStyle.getPropertyValue('--surface-100');
 
     // Update chart colors
     if (this.chartData && this.chartData.datasets) {
@@ -64,6 +68,10 @@ export class HomeComponent {
       this.chartData.datasets[0].borderColor = primaryColor;
       this.chartData.datasets[1].backgroundColor = textColorSecondary;
       this.chartData.datasets[1].borderColor = textColorSecondary;
+      this.chartData.datasets[2].backgroundColor = mhzColor;
+      this.chartData.datasets[2].borderColor = mhzColor;
+      this.chartData.datasets[3].backgroundColor = coreVoltageColor;
+      this.chartData.datasets[3].borderColor = coreVoltageColor;
     }
 
     // Update chart options
@@ -75,6 +83,10 @@ export class HomeComponent {
       this.chartOptions.scales.y.grid.color = surfaceBorder;
       this.chartOptions.scales.y2.ticks.color = textColorSecondary;
       this.chartOptions.scales.y2.grid.color = surfaceBorder;
+      this.chartOptions.scales.y3.ticks.color = mhzColor;
+      this.chartOptions.scales.y3.grid.color = surfaceBorder;
+      this.chartOptions.scales.y4.ticks.color = coreVoltageColor;
+      this.chartOptions.scales.y4.grid.color = surfaceBorder;
     }
 
     // Force chart update
@@ -87,6 +99,8 @@ export class HomeComponent {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
+    const mhzColor = documentStyle.getPropertyValue('--surface-50');
+    const coreVoltageColor = documentStyle.getPropertyValue('--surface-100');
 
     this.chartData = {
       labels: [],
@@ -116,6 +130,32 @@ export class HomeComponent {
           pointHoverRadius: 5,
           borderWidth: 1,
           yAxisID: 'y2',
+        },
+        {
+          type: 'line',
+          label: 'ASIC Freq',
+          data: [],
+          fill: false,
+          backgroundColor: mhzColor,
+          borderColor: mhzColor,
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          borderWidth: 1,
+          yAxisID: 'y3',
+        },
+        {
+          type: 'line',
+          label: 'ASIC Volt',
+          data: [],
+          fill: false,
+          backgroundColor: coreVoltageColor,
+          borderColor: coreVoltageColor,
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          borderWidth: 1,
+          yAxisID: 'y4',
         }
       ]
     };
@@ -138,7 +178,14 @@ export class HomeComponent {
               }
               if (tooltipItem.dataset.label === 'ASIC Temp') {
                 label += tooltipItem.raw + '°C';
-              } else {
+              }
+              else if (tooltipItem.dataset.label === 'ASIC Freq') {
+                label += tooltipItem.raw + 'mHz';
+              }
+              else if (tooltipItem.dataset.label === 'ASIC Volt') {
+                label += tooltipItem.raw + 'mv';
+              }
+              else {
                 label += HashSuffixPipe.transform(tooltipItem.raw);
               }
               return label;
@@ -184,6 +231,35 @@ export class HomeComponent {
             color: surfaceBorder
           },
           suggestedMax: 80
+        },
+        y3: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          ticks: {
+            color: mhzColor,
+            callback: (value: number) => value + 'mHz'
+          },
+          grid: {
+            drawOnChartArea: false,
+            color: surfaceBorder
+          },
+          suggestedMax: 600
+        }
+        ,
+        y4: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          ticks: {
+            color: coreVoltageColor,
+            callback: (value: number) => value + 'mv'
+          },
+          grid: {
+            drawOnChartArea: false,
+            color: surfaceBorder
+          },
+          suggestedMax: 800
         }
       }
     };
@@ -199,6 +275,8 @@ export class HomeComponent {
         if (!info.power_fault) {
           this.hashrateData.push(info.hashRate * 1000000000);
           this.temperatureData.push(info.temp);
+          this.mhzData.push(info.frequency);
+          this.coreVoltageData.push(info.coreVoltage);
           this.powerData.push(info.power);
 
           this.dataLabel.push(new Date().getTime());
@@ -206,6 +284,8 @@ export class HomeComponent {
           if (this.hashrateData.length >= 720) {
             this.hashrateData.shift();
             this.temperatureData.shift();
+            this.mhzData.shift();
+            this.coreVoltageData.shift();
             this.powerData.shift();
             this.dataLabel.shift();
           }
@@ -213,6 +293,8 @@ export class HomeComponent {
           this.chartData.labels = this.dataLabel;
           this.chartData.datasets[0].data = this.hashrateData;
           this.chartData.datasets[1].data = this.temperatureData;
+          this.chartData.datasets[2].data = this.mhzData;
+          this.chartData.datasets[3].data = this.coreVoltageData;
 
           this.chartData = {
             ...this.chartData
