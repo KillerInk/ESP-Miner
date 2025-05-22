@@ -36,6 +36,11 @@ double pid_p = 4.0;
 double pid_i = 0.2;
 double pid_d = 3.0;
 
+double autotune_power_limit = 30.;
+uint16_t autotune_fan_limit = 80;
+uint8_t autotune_step = 2;
+uint8_t autotune_read_tick = 2;
+
 PIDController pid;
 
 void POWER_MANAGEMENT_task(void * pvParameters)
@@ -107,8 +112,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
             exit(EXIT_FAILURE);
         }
+        bool pid_control_fanspeed = nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1;
         // enable the PID auto control for the FAN if set
-        if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
+        if (pid_control_fanspeed) {
             // Ignore invalid temperature readings (-1) during startup
             if (power_management->chip_temp_avg >= 0) {
                 pid_input = power_management->chip_temp_avg;
@@ -150,21 +156,21 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
             asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
         } else {
-            if (sys_module->current_hashrate > 0) {
-                if (auto_tune_counter >= 2) {
+            if (sys_module->current_hashrate > 0 && pid_control_fanspeed) {
+                if (auto_tune_counter >= autotune_read_tick) {
                     auto_tune_counter = 0;
-                    if (power_management->fan_perc < 80 && power_management->power < 30) {
+                    if (power_management->fan_perc < autotune_fan_limit && power_management->power < autotune_power_limit) {
                         if (last_hashrate_auto < sys_module->current_hashrate)
-                            last_asic_frequency_auto += 2;
+                            last_asic_frequency_auto += autotune_step;
                         else
-                            last_core_voltage_auto += 2;
+                            last_core_voltage_auto += autotune_step;
                             
 
-                    } else if (power_management->fan_perc > 80) {
+                    } else if (power_management->fan_perc > autotune_fan_limit || power_management->power > autotune_power_limit) {
                         if (last_hashrate_auto > sys_module->current_hashrate)
-                            last_asic_frequency_auto -= 2;
+                            last_asic_frequency_auto -= autotune_step;
                         else
-                            last_core_voltage_auto -= 2;
+                            last_core_voltage_auto -= autotune_step;
                     }
                     ESP_LOGI(TAG, "\n######### \n       voltage:%u frequency:%u hash last/cur:%f %f \n#########",
                              last_core_voltage_auto, last_asic_frequency_auto, last_hashrate_auto, sys_module->current_hashrate);
