@@ -13,6 +13,7 @@ typedef struct
     float frequency_value;
     float power;
     float current;
+    float core_voltage;
 } PowerManagementModule;
 
 void POWER_MANAGEMENT_task(void * pvParameters);

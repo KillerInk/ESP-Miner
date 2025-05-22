@@ -1,5 +1,7 @@
-#include <string.h>
 #include "INA260.h"
+#include "PID.h"
+#include "TPS546.h"
+#include "asic.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -7,13 +9,11 @@
 #include "math.h"
 #include "mining.h"
 #include "nvs_config.h"
-#include "serial.h"
-#include "TPS546.h"
-#include "vcore.h"
-#include "thermal.h"
-#include "PID.h"
 #include "power.h"
-#include "asic.h"
+#include "serial.h"
+#include "thermal.h"
+#include "vcore.h"
+#include <string.h>
 
 #define POLL_RATE 1800
 #define MAX_TEMP 90.0
@@ -43,9 +43,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     ESP_LOGI(TAG, "Starting");
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-    
+
     // Initialize PID controller
-    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
+    pid_setPoint = (double) nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
     pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, PID_P_ON_E, PID_DIRECT);
     pid_set_sample_time(&pid, POLL_RATE - 1);
     pid_set_output_limits(&pid, 25, 100);
@@ -58,17 +58,23 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     power_management->frequency_multiplier = 1;
 
-    //int last_frequency_increase = 0;
-    //uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    // int last_frequency_increase = 0;
+    // uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
     uint16_t last_asic_frequency = power_management->frequency_value;
-    
+    uint16_t last_core_voltage_auto = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
+    power_management->core_voltage = last_core_voltage_auto;
+    uint16_t last_asic_frequency_auto = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    double last_hashrate_auto = sys_module->current_hashrate;
+    bool auto_tune_hashrate = true;
+    uint8_t auto_tune_counter = 0;
+
     while (1) {
 
         // Refresh PID setpoint from NVS in case it was changed via API
-        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
+        pid_setPoint = (double) nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
 
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);
@@ -78,15 +84,16 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
 
-
         // ASIC Thermal Diode will give bad readings if the ASIC is turned off
         // if(power_management->voltage < tps546_config.TPS546_INIT_VOUT_MIN){
         //     goto looper;
         // }
 
-        //overheat mode if the voltage regulator or ASIC is too hot
-        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-            ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg );
+        // overheat mode if the voltage regulator or ASIC is too hot
+        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) &&
+            (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+            auto_tune_hashrate = false;
+            ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg);
             power_management->fan_perc = 100;
             Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, 1);
 
@@ -100,7 +107,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
             exit(EXIT_FAILURE);
         }
-        //enable the PID auto control for the FAN if set
+        // enable the PID auto control for the FAN if set
         if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
             // Ignore invalid temperature readings (-1) during startup
             if (power_management->chip_temp_avg >= 0) {
@@ -112,7 +119,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             } else {
                 // Set fan to 70% in AP mode when temperature reading is invalid
                 if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled) {
-                    ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%", power_management->chip_temp_avg);
+                    ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%",
+                             power_management->chip_temp_avg);
                     power_management->fan_perc = 70;
                     Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, 0.7);
                 } else {
@@ -135,30 +143,64 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         // }
 
         // New voltage and frequency adjustment code
-        uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-        uint16_t asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+        uint16_t core_voltage;
+        uint16_t asic_frequency;
+
+        if (!auto_tune_hashrate) {
+            core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
+            asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+        } else {
+            if (sys_module->current_hashrate > 0) {
+                if (auto_tune_counter >= 2) {
+                    auto_tune_counter = 0;
+                    if (power_management->fan_perc < 80 && power_management->power < 30) {
+                        if (last_hashrate_auto < sys_module->current_hashrate)
+                            last_core_voltage_auto += 2;
+                        else
+                            last_asic_frequency_auto += 2;
+
+                    } else if (power_management->fan_perc > 80) {
+                        if (last_hashrate_auto > sys_module->current_hashrate)
+                            last_core_voltage_auto -= 2;
+                        else
+                            last_asic_frequency_auto -= 2;
+                    }
+                    ESP_LOGI(TAG, "\n######### \n       voltage:%u frequency:%u hash last/cur:%f %f \n#########",
+                             last_core_voltage_auto, last_asic_frequency_auto, last_hashrate_auto, sys_module->current_hashrate);
+                    if (last_hashrate_auto == 0)
+                        last_hashrate_auto = sys_module->current_hashrate;
+                    else
+                        last_hashrate_auto = 0.93 * last_hashrate_auto + 0.07 * sys_module->current_hashrate;
+                } else {
+                    auto_tune_counter++;
+                }
+            }
+            core_voltage = last_core_voltage_auto;
+            asic_frequency = last_asic_frequency_auto;
+        }
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
             VCORE_set_voltage((double) core_voltage / 1000.0, GLOBAL_STATE);
             last_core_voltage = core_voltage;
+            power_management->core_voltage = core_voltage;
         }
 
         if (asic_frequency != last_asic_frequency) {
             ESP_LOGI(TAG, "New ASIC frequency requested: %uMHz (current: %uMHz)", asic_frequency, last_asic_frequency);
-            
-            bool success = ASIC_set_frequency(GLOBAL_STATE, (float)asic_frequency);
-            
+
+            bool success = ASIC_set_frequency(GLOBAL_STATE, (float) asic_frequency);
+
             if (success) {
-                power_management->frequency_value = (float)asic_frequency;
+                power_management->frequency_value = (float) asic_frequency;
             }
-            
+
             last_asic_frequency = asic_frequency;
         }
 
         // Check for changing of overheat mode
         uint16_t new_overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-        
+
         if (new_overheat_mode != sys_module->overheat_mode) {
             sys_module->overheat_mode = new_overheat_mode;
             ESP_LOGI(TAG, "Overheat mode updated to: %d", sys_module->overheat_mode);
