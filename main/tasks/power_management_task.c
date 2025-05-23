@@ -36,12 +36,12 @@ double pid_p = 4.0;
 double pid_i = 0.2;
 double pid_d = 3.0;
 
-double autotune_power_limit = 30.;
+double autotune_power_limit = 38.;
 uint16_t autotune_fan_limit = 80;
 uint8_t autotune_step = 2;
 uint8_t autotune_read_tick = 1;
-const uint16_t max_voltage_asic = 1500;
-const uint16_t max_frequency_asic = 1200;
+const uint16_t max_voltage_asic = 1400;
+const uint16_t max_frequency_asic = 1000;
 const uint8_t max_asic_temperatur = 65;
 
 PIDController pid;
@@ -78,6 +78,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     double last_hashrate_auto = sys_module->current_hashrate;
     bool auto_tune_hashrate = true;
     uint8_t auto_tune_counter = 0;
+    bool lastVoltageSet = false;
 
     while (1) {
 
@@ -159,34 +160,79 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
             asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
         } else {
-            if (sys_module->current_hashrate > 0 && pid_control_fanspeed && auto_tune_counter > 50) 
-            {
-                if (auto_tune_counter >= autotune_read_tick || power_management->chip_temp_avg >= max_asic_temperatur) 
-                {
+            // auto tune starts when 50xtimes this got called and its hashing
+            if (sys_module->current_hashrate > 0 && pid_control_fanspeed && auto_tune_counter > 50) {
+                // enter when its tick time or emergency due high asic temp
+                if (auto_tune_counter >= autotune_read_tick || power_management->chip_temp_avg >= max_asic_temperatur) {
                     auto_tune_counter = 51;
-                    if (power_management->fan_perc < autotune_fan_limit-2  && power_management->power < autotune_power_limit) 
-                    {
-                        if (last_hashrate_auto < sys_module->current_hashrate) 
-                        {
+                    // speed up if fan ist below max fan limit -2. in that 2%range do nothing, most time happy hashing.
+                    if (power_management->fan_perc < autotune_fan_limit - 2 && power_management->power < autotune_power_limit) {
+                        // current hash is higher then the old one
+                        if (last_hashrate_auto < sys_module->current_hashrate) {
+                            // last step was frequency step increase again
+                            if (!lastVoltageSet) {
+                                last_asic_frequency_auto += autotune_step;
+                            }
+                            // last set was to core voltage
+                            else {
+                                last_core_voltage_auto += autotune_step - 1;
+                            }
+                        }
+                        // hash rate decrased with last set
+                        else {
+                            // last set was voltage, increase now frequency
+                            if (lastVoltageSet) {
+                                last_asic_frequency_auto += autotune_step;
+                                lastVoltageSet = false;
+                            }
+                            // last set was to frequency, increase voltage
+                            else {
+                                last_core_voltage_auto += autotune_step - 1;
+                                lastVoltageSet = true;
+                            }
+                        }
+
+                        if (last_asic_frequency_auto >= max_frequency_asic) {
+                            last_asic_frequency_auto = max_frequency_asic;
+                            last_core_voltage_auto += autotune_step - 1;
+                            lastVoltageSet = true;
+                        }
+
+                        if (last_core_voltage_auto >= max_voltage_asic) {
+                            last_core_voltage_auto = max_voltage_asic;
                             last_asic_frequency_auto += autotune_step;
-                        } else {
-                            last_core_voltage_auto += autotune_step;
+                            lastVoltageSet = false;
                         }
 
                         if (last_asic_frequency_auto >= max_frequency_asic)
                             last_asic_frequency_auto = max_frequency_asic;
 
-                        if (last_core_voltage_auto >= max_voltage_asic)
-                            last_core_voltage_auto = max_voltage_asic;
-                            
-                    } else if (power_management->fan_perc >= autotune_fan_limit ||
-                               power_management->power >= autotune_power_limit ||
-                               power_management->chip_temp_avg >= max_asic_temperatur) {
+                    }
+                    // we hit a limit
+                    else if (power_management->fan_perc >= autotune_fan_limit || power_management->power >= autotune_power_limit ||
+                             power_management->chip_temp_avg >= max_asic_temperatur) {
+                        // fan limit reached do normal throttle, asic is in temp range 
                         if (power_management->chip_temp_avg < max_asic_temperatur) {
+                            //hasrate increasing
                             if (last_hashrate_auto < sys_module->current_hashrate) {
-                                last_asic_frequency_auto -= autotune_step;
-                        } else {
-                                last_core_voltage_auto -= autotune_step;
+                                //last set was frequency
+                                if (!lastVoltageSet) {
+                                    // decrease core voltage and hope that it helps to keep hashrate up
+                                    last_core_voltage_auto -= autotune_step - 1;
+                                } else {
+                                    //decrase frequency
+                                    last_asic_frequency_auto -= autotune_step;
+                                }
+                            }
+                            //hashrate decrease 
+                            else {
+                                //last set was voltage
+                                if (lastVoltageSet) {
+                                    //undo voltage
+                                    last_core_voltage_auto -= autotune_step - 1;
+                                } else {
+                                    last_asic_frequency_auto -= autotune_step;
+                                }
                             }
                         } else {
                             last_asic_frequency_auto -= autotune_step;
