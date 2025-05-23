@@ -39,7 +39,7 @@ double pid_d = 3.0;
 double autotune_power_limit = 30.;
 uint16_t autotune_fan_limit = 80;
 uint8_t autotune_step = 2;
-uint8_t autotune_read_tick = 2;
+uint8_t autotune_read_tick = 1;
 const uint16_t max_voltage_asic = 1500;
 const uint16_t max_frequency_asic = 1200;
 const uint8_t max_asic_temperatur = 65;
@@ -159,33 +159,38 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
             asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
         } else {
-            if (sys_module->current_hashrate > 0 && pid_control_fanspeed) {
-                if (auto_tune_counter >= autotune_read_tick || power_management->chip_temp_avg >= max_asic_temperatur) {
-                    auto_tune_counter = 0;
-                    if (power_management->fan_perc < autotune_fan_limit && power_management->power < autotune_power_limit) {
-                        if (last_hashrate_auto < sys_module->current_hashrate)
+            if (sys_module->current_hashrate > 0 && pid_control_fanspeed && auto_tune_counter > 50) 
+            {
+                if (auto_tune_counter >= autotune_read_tick || power_management->chip_temp_avg >= max_asic_temperatur) 
+                {
+                    auto_tune_counter = 51;
+                    if (power_management->fan_perc < autotune_fan_limit-2  && power_management->power < autotune_power_limit) 
+                    {
+                        if (last_hashrate_auto < sys_module->current_hashrate) 
+                        {
                             last_asic_frequency_auto += autotune_step;
-                        else
+                        } else {
                             last_core_voltage_auto += autotune_step;
-
-                    if(last_asic_frequency_auto >= max_frequency_asic)
-                        last_asic_frequency_auto = max_frequency_asic;
-
-                    if(last_core_voltage_auto >= max_voltage_asic)
-                        last_core_voltage_auto = max_voltage_asic;
-
-                    } else if (power_management->fan_perc >= autotune_fan_limit || power_management->power >= autotune_power_limit || power_management->chip_temp_avg >= max_asic_temperatur) {
-                        if(power_management->chip_temp_avg < max_asic_temperatur)
-                        {
-                        if (last_hashrate_auto > sys_module->current_hashrate)
-                            last_asic_frequency_auto -= autotune_step;
-                        else
-                            last_core_voltage_auto -= autotune_step;
                         }
-                        else
-                        {
+
+                        if (last_asic_frequency_auto >= max_frequency_asic)
+                            last_asic_frequency_auto = max_frequency_asic;
+
+                        if (last_core_voltage_auto >= max_voltage_asic)
+                            last_core_voltage_auto = max_voltage_asic;
+                            
+                    } else if (power_management->fan_perc >= autotune_fan_limit ||
+                               power_management->power >= autotune_power_limit ||
+                               power_management->chip_temp_avg >= max_asic_temperatur) {
+                        if (power_management->chip_temp_avg < max_asic_temperatur) {
+                            if (last_hashrate_auto < sys_module->current_hashrate) {
+                                last_asic_frequency_auto -= autotune_step;
+                        } else {
+                                last_core_voltage_auto -= autotune_step;
+                            }
+                        } else {
                             last_asic_frequency_auto -= autotune_step;
-                            last_core_voltage_auto -= autotune_step*2;
+                            last_core_voltage_auto -= autotune_step * 2;
                         }
                     }
                     ESP_LOGI(TAG, "\n######### \n       voltage:%u frequency:%u hash last/cur:%f %f \n#########",
@@ -194,9 +199,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                         last_hashrate_auto = sys_module->current_hashrate;
                     else
                         last_hashrate_auto = 0.93 * last_hashrate_auto + 0.07 * sys_module->current_hashrate;
-                } else {
-                    auto_tune_counter++;
                 }
+            } else {
+                auto_tune_counter++;
             }
             core_voltage = last_core_voltage_auto;
             asic_frequency = last_asic_frequency_auto;
