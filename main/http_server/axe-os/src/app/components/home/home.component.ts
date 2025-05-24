@@ -1,4 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
+import { Chart } from 'chart.js';
+import { ChartModule, UIChart } from 'primeng/chart';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
@@ -39,12 +41,15 @@ export class HomeComponent {
   public activePoolPort!: number;
   public activePoolUser!: string;
   public activePoolLabel!: 'Primary' | 'Fallback';
+  @ViewChild('chart')
+  private chart?: UIChart
 
   constructor(
     private systemService: SystemService,
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
-    private shareRejectReasonsService: ShareRejectionExplanationService
+    private shareRejectReasonsService: ShareRejectionExplanationService,
+
   ) {
     this.initializeChart();
 
@@ -115,7 +120,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'Hashrate',
-          data: [],
+          data: this.hashrateData,
           backgroundColor: primaryColor + '30',
           borderColor: primaryColor,
           tension: 0,
@@ -128,7 +133,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'ASIC Temp',
-          data: [],
+          data: this.temperatureData,
           fill: false,
           backgroundColor: textColorSecondary,
           borderColor: textColorSecondary,
@@ -141,7 +146,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'ASIC Freq',
-          data: [],
+          data: this.mhzData,
           fill: false,
           backgroundColor: mhzColor,
           borderColor: mhzColor,
@@ -154,7 +159,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'ASIC Volt',
-          data: [],
+          data: this.coreVoltageData,
           fill: false,
           backgroundColor: coreVoltageColor,
           borderColor: coreVoltageColor,
@@ -168,7 +173,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'Fan',
-          data: [],
+          data: this.fanspeed,
           fill: false,
           backgroundColor: fanspeedColor,
           borderColor: fanspeedColor,
@@ -304,6 +309,17 @@ export class HomeComponent {
       }
     };
 
+    this.chartData.labels = this.dataLabel;
+    this.chartData.datasets[0].data = this.hashrateData;
+    this.chartData.datasets[1].data = this.temperatureData;
+    this.chartData.datasets[2].data = this.mhzData;
+    this.chartData.datasets[3].data = this.coreVoltageData;
+    this.chartData.datasets[4].data = this.fanspeed;
+
+    this.chartData = {
+      ...this.chartData
+    };
+
 
     this.info$ = interval(5000).pipe(
       startWith(() => this.systemService.getInfo()),
@@ -332,16 +348,7 @@ export class HomeComponent {
             this.fanspeed.shift();
           }
 
-          this.chartData.labels = this.dataLabel;
-          this.chartData.datasets[0].data = this.hashrateData;
-          this.chartData.datasets[1].data = this.temperatureData;
-          this.chartData.datasets[2].data = this.mhzData;
-          this.chartData.datasets[3].data = this.coreVoltageData;
-          this.chartData.datasets[4].data = this.fanspeed;
-
-          this.chartData = {
-            ...this.chartData
-          };
+          this.chart?.refresh();
         }
 
         this.maxPower = Math.max(info.maxPower, info.power);
@@ -406,9 +413,9 @@ export class HomeComponent {
     // Calculate efficiency for each data point and average them
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
-      return power / (hashrate/1000000000000); // Convert to J/TH
+      return power / (hashrate / 1000000000000); // Convert to J/TH
     });
 
     return this.calculateAverage(efficiencies);
-  }  
+  }
 }
