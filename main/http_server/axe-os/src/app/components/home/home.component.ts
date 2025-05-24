@@ -25,6 +25,7 @@ export class HomeComponent {
   public mhzData: number[] = [];
   public coreVoltageData: number[] = [];
   public powerData: number[] = [];
+  public fanspeed: number[] = [];
   public chartData?: any;
 
   public maxPower: number = 0;
@@ -59,8 +60,9 @@ export class HomeComponent {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
-    const mhzColor = documentStyle.getPropertyValue('--surface-50');
-    const coreVoltageColor = documentStyle.getPropertyValue('--surface-100');
+    const mhzColor = documentStyle.getPropertyValue('--green-800');
+    const coreVoltageColor = documentStyle.getPropertyValue('--yellow-700');
+    const fanspeedColor = documentStyle.getPropertyValue('--indigo-600');
 
     // Update chart colors
     if (this.chartData && this.chartData.datasets) {
@@ -72,6 +74,8 @@ export class HomeComponent {
       this.chartData.datasets[2].borderColor = mhzColor;
       this.chartData.datasets[3].backgroundColor = coreVoltageColor;
       this.chartData.datasets[3].borderColor = coreVoltageColor;
+      this.chartData.datasets[4].backgroundColor = fanspeedColor;
+      this.chartData.datasets[4].borderColor = fanspeedColor;
     }
 
     // Update chart options
@@ -87,6 +91,8 @@ export class HomeComponent {
       this.chartOptions.scales.y3.grid.color = surfaceBorder;
       this.chartOptions.scales.y4.ticks.color = coreVoltageColor;
       this.chartOptions.scales.y4.grid.color = surfaceBorder;
+      this.chartOptions.scales.y5.ticks.color = fanspeedColor;
+      this.chartOptions.scales.y5.grid.color = surfaceBorder;
     }
 
     // Force chart update
@@ -99,8 +105,9 @@ export class HomeComponent {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
-    const mhzColor = documentStyle.getPropertyValue('--surface-50');
-    const coreVoltageColor = documentStyle.getPropertyValue('--surface-100');
+    const mhzColor = documentStyle.getPropertyValue('--green-800');
+    const coreVoltageColor = documentStyle.getPropertyValue('--yellow-700');
+    const fanspeedColor = documentStyle.getPropertyValue('--indigo-600');
 
     this.chartData = {
       labels: [],
@@ -112,11 +119,11 @@ export class HomeComponent {
           backgroundColor: primaryColor + '30',
           borderColor: primaryColor,
           tension: 0,
-          pointRadius: 2,
-          pointHoverRadius: 5,
+          pointRadius: 0,
+          pointHoverRadius: 1,
           borderWidth: 1,
           yAxisID: 'y',
-          fill: true,
+          fill: false,
         },
         {
           type: 'line',
@@ -126,8 +133,8 @@ export class HomeComponent {
           backgroundColor: textColorSecondary,
           borderColor: textColorSecondary,
           tension: 0,
-          pointRadius: 2,
-          pointHoverRadius: 5,
+          pointRadius: 0,
+          pointHoverRadius: 1,
           borderWidth: 1,
           yAxisID: 'y2',
         },
@@ -139,8 +146,8 @@ export class HomeComponent {
           backgroundColor: mhzColor,
           borderColor: mhzColor,
           tension: 0,
-          pointRadius: 2,
-          pointHoverRadius: 5,
+          pointRadius: 0,
+          pointHoverRadius: 1,
           borderWidth: 1,
           yAxisID: 'y3',
         },
@@ -152,10 +159,24 @@ export class HomeComponent {
           backgroundColor: coreVoltageColor,
           borderColor: coreVoltageColor,
           tension: 0,
-          pointRadius: 2,
-          pointHoverRadius: 5,
+          pointRadius: 0,
+          pointHoverRadius: 1,
           borderWidth: 1,
           yAxisID: 'y4',
+        }
+        ,
+        {
+          type: 'line',
+          label: 'Fan',
+          data: [],
+          fill: false,
+          backgroundColor: fanspeedColor,
+          borderColor: fanspeedColor,
+          tension: 0,
+          pointRadius: 1,
+          pointHoverRadius: 1,
+          borderWidth: 1,
+          yAxisID: 'y5',
         }
       ]
     };
@@ -184,6 +205,9 @@ export class HomeComponent {
               }
               else if (tooltipItem.dataset.label === 'ASIC Volt') {
                 label += tooltipItem.raw + 'mv';
+              }
+              else if (tooltipItem.dataset.label === 'Fan') {
+                label += tooltipItem.raw + '%';
               }
               else {
                 label += HashSuffixPipe.transform(tooltipItem.raw);
@@ -219,6 +243,7 @@ export class HomeComponent {
           }
         },
         y2: {
+          drawOnChartArea: false,
           type: 'linear',
           display: true,
           position: 'right',
@@ -261,6 +286,21 @@ export class HomeComponent {
           },
           suggestedMax: 800
         }
+        ,
+        y5: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          ticks: {
+            color: coreVoltageColor,
+            callback: (value: number) => value + '%'
+          },
+          grid: {
+            drawOnChartArea: false,
+            color: surfaceBorder
+          },
+          suggestedMax: 100
+        }
       }
     };
 
@@ -278,6 +318,7 @@ export class HomeComponent {
           this.mhzData.push(info.frequency);
           this.coreVoltageData.push(info.coreVoltage);
           this.powerData.push(info.power);
+          this.fanspeed.push(info.fanspeed);
 
           this.dataLabel.push(new Date().getTime());
 
@@ -288,6 +329,7 @@ export class HomeComponent {
             this.coreVoltageData.shift();
             this.powerData.shift();
             this.dataLabel.shift();
+            this.fanspeed.shift();
           }
 
           this.chartData.labels = this.dataLabel;
@@ -295,6 +337,7 @@ export class HomeComponent {
           this.chartData.datasets[1].data = this.temperatureData;
           this.chartData.datasets[2].data = this.mhzData;
           this.chartData.datasets[3].data = this.coreVoltageData;
+          this.chartData.datasets[4].data = this.fanspeed;
 
           this.chartData = {
             ...this.chartData
