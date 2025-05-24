@@ -237,7 +237,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                             }
                         } else {
                             last_asic_frequency_auto -= autotune_step;
-                            last_core_voltage_auto -= autotune_step * 2;
+                            last_core_voltage_auto -= autotune_step;
                         }
                     }
                     ESP_LOGI(TAG, "\n######### \n       voltage:%u frequency:%u hash last/cur:%f %f \n#########",
