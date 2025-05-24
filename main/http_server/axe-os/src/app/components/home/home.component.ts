@@ -1,7 +1,7 @@
 import { Component, ViewChild } from '@angular/core';
 import { Chart } from 'chart.js';
 import { ChartModule, UIChart } from 'primeng/chart';
-import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
+import { interval, map, min, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
@@ -274,7 +274,9 @@ export class HomeComponent {
           grid: {
             color: surfaceBorder,
             drawBorder: false
-          }
+          },
+          min:0,
+          suggestedMax:3000000000000
         },
         y2: {
           drawOnChartArea: false,
@@ -333,17 +335,21 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          suggestedMax: 100
+          suggestedMax: 100,
+          min:0
         },
         y6: {
           ticks: {
             color: avghashColor,
-            callback: (value: number) => HashSuffixPipe.transform(value)
+            display: true,
+            callback: (value: number) => ''
           },
           grid: {
             color: surfaceBorder,
             drawOnChartArea: false,
-          }
+          },
+          min:0,
+          suggestedMax: 3000000000000
         }
       }
     };
