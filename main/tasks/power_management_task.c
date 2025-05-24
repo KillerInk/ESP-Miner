@@ -163,7 +163,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             // auto tune starts when 50xtimes this got called and its hashing
             if (sys_module->current_hashrate > 0 && pid_control_fanspeed && auto_tune_counter > 50) {
                 // enter when its tick time or emergency due high asic temp
-                if (auto_tune_counter >= autotune_read_tick || power_management->chip_temp_avg >= max_asic_temperatur) {
+                if (auto_tune_counter >= 53 || power_management->chip_temp_avg >= max_asic_temperatur ||
+                    power_management->fan_perc > autotune_fan_limit) {
                     auto_tune_counter = 51;
                     // speed up if fan ist below max fan limit -2. in that 2%range do nothing, most time happy hashing.
                     if (power_management->fan_perc < autotune_fan_limit - 2 && power_management->power < autotune_power_limit) {
@@ -211,24 +212,24 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     // we hit a limit
                     else if (power_management->fan_perc >= autotune_fan_limit || power_management->power >= autotune_power_limit ||
                              power_management->chip_temp_avg >= max_asic_temperatur) {
-                        // fan limit reached do normal throttle, asic is in temp range 
+                        // fan limit reached do normal throttle, asic is in temp range
                         if (power_management->chip_temp_avg < max_asic_temperatur) {
-                            //hasrate increasing
+                            // hasrate increasing
                             if (last_hashrate_auto < sys_module->current_hashrate) {
-                                //last set was frequency
+                                // last set was frequency
                                 if (!lastVoltageSet) {
                                     // decrease core voltage and hope that it helps to keep hashrate up
                                     last_core_voltage_auto -= autotune_step - 1;
                                 } else {
-                                    //decrase frequency
+                                    // decrase frequency
                                     last_asic_frequency_auto -= autotune_step;
                                 }
                             }
-                            //hashrate decrease 
+                            // hashrate decrease
                             else {
-                                //last set was voltage
+                                // last set was voltage
                                 if (lastVoltageSet) {
-                                    //undo voltage
+                                    // undo voltage
                                     last_core_voltage_auto -= autotune_step - 1;
                                 } else {
                                     last_asic_frequency_auto -= autotune_step;
@@ -241,14 +242,16 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     }
                     ESP_LOGI(TAG, "\n######### \n       voltage:%u frequency:%u hash last/cur:%f %f \n#########",
                              last_core_voltage_auto, last_asic_frequency_auto, last_hashrate_auto, sys_module->current_hashrate);
-                    if (last_hashrate_auto == 0)
-                        last_hashrate_auto = sys_module->current_hashrate;
-                    else
-                        last_hashrate_auto = 0.93 * last_hashrate_auto + 0.07 * sys_module->current_hashrate;
-                }
+
+                } else
+                    auto_tune_counter++;
             } else {
                 auto_tune_counter++;
             }
+            if (last_hashrate_auto == 0)
+                last_hashrate_auto = sys_module->current_hashrate;
+            else
+                last_hashrate_auto = 0.93 * last_hashrate_auto + 0.07 * sys_module->current_hashrate;
             core_voltage = last_core_voltage_auto;
             asic_frequency = last_asic_frequency_auto;
         }
