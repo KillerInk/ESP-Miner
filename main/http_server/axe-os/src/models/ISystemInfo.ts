@@ -57,5 +57,6 @@ export interface ISystemInfo {
     boardtemp2?: number,
     overheat_mode: number,
     power_fault?: string
-    overclockEnabled?: number
+    overclockEnabled?: number,
+    avghashRate: number
 }

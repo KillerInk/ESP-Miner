@@ -252,6 +252,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 last_hashrate_auto = sys_module->current_hashrate;
             else
                 last_hashrate_auto = 0.93 * last_hashrate_auto + 0.07 * sys_module->current_hashrate;
+            sys_module->avg_hashrate = last_hashrate_auto;
             core_voltage = last_core_voltage_auto;
             asic_frequency = last_asic_frequency_auto;
         }

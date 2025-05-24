@@ -29,6 +29,7 @@ export class HomeComponent {
   public powerData: number[] = [];
   public fanspeed: number[] = [];
   public chartData?: any;
+  public avghashrateData: number[] = [];
 
   public maxPower: number = 0;
   public nominalVoltage: number = 0;
@@ -68,6 +69,8 @@ export class HomeComponent {
     const mhzColor = documentStyle.getPropertyValue('--green-800');
     const coreVoltageColor = documentStyle.getPropertyValue('--yellow-700');
     const fanspeedColor = documentStyle.getPropertyValue('--indigo-600');
+    const avghashColor = documentStyle.getPropertyValue('--pink-300');
+    
 
     // Update chart colors
     if (this.chartData && this.chartData.datasets) {
@@ -81,6 +84,8 @@ export class HomeComponent {
       this.chartData.datasets[3].borderColor = coreVoltageColor;
       this.chartData.datasets[4].backgroundColor = fanspeedColor;
       this.chartData.datasets[4].borderColor = fanspeedColor;
+      this.chartData.datasets[5].borderColor = avghashColor;
+      this.chartData.datasets[5].backgroundColor = avghashColor;
     }
 
     // Update chart options
@@ -98,6 +103,8 @@ export class HomeComponent {
       this.chartOptions.scales.y4.grid.color = surfaceBorder;
       this.chartOptions.scales.y5.ticks.color = fanspeedColor;
       this.chartOptions.scales.y5.grid.color = surfaceBorder;
+      this.chartOptions.scales.y6.ticks.color = avghashColor;
+      this.chartOptions.scales.y6.grid.color = surfaceBorder;
     }
 
     // Force chart update
@@ -113,6 +120,7 @@ export class HomeComponent {
     const mhzColor = documentStyle.getPropertyValue('--green-800');
     const coreVoltageColor = documentStyle.getPropertyValue('--yellow-700');
     const fanspeedColor = documentStyle.getPropertyValue('--indigo-600');
+    const avghashColor = documentStyle.getPropertyValue('--pink-300');
 
     this.chartData = {
       labels: [],
@@ -182,6 +190,19 @@ export class HomeComponent {
           pointHoverRadius: 1,
           borderWidth: 1,
           yAxisID: 'y5',
+        },
+        {
+          type: 'line',
+          label: 'AvgHashrate',
+          data: this.hashrateData,
+          backgroundColor: avghashColor + '30',
+          borderColor: avghashColor,
+          tension: 0,
+          pointRadius: 1,
+          pointHoverRadius: 1,
+          borderWidth: 1,
+          yAxisID: 'y6',
+          fill: false,
         }
       ]
     };
@@ -189,6 +210,11 @@ export class HomeComponent {
     this.chartOptions = {
       animation: false,
       maintainAspectRatio: false,
+       interaction: {
+            mode: 'nearest',
+            axis: 'x',
+            intersect: false
+        },
       plugins: {
         legend: {
           labels: {
@@ -213,6 +239,9 @@ export class HomeComponent {
               }
               else if (tooltipItem.dataset.label === 'Fan') {
                 label += tooltipItem.raw + '%';
+              }
+              else if (tooltipItem.dataset.label === 'AvgHashrate') {
+                label += HashSuffixPipe.transform(tooltipItem.raw);
               }
               else {
                 label += HashSuffixPipe.transform(tooltipItem.raw);
@@ -305,6 +334,16 @@ export class HomeComponent {
             color: surfaceBorder
           },
           suggestedMax: 100
+        },
+        y6: {
+          ticks: {
+            color: avghashColor,
+            callback: (value: number) => HashSuffixPipe.transform(value)
+          },
+          grid: {
+            color: surfaceBorder,
+            drawOnChartArea: false,
+          }
         }
       }
     };
@@ -315,6 +354,7 @@ export class HomeComponent {
     this.chartData.datasets[2].data = this.mhzData;
     this.chartData.datasets[3].data = this.coreVoltageData;
     this.chartData.datasets[4].data = this.fanspeed;
+    this.chartData.datasets[5].data = this.avghashrateData;
 
     this.chartData = {
       ...this.chartData
@@ -335,6 +375,7 @@ export class HomeComponent {
           this.coreVoltageData.push(info.coreVoltage);
           this.powerData.push(info.power);
           this.fanspeed.push(info.fanspeed);
+          this.avghashrateData.push(info.avghashRate * 1000000000);
 
           this.dataLabel.push(new Date().getTime());
 
@@ -346,6 +387,7 @@ export class HomeComponent {
             this.powerData.shift();
             this.dataLabel.shift();
             this.fanspeed.shift();
+            this.avghashrateData.shift();
           }
 
           this.chart?.refresh();
