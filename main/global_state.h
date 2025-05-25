@@ -109,4 +109,6 @@ typedef struct
     bool psram_is_available;
 } GlobalState;
 
+extern GlobalState GLOBAL_STATE;
+
 #endif /* GLOBAL_STATE_H_ */

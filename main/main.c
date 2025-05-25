@@ -21,7 +21,7 @@
 #include "driver/gpio.h"
 #include "device_config.h"
 
-static GlobalState GLOBAL_STATE = {
+GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
     .extranonce_2_len = 0, 
     .abandon_work = 0, 
@@ -82,7 +82,7 @@ void app_main(void)
     GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
 
-    xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, NULL,10, NULL);
 
     //start the API for AxeOS
     start_rest_server((void *) &GLOBAL_STATE);
@@ -113,8 +113,8 @@ void app_main(void)
 
     GLOBAL_STATE.ASIC_initalized = true;
 
-    xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
-    xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
+    xTaskCreate(stratum_task, "stratum admin", 8192, NULL, 5, NULL);
+    xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
+    xTaskCreate(ASIC_task, "asic", 8192, NULL, 10, NULL);
+    xTaskCreate(ASIC_result_task, "asic result", 8192, NULL, 15, NULL);
 }

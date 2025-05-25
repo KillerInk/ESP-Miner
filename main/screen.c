@@ -38,7 +38,6 @@ static screen_t current_screen = -1;
 static int current_screen_time_ms;
 static int current_screen_delay_ms;
 
-static GlobalState * GLOBAL_STATE;
 
 static lv_obj_t *asic_status_label;
 
@@ -296,11 +295,11 @@ static void screen_update_cb(lv_timer_t * timer)
         }
     }
 
-    if (GLOBAL_STATE->SELF_TEST_MODULE.active) {
+    if (GLOBAL_STATE.SELF_TEST_MODULE.active) {
 
         screen_show(SCR_SELF_TEST);
 
-        SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
+        SelfTestModule * self_test = &GLOBAL_STATE.SELF_TEST_MODULE;
 
         lv_label_set_text(self_test_message_label, self_test->message);
 
@@ -317,18 +316,18 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update) {
-        if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
-            lv_label_set_text(firmware_update_scr_filename_label, GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename);
+    if (GLOBAL_STATE.SYSTEM_MODULE.is_firmware_update) {
+        if (strcmp(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_filename_label, GLOBAL_STATE.SYSTEM_MODULE.firmware_update_filename);
         }
-        if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
-            lv_label_set_text(firmware_update_scr_status_label, GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status);
+        if (strcmp(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_status_label, GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status);
         }
         screen_show(SCR_FIRMWARE_UPDATE);
         return;
     }
 
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
 
     if (module->asic_status) {
         lv_label_set_text(asic_status_label, module->asic_status);
@@ -362,7 +361,7 @@ static void screen_update_cb(lv_timer_t * timer)
 
     current_screen_time_ms += SCREEN_UPDATE_MS;
 
-    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    PowerManagementModule * power_management = &GLOBAL_STATE.POWER_MANAGEMENT_MODULE;
 
     char *pool_url = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
     if (strcmp(lv_label_get_text(mining_url_scr_urls_label), pool_url) != 0) {
@@ -422,10 +421,10 @@ void screen_next()
 
 esp_err_t screen_start(void * pvParameters)
 {
-    GLOBAL_STATE = (GlobalState *) pvParameters;
+    
 
-    if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
-        SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    if (GLOBAL_STATE.SYSTEM_MODULE.is_screen_active) {
+        SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
 
         screens[SCR_SELF_TEST] = create_scr_self_test();
         screens[SCR_OVERHEAT] = create_scr_overheat(module);
@@ -433,7 +432,7 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_CONFIGURE] = create_scr_configure(module);
         screens[SCR_FIRMWARE_UPDATE] = create_scr_ota(module);
         screens[SCR_CONNECTION] = create_scr_connection(module);
-        screens[SCR_BITAXE_LOGO] = create_scr_bitaxe_logo(GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version);
+        screens[SCR_BITAXE_LOGO] = create_scr_bitaxe_logo(GLOBAL_STATE.DEVICE_CONFIG.family.name, GLOBAL_STATE.DEVICE_CONFIG.board_version);
         screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
         screens[SCR_URLS] = create_scr_urls(module);
         screens[SCR_STATS] = create_scr_stats();

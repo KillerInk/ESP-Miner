@@ -14,6 +14,7 @@
 #include "thermal.h"
 #include "vcore.h"
 #include <string.h>
+#include <auto_tune.h>
 
 #define POLL_RATE 1800
 #define MAX_TEMP 90.0
@@ -36,21 +37,12 @@ double pid_p = 4.0;
 double pid_i = 0.2;
 double pid_d = 3.0;
 
-double autotune_power_limit = 38.;
-uint16_t autotune_fan_limit = 80;
-uint8_t autotune_step = 2;
-uint8_t autotune_read_tick = 1;
-const uint16_t max_voltage_asic = 1400;
-const uint16_t max_frequency_asic = 1000;
-const uint8_t max_asic_temperatur = 65;
-
 PIDController pid;
 
 void POWER_MANAGEMENT_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
 
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     // Initialize PID controller
     pid_setPoint = (double) nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
@@ -61,8 +53,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     pid_set_controller_direction(&pid, PID_REVERSE);
     pid_initialize(&pid);
 
-    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-    SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
+    PowerManagementModule * power_management = &GLOBAL_STATE.POWER_MANAGEMENT_MODULE;
+    SystemModule * sys_module = &GLOBAL_STATE.SYSTEM_MODULE;
 
     power_management->frequency_multiplier = 1;
 
@@ -72,26 +64,21 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
     uint16_t last_asic_frequency = power_management->frequency_value;
-    uint16_t last_core_voltage_auto = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-    power_management->core_voltage = last_core_voltage_auto;
-    uint16_t last_asic_frequency_auto = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    double last_hashrate_auto = sys_module->current_hashrate;
     bool auto_tune_hashrate = true;
-    uint8_t auto_tune_counter = 0;
-    bool lastVoltageSet = false;
+    auto_tune_init();
 
     while (1) {
 
         // Refresh PID setpoint from NVS in case it was changed via API
         pid_setPoint = (double) nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
 
-        power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
-        power_management->power = Power_get_power(GLOBAL_STATE);
+        power_management->voltage = Power_get_input_voltage();
+        power_management->power = Power_get_power();
 
-        power_management->fan_rpm = Thermal_get_fan_speed(GLOBAL_STATE->DEVICE_CONFIG);
-        power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
+        power_management->fan_rpm = Thermal_get_fan_speed(GLOBAL_STATE.DEVICE_CONFIG);
+        power_management->chip_temp_avg = Thermal_get_chip_temp();
 
-        power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
+        power_management->vr_temp = Power_get_vreg_temp();
 
         // ASIC Thermal Diode will give bad readings if the ASIC is turned off
         // if(power_management->voltage < tps546_config.TPS546_INIT_VOUT_MIN){
@@ -104,10 +91,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             auto_tune_hashrate = false;
             ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg);
             power_management->fan_perc = 100;
-            Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, 1);
+            Thermal_set_fan_percent(GLOBAL_STATE.DEVICE_CONFIG, 1);
 
             // Turn off core voltage
-            VCORE_set_voltage(0.0f, GLOBAL_STATE);
+            VCORE_set_voltage(0.0f);
 
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
             nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
@@ -124,15 +111,15 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 pid_input = power_management->chip_temp_avg;
                 pid_compute(&pid);
                 power_management->fan_perc = (uint16_t) pid_output;
-                Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, pid_output / 100.0);
+                Thermal_set_fan_percent(GLOBAL_STATE.DEVICE_CONFIG, pid_output / 100.0);
                 ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%%", pid_input, pid_setPoint, pid_output);
             } else {
                 // Set fan to 70% in AP mode when temperature reading is invalid
-                if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled) {
+                if (GLOBAL_STATE.SYSTEM_MODULE.ap_enabled) {
                     ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%",
                              power_management->chip_temp_avg);
                     power_management->fan_perc = 70;
-                    Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, 0.7);
+                    Thermal_set_fan_percent(GLOBAL_STATE.DEVICE_CONFIG, 0.7);
                 } else {
                     ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f°C", power_management->chip_temp_avg);
                 }
@@ -140,7 +127,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         } else {
             float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
             power_management->fan_perc = fs;
-            Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, (float) fs / 100.0);
+            Thermal_set_fan_percent(GLOBAL_STATE.DEVICE_CONFIG, (float) fs / 100.0);
         }
 
         // Read the state of plug sense pin
@@ -160,106 +147,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
             asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
         } else {
-            // auto tune starts when 50xtimes this got called and its hashing
-            if (sys_module->current_hashrate > 0 && pid_control_fanspeed && auto_tune_counter > 50) {
-                // enter when its tick time or emergency due high asic temp
-                if (auto_tune_counter >= 53 || power_management->chip_temp_avg >= max_asic_temperatur ||
-                    power_management->fan_perc > autotune_fan_limit) {
-                    auto_tune_counter = 51;
-                    // speed up if fan ist below max fan limit -2. in that 2%range do nothing, most time happy hashing.
-                    if (power_management->fan_perc < autotune_fan_limit - 2 && power_management->power < autotune_power_limit) {
-                        // current hash is higher then the old one
-                        if (last_hashrate_auto < sys_module->current_hashrate) {
-                            // last step was frequency step increase again
-                            if (!lastVoltageSet) {
-                                last_asic_frequency_auto += autotune_step;
-                            }
-                            // last set was to core voltage
-                            else {
-                                last_core_voltage_auto += autotune_step - 1;
-                            }
-                        }
-                        // hash rate decrased with last set
-                        else {
-                            // last set was voltage, increase now frequency
-                            if (lastVoltageSet) {
-                                last_asic_frequency_auto += autotune_step;
-                                lastVoltageSet = false;
-                            }
-                            // last set was to frequency, increase voltage
-                            else {
-                                last_core_voltage_auto += autotune_step - 1;
-                                lastVoltageSet = true;
-                            }
-                        }
-
-                        if (last_asic_frequency_auto >= max_frequency_asic) {
-                            last_asic_frequency_auto = max_frequency_asic;
-                            last_core_voltage_auto += autotune_step - 1;
-                            lastVoltageSet = true;
-                        }
-
-                        if (last_core_voltage_auto >= max_voltage_asic) {
-                            last_core_voltage_auto = max_voltage_asic;
-                            last_asic_frequency_auto += autotune_step;
-                            lastVoltageSet = false;
-                        }
-
-                        if (last_asic_frequency_auto >= max_frequency_asic)
-                            last_asic_frequency_auto = max_frequency_asic;
-
-                    }
-                    // we hit a limit
-                    else if (power_management->fan_perc >= autotune_fan_limit || power_management->power >= autotune_power_limit ||
-                             power_management->chip_temp_avg >= max_asic_temperatur) {
-                        // fan limit reached do normal throttle, asic is in temp range
-                        if (power_management->chip_temp_avg < max_asic_temperatur) {
-                            // hasrate increasing
-                            if (last_hashrate_auto < sys_module->current_hashrate) {
-                                // last set was frequency
-                                if (!lastVoltageSet) {
-                                    // decrease core voltage and hope that it helps to keep hashrate up
-                                    last_core_voltage_auto -= autotune_step - 1;
-                                } else {
-                                    // decrase frequency
-                                    last_asic_frequency_auto -= autotune_step;
-                                }
-                            }
-                            // hashrate decrease
-                            else {
-                                // last set was voltage
-                                if (lastVoltageSet) {
-                                    // undo voltage
-                                    last_core_voltage_auto -= autotune_step - 1;
-                                } else {
-                                    last_asic_frequency_auto -= autotune_step;
-                                }
-                            }
-                        } else {
-                            last_asic_frequency_auto -= autotune_step;
-                            last_core_voltage_auto -= autotune_step;
-                        }
-                    }
-                    ESP_LOGI(TAG, "\n######### \n       voltage:%u frequency:%u hash last/cur:%f %f \n#########",
-                             last_core_voltage_auto, last_asic_frequency_auto, last_hashrate_auto, sys_module->current_hashrate);
-
-                } else
-                    auto_tune_counter++;
-            } else {
-                auto_tune_counter++;
-            }
-            if (last_hashrate_auto == 0)
-                last_hashrate_auto = sys_module->current_hashrate;
-            else
-                last_hashrate_auto = 0.93 * last_hashrate_auto + 0.07 * sys_module->current_hashrate;
-            sys_module->avg_hashrate = last_hashrate_auto;
-            core_voltage = last_core_voltage_auto;
-            asic_frequency = last_asic_frequency_auto;
+            auto_tune(pid_control_fanspeed);
+            core_voltage = auto_tune_get_voltage();
+            asic_frequency = auto_tune_get_frequency();
         }
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
-            VCORE_set_voltage((double) core_voltage / 1000.0, GLOBAL_STATE);
+            VCORE_set_voltage((double) core_voltage / 1000.0);
             last_core_voltage = core_voltage;
             power_management->core_voltage = core_voltage;
         }
@@ -267,7 +162,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         if (asic_frequency != last_asic_frequency) {
             ESP_LOGI(TAG, "New ASIC frequency requested: %uMHz (current: %uMHz)", asic_frequency, last_asic_frequency);
 
-            bool success = ASIC_set_frequency(GLOBAL_STATE, (float) asic_frequency);
+            bool success = ASIC_set_frequency((float) asic_frequency);
 
             if (success) {
                 power_management->frequency_value = (float) asic_frequency;
@@ -284,7 +179,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             ESP_LOGI(TAG, "Overheat mode updated to: %d", sys_module->overheat_mode);
         }
 
-        VCORE_check_fault(GLOBAL_STATE);
+        VCORE_check_fault();
 
         // looper:
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);

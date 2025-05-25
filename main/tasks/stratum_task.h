@@ -7,6 +7,6 @@ typedef struct
 } SystemTaskModule;
 
 void stratum_task(void *pvParameters);
-void stratum_close_connection(GlobalState * GLOBAL_STATE);
+void stratum_close_connection();
 
 #endif

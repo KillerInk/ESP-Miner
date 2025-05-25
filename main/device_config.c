@@ -10,7 +10,6 @@ static const char * TAG = "device_config";
 
 esp_err_t device_config_init(void * pvParameters)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     // TODO: Read board version from eFuse
 
@@ -18,11 +17,11 @@ esp_err_t device_config_init(void * pvParameters)
 
     for (int i = 0 ; i < ARRAY_SIZE(default_configs); i++) {
         if (strcmp(default_configs[i].board_version, board_version) == 0) {
-            GLOBAL_STATE->DEVICE_CONFIG = default_configs[i];
+            GLOBAL_STATE.DEVICE_CONFIG = default_configs[i];
 
-            ESP_LOGI(TAG, "Device Model: %s", GLOBAL_STATE->DEVICE_CONFIG.family.name);
-            ESP_LOGI(TAG, "Board Version: %s", GLOBAL_STATE->DEVICE_CONFIG.board_version);
-            ESP_LOGI(TAG, "ASIC: %dx %s (%d cores)", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name, GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count);
+            ESP_LOGI(TAG, "Device Model: %s", GLOBAL_STATE.DEVICE_CONFIG.family.name);
+            ESP_LOGI(TAG, "Board Version: %s", GLOBAL_STATE.DEVICE_CONFIG.board_version);
+            ESP_LOGI(TAG, "ASIC: %dx %s (%d cores)", GLOBAL_STATE.DEVICE_CONFIG.family.asic_count, GLOBAL_STATE.DEVICE_CONFIG.family.asic.name, GLOBAL_STATE.DEVICE_CONFIG.family.asic.core_count);
 
             free(board_version);
             return ESP_OK;

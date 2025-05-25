@@ -43,20 +43,20 @@ uint16_t Thermal_get_fan_speed(DeviceConfig device_config)
     return 0;
 }
 
-float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE) 
+float Thermal_get_chip_temp() 
 {
-    if (!GLOBAL_STATE->ASIC_initalized) {
+    if (!GLOBAL_STATE.ASIC_initalized) {
         return -1;
     }
 
-    if (GLOBAL_STATE->DEVICE_CONFIG.EMC2101) {
-        if (GLOBAL_STATE->DEVICE_CONFIG.emc_internal_temp) {
+    if (GLOBAL_STATE.DEVICE_CONFIG.EMC2101) {
+        if (GLOBAL_STATE.DEVICE_CONFIG.emc_internal_temp) {
             return EMC2101_get_internal_temp() + INTERNAL_OFFSET;
         } else {
             return EMC2101_get_external_temp();
         }
     }
-    if (GLOBAL_STATE->DEVICE_CONFIG.EMC2103) {
+    if (GLOBAL_STATE.DEVICE_CONFIG.EMC2103) {
         return EMC2103_get_external_temp();
     }
     return -1;
