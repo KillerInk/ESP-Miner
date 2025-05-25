@@ -63,7 +63,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
-    uint16_t last_asic_frequency = power_management->frequency_value;
+    uint16_t last_asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    power_management->frequency_value = last_asic_frequency;
     bool auto_tune_hashrate = true;
     auto_tune_init();
 
@@ -71,7 +72,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         // Refresh PID setpoint from NVS in case it was changed via API
         pid_setPoint = (double) nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
-
+        
         power_management->voltage = Power_get_input_voltage();
         power_management->power = Power_get_power();
 
