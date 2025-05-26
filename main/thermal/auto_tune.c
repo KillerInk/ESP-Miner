@@ -8,6 +8,7 @@ static const char * TAG = "auto_tune";
 uint16_t last_core_voltage_auto;
 uint16_t last_asic_frequency_auto;
 double last_hashrate_auto;
+double current_hashrate_auto;
 
 uint8_t auto_tune_counter = 0;
 bool lastVoltageSet = false;
@@ -43,12 +44,13 @@ void auto_tune_init()
     core_voltage = last_core_voltage_auto;
     GLOBAL_STATE.POWER_MANAGEMENT_MODULE.core_voltage = last_core_voltage_auto;
     last_hashrate_auto = GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
+    current_hashrate_auto = last_hashrate_auto;
     state = sleep_bevor_warmup;
 }
 
 bool waitForStartUp(bool pid_control_fanspeed)
 {
-    return GLOBAL_STATE.SYSTEM_MODULE.current_hashrate > 0 && pid_control_fanspeed && auto_tune_counter > 50;
+    return current_hashrate_auto > 0 && pid_control_fanspeed && auto_tune_counter > 50;
 }
 
 bool should_do_work()
@@ -65,14 +67,14 @@ bool can_increase_values()
 
 bool hashrate_increase()
 {
-    return last_hashrate_auto < GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
+    return last_hashrate_auto < current_hashrate_auto;
 }
 
 void respectLimits()
 {
     if (last_asic_frequency_auto >= max_frequency_asic) {
         last_asic_frequency_auto = max_frequency_asic;
-        last_core_voltage_auto += autotune_step - 1;
+        last_core_voltage_auto += autotune_step_volt;
         lastVoltageSet = true;
     }
 
@@ -88,7 +90,7 @@ void respectLimits()
 
 bool limithit()
 {
-    return GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit ||
+    return GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit +3 ||
            GLOBAL_STATE.POWER_MANAGEMENT_MODULE.power >= autotune_power_limit ||
            GLOBAL_STATE.POWER_MANAGEMENT_MODULE.chip_temp_avg >= max_asic_temperatur;
 }
@@ -154,6 +156,7 @@ void decrease_values()
 
 void dowork()
 {
+    
     if (should_do_work()) {
         auto_tune_counter = 51;
         if (can_increase_values()) {
@@ -162,20 +165,21 @@ void dowork()
             if (!critical_limithit()) {
                 decrease_values();
             } else {
-                last_asic_frequency_auto -= autotune_step;
-                last_core_voltage_auto -= autotune_step_volt;
+                last_asic_frequency_auto -= autotune_step*2;
+                last_core_voltage_auto -= autotune_step_volt*2;
             }
         }
         ESP_LOGI(TAG, "\n######### \n       voltage:%u frequency:%u hash last/cur:%f %f \n#########", last_core_voltage_auto,
-                 last_asic_frequency_auto, last_hashrate_auto, GLOBAL_STATE.SYSTEM_MODULE.current_hashrate);
+                 last_asic_frequency_auto, last_hashrate_auto, current_hashrate_auto);
 
     } else {
         auto_tune_counter++;
     }
-    if (last_hashrate_auto == 0)
+    /*if (last_hashrate_auto == 0)
         last_hashrate_auto = GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
     else
-        last_hashrate_auto = 0.93 * last_hashrate_auto + 0.07 * GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
+        last_hashrate_auto = 0.97 * last_hashrate_auto + 0.03 * GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;*/
+    last_hashrate_auto = current_hashrate_auto;
     GLOBAL_STATE.SYSTEM_MODULE.avg_hashrate = last_hashrate_auto;
     core_voltage = last_core_voltage_auto;
     asic_frequency = last_asic_frequency_auto;
@@ -183,6 +187,7 @@ void dowork()
 
 void auto_tune(bool pid_control_fanspeed)
 {
+    current_hashrate_auto = GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
     switch (state) {
     case sleep_bevor_warmup: 
         if (waitForStartUp(pid_control_fanspeed))
