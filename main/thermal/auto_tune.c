@@ -9,6 +9,7 @@ uint16_t last_core_voltage_auto;
 uint16_t last_asic_frequency_auto;
 double last_hashrate_auto;
 double current_hashrate_auto;
+double avg_hashrate_auto;
 
 uint8_t auto_tune_counter = 0;
 bool lastVoltageSet = false;
@@ -175,12 +176,12 @@ void dowork()
     } else {
         auto_tune_counter++;
     }
-    /*if (last_hashrate_auto == 0)
-        last_hashrate_auto = GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
+    if (avg_hashrate_auto == 0)
+        avg_hashrate_auto = GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
     else
-        last_hashrate_auto = 0.97 * last_hashrate_auto + 0.03 * GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;*/
+        avg_hashrate_auto = 0.995 * avg_hashrate_auto + 0.005 * GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
     last_hashrate_auto = current_hashrate_auto;
-    GLOBAL_STATE.SYSTEM_MODULE.avg_hashrate = last_hashrate_auto;
+    GLOBAL_STATE.SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
     core_voltage = last_core_voltage_auto;
     asic_frequency = last_asic_frequency_auto;
 }
