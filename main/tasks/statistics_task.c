@@ -133,6 +133,7 @@ void statistics_task(void * pvParameters)
             statsData.voltage = power_management->voltage;
             statsData.current = Power_get_current(GLOBAL_STATE);
             statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
+            statsData.coreVoltage = power_management->core_voltage;
             statsData.fanSpeed = power_management->fan_perc;
             statsData.fanRPM = power_management->fan_rpm;
             statsData.wifiRSSI = wifiRSSI;
