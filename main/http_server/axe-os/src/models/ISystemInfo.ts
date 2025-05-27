@@ -28,6 +28,7 @@ export interface ISystemInfo {
     macAddr: string,
     ssid: string,
     wifiStatus: string,
+    wifiRSSI: number,
     apEnabled: number,
     sharesAccepted: number,
     sharesRejected: number,
@@ -51,6 +52,8 @@ export interface ISystemInfo {
     fanspeed: number,
     temptarget: number,
     fanrpm: number,
+    statsLimit: number,
+    statsDuration: number,
     coreVoltageActual: number,
 
     boardtemp1?: number,
