@@ -255,7 +255,7 @@ export class HomeComponent {
         x: {
           type: 'time',
           time: {
-            unit: 'hour', // Set the unit to 'minute'
+            unit: 'minute', // Set the unit to 'minute'
           },
           ticks: {
             color: textColorSecondary
@@ -276,7 +276,7 @@ export class HomeComponent {
             drawBorder: false
           },
           min:0,
-          suggestedMax:3000000000000
+          suggestedMax:2000000000000
         },
         y2: {
           drawOnChartArea: false,
@@ -291,7 +291,7 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          suggestedMax: 80
+          suggestedMax: 60
         },
         y3: {
           type: 'linear',
@@ -335,8 +335,6 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          suggestedMax: 100,
-          min:0
         },
         y6: {
           ticks: {
@@ -349,7 +347,7 @@ export class HomeComponent {
             drawOnChartArea: false,
           },
           min:0,
-          suggestedMax: 3000000000000
+          suggestedMax: 2000000000000
         }
       }
     };
