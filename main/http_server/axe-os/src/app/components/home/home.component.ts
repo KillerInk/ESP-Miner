@@ -414,7 +414,7 @@ export class HomeComponent {
           this.avghashrateData.push(info.avghashRate * 1000000000);
           this.dataLabel.push(new Date().getTime());
 
-          if ((this.hashrateData.length) >= 720) {
+          if (this.hashrateData.length >= 720) {
             this.hashrateData.shift();
             this.temperatureData.shift();
             this.mhzData.shift();
@@ -423,7 +423,6 @@ export class HomeComponent {
             this.dataLabel.shift();
             this.fanspeed.shift();
             this.avghashrateData.shift();
-            //}
           }
           this.chart?.refresh();
         }

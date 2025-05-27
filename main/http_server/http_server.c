@@ -686,12 +686,13 @@ int create_json_statistics_all(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltage));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
+                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.avghashrate));
 
                 cJSON_AddItemToArray(statsArray, valueArray);
                 prebuffer++;
