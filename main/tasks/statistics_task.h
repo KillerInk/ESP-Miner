@@ -8,10 +8,12 @@ struct StatisticsData
 {
     int64_t timestamp;
     double hashrate;
+    double avghashrate;
     float chipTemperature;
     float vrTemperature;
     float power;
     float voltage;
+    uint16_t frequency;
     float current;
     int16_t coreVoltageActual;
     uint16_t fanSpeed;

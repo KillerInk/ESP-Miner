@@ -120,7 +120,6 @@ void statistics_task(void * pvParameters)
         struct StatisticsData statsData;
 
         ESP_LOGI(TAG, "Ready!");
-
         TickType_t taskWakeTime = xTaskGetTickCount();
         while (1) {
             int8_t wifiRSSI = -90;
@@ -138,6 +137,8 @@ void statistics_task(void * pvParameters)
             statsData.fanRPM = power_management->fan_rpm;
             statsData.wifiRSSI = wifiRSSI;
             statsData.freeHeap = esp_get_free_heap_size();
+            statsData.frequency = power_management->frequency_value;
+            statsData.avghashrate = sys_module->avg_hashrate;
 
             addStatisticData(&statsData);
 

@@ -29,10 +29,6 @@ export class HomeComponent {
   public coreVoltageData: number[] = [];
   public powerData: number[] = [];
   public fanspeed: number[] = [];
-  public previousDataLabel: number[] = [];
-  public previousHashrateData: number[] = [];
-  public previousTemperatureData: number[] = [];
-  public previousPowerData: number[] = [];
   public chartData?: any;
   public avghashrateData: number[] = [];
 
@@ -365,10 +361,6 @@ export class HomeComponent {
     this.chartData.datasets[4].data = this.fanspeed;
     this.chartData.datasets[5].data = this.avghashrateData;
 
-    this.chartData = {
-      ...this.chartData
-    };
-
     // load previous data
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
     this.stats$.subscribe(stats => {
@@ -377,17 +369,29 @@ export class HomeComponent {
         const idxTemperature = 1;
         const idxPower = 2;
         const idxTimestamp = 3;
+        const idxVoltage = 4;
+        const idxFreqency = 5;
+        const idxFanSpeed = 6;
+        const idxAvgHashrate = 7;
 
-        this.previousHashrateData.push(element[idxHashrate] * 1000000000);
-        this.previousTemperatureData.push(element[idxTemperature]);
-        this.previousPowerData.push(element[idxPower]);
-        this.previousDataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
+        this.hashrateData.push(element[idxHashrate] * 1000000000);
+        this.temperatureData.push(element[idxTemperature]);
+        this.powerData.push(element[idxPower]);
+        this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
+        this.coreVoltageData.push(element[idxVoltage]);
+        this.mhzData.push(element[idxFreqency]);
+        this.fanspeed.push(element[idxFanSpeed]);
+        this.avghashrateData.push(element[idxAvgHashrate]);
 
-        if (this.previousHashrateData.length >= 720) {
-          this.previousHashrateData.shift();
-          this.previousTemperatureData.shift();
-          this.previousPowerData.shift();
-          this.previousDataLabel.shift();
+        if (this.hashrateData.length >= 720) {
+          this.hashrateData.shift();
+          this.temperatureData.shift();
+          this.mhzData.shift();
+          this.coreVoltageData.shift();
+          this.powerData.shift();
+          this.dataLabel.shift();
+          this.fanspeed.shift();
+          this.avghashrateData.shift();
         }
       });
     });
@@ -410,27 +414,17 @@ export class HomeComponent {
           this.avghashrateData.push(info.avghashRate * 1000000000);
           this.dataLabel.push(new Date().getTime());
 
-          if ((this.previousHashrateData.length + this.hashrateData.length) >= 720) {
-            if (this.previousHashrateData.length > 0) {
-              this.previousHashrateData.shift();
-              this.previousTemperatureData.shift();
-              this.previousPowerData.shift();
-              this.previousDataLabel.shift();
-            } else {
-              this.hashrateData.shift();
-              this.temperatureData.shift();
-              this.mhzData.shift();
-              this.coreVoltageData.shift();
-              this.powerData.shift();
-              this.dataLabel.shift();
-              this.fanspeed.shift();
-              this.avghashrateData.shift();
-            }
+          if ((this.hashrateData.length) >= 720) {
+            this.hashrateData.shift();
+            this.temperatureData.shift();
+            this.mhzData.shift();
+            this.coreVoltageData.shift();
+            this.powerData.shift();
+            this.dataLabel.shift();
+            this.fanspeed.shift();
+            this.avghashrateData.shift();
+            //}
           }
-
-          this.chartData.labels = this.previousDataLabel.concat(this.dataLabel);
-          this.chartData.datasets[0].data = this.previousHashrateData.concat(this.hashrateData);
-          this.chartData.datasets[1].data = this.previousTemperatureData.concat(this.temperatureData);
           this.chart?.refresh();
         }
 
