@@ -29,6 +29,7 @@ GlobalState GLOBAL_STATE = {
     .version_mask = 0,
     .ASIC_initalized = false
 };
+SystemModule SYSTEM_MODULE;
 
 static const char * TAG = "bitaxe";
 
@@ -89,11 +90,11 @@ void app_main(void)
     //start the API for AxeOS
     start_rest_server((void *) &GLOBAL_STATE);
 
-    while (!GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
+    while (!SYSTEM_MODULE.is_connected) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
-    ESP_LOGI(TAG, "Connected to SSID: %s", GLOBAL_STATE.SYSTEM_MODULE.ssid);
+    ESP_LOGI(TAG, "Connected to SSID: %s", SYSTEM_MODULE.ssid);
 
     GLOBAL_STATE.new_stratum_version_rolling_msg = false;
 
@@ -105,7 +106,7 @@ void app_main(void)
     SERIAL_init();
 
     if (ASIC_init(&GLOBAL_STATE) == 0) {
-        GLOBAL_STATE.SYSTEM_MODULE.asic_status = "Chip count 0";
+        SYSTEM_MODULE.asic_status = "Chip count 0";
         ESP_LOGE(TAG, "Chip count 0");
         return;
     }

@@ -103,7 +103,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 
     while (1)
     {
-        if (GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback == false) {
+        if (SYSTEM_MODULE.is_using_fallback == false) {
             vTaskDelay(10000 / portTICK_PERIOD_MS);
             continue;
         }
@@ -152,7 +152,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 
         int send_uid = 1;
         STRATUM_V1_subscribe(sock, send_uid++, GLOBAL_STATE.DEVICE_CONFIG.family.asic.name);
-        STRATUM_V1_authenticate(sock, send_uid++, GLOBAL_STATE.SYSTEM_MODULE.pool_user, GLOBAL_STATE.SYSTEM_MODULE.pool_pass);
+        STRATUM_V1_authenticate(sock, send_uid++, SYSTEM_MODULE.pool_user, SYSTEM_MODULE.pool_pass);
 
         char recv_buffer[BUFFER_SIZE];
         memset(recv_buffer, 0, BUFFER_SIZE);
@@ -168,7 +168,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 
         if (strstr(recv_buffer, "mining.notify") != NULL) {
             ESP_LOGI(TAG, "Heartbeat successful and in fallback mode. Switching back to primary.");
-            GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback = false;
+            SYSTEM_MODULE.is_using_fallback = false;
             stratum_close_connection();
             continue;
         }
@@ -180,10 +180,10 @@ void stratum_primary_heartbeat(void * pvParameters)
 void stratum_task(void * pvParameters)
 {
 
-    primary_stratum_url = GLOBAL_STATE.SYSTEM_MODULE.pool_url;
-    primary_stratum_port = GLOBAL_STATE.SYSTEM_MODULE.pool_port;
-    char * stratum_url = GLOBAL_STATE.SYSTEM_MODULE.pool_url;
-    uint16_t port = GLOBAL_STATE.SYSTEM_MODULE.pool_port;
+    primary_stratum_url = SYSTEM_MODULE.pool_url;
+    primary_stratum_port = SYSTEM_MODULE.pool_port;
+    char * stratum_url = SYSTEM_MODULE.pool_url;
+    uint16_t port = SYSTEM_MODULE.pool_port;
 
     STRATUM_V1_initialize_buffer();
     char host_ip[20];
@@ -204,30 +204,30 @@ void stratum_task(void * pvParameters)
 
         if (retry_attempts >= MAX_RETRY_ATTEMPTS)
         {
-            if (GLOBAL_STATE.SYSTEM_MODULE.fallback_pool_url == NULL || GLOBAL_STATE.SYSTEM_MODULE.fallback_pool_url[0] == '\0') {
+            if (SYSTEM_MODULE.fallback_pool_url == NULL || SYSTEM_MODULE.fallback_pool_url[0] == '\0') {
                 ESP_LOGI(TAG, "Unable to switch to fallback. No url configured. (retries: %d)...", retry_attempts);
-                GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback = false;
+                SYSTEM_MODULE.is_using_fallback = false;
                 retry_attempts = 0;
                 continue;
             }
 
-            GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback;
+            SYSTEM_MODULE.is_using_fallback = !SYSTEM_MODULE.is_using_fallback;
             
             // Reset share stats at failover
-            for (int i = 0; i < GLOBAL_STATE.SYSTEM_MODULE.rejected_reason_stats_count; i++) {
-                GLOBAL_STATE.SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
-                GLOBAL_STATE.SYSTEM_MODULE.rejected_reason_stats[i].message[0] = '\0';
+            for (int i = 0; i < SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+                SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
+                SYSTEM_MODULE.rejected_reason_stats[i].message[0] = '\0';
             }
-            GLOBAL_STATE.SYSTEM_MODULE.rejected_reason_stats_count = 0;
-            GLOBAL_STATE.SYSTEM_MODULE.shares_accepted = 0;
-            GLOBAL_STATE.SYSTEM_MODULE.shares_rejected = 0;
+            SYSTEM_MODULE.rejected_reason_stats_count = 0;
+            SYSTEM_MODULE.shares_accepted = 0;
+            SYSTEM_MODULE.shares_rejected = 0;
 
             ESP_LOGI(TAG, "Switching target due to too many failures (retries: %d)...", retry_attempts);
             retry_attempts = 0;
         }
 
-        stratum_url = GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE.SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE.SYSTEM_MODULE.pool_url;
-        port = GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE.SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE.SYSTEM_MODULE.pool_port;
+        stratum_url = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_url : SYSTEM_MODULE.pool_url;
+        port = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_port : SYSTEM_MODULE.pool_port;
 
         struct hostent *dns_addr = gethostbyname(stratum_url);
         if (dns_addr == NULL) {
@@ -288,8 +288,8 @@ void stratum_task(void * pvParameters)
         // mining.subscribe - ID: 2
         STRATUM_V1_subscribe(GLOBAL_STATE.sock, GLOBAL_STATE.send_uid++, GLOBAL_STATE.DEVICE_CONFIG.family.asic.name);
 
-        char * username = GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE.SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE.SYSTEM_MODULE.pool_user;
-        char * password = GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE.SYSTEM_MODULE.fallback_pool_pass : GLOBAL_STATE.SYSTEM_MODULE.pool_pass;
+        char * username = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_user : SYSTEM_MODULE.pool_user;
+        char * password = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_pass : SYSTEM_MODULE.pool_pass;
 
         //mining.authorize - ID: 3
         STRATUM_V1_authenticate(GLOBAL_STATE.sock, GLOBAL_STATE.send_uid++, username, password);

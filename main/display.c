@@ -191,10 +191,10 @@ esp_err_t display_init(void * pvParameters)
         // Only turn on the screen when it has been cleared
         ESP_RETURN_ON_ERROR(display_on(true), TAG, "Display on failed");
 
-        GLOBAL_STATE.SYSTEM_MODULE.is_screen_active = true;
+        SYSTEM_MODULE.is_screen_active = true;
     } else {
         ESP_LOGW(TAG, "No display found or panel init failed. Screen not active.");
-        GLOBAL_STATE.SYSTEM_MODULE.is_screen_active = false;
+        SYSTEM_MODULE.is_screen_active = false;
     }
 
     ESP_LOGI(TAG, "Display init success!");

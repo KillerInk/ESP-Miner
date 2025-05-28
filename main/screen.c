@@ -322,7 +322,7 @@ static void screen_update_cb(lv_timer_t * timer)
     }
     // Update WiFi RSSI periodically
     int8_t rssi_value = -128; // Invalid value by default
-    if (GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
+    if (SYSTEM_MODULE.is_connected) {
         get_wifi_current_rssi(&rssi_value);
     }
     
@@ -351,18 +351,18 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (GLOBAL_STATE.SYSTEM_MODULE.is_firmware_update) {
-        if (strcmp(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
-            lv_label_set_text(firmware_update_scr_filename_label, GLOBAL_STATE.SYSTEM_MODULE.firmware_update_filename);
+    if (SYSTEM_MODULE.is_firmware_update) {
+        if (strcmp(SYSTEM_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_filename_label, SYSTEM_MODULE.firmware_update_filename);
         }
-        if (strcmp(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
-            lv_label_set_text(firmware_update_scr_status_label, GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status);
+        if (strcmp(SYSTEM_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_status_label, SYSTEM_MODULE.firmware_update_status);
         }
         screen_show(SCR_FIRMWARE_UPDATE);
         return;
     }
 
-    SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
+    SystemModule * module = &SYSTEM_MODULE;
 
     if (module->asic_status) {
         lv_label_set_text(asic_status_label, module->asic_status);
@@ -483,7 +483,7 @@ static void uptime_update_cb(lv_timer_t * timer)
 {
     if (esp_uptime_label) {
         char uptime[50];
-        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE.SYSTEM_MODULE.start_time) / 1000000;
+        uint32_t uptime_seconds = (esp_timer_get_time() - SYSTEM_MODULE.start_time) / 1000000;
         
         uint32_t days = uptime_seconds / (24 * 3600);
         uptime_seconds %= (24 * 3600);
@@ -512,8 +512,8 @@ esp_err_t screen_start(void * pvParameters)
 {
     
 
-    if (GLOBAL_STATE.SYSTEM_MODULE.is_screen_active) {
-        SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
+    if (SYSTEM_MODULE.is_screen_active) {
+        SystemModule * module = &SYSTEM_MODULE;
 
         screens[SCR_SELF_TEST] = create_scr_self_test();
         screens[SCR_OVERHEAT] = create_scr_overheat(module);

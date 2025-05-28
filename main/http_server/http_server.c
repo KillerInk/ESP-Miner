@@ -165,7 +165,7 @@ static uint32_t extract_origin_ip_addr(char * origin)
 
 esp_err_t is_network_allowed(httpd_req_t * req)
 {
-    if (GLOBAL_STATE.SYSTEM_MODULE.ap_enabled == true) {
+    if (SYSTEM_MODULE.ap_enabled == true) {
         ESP_LOGI(CORS_TAG, "Device in AP mode. Allowing CORS.");
         return ESP_OK;
     }
@@ -571,13 +571,13 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE.POWER_MANAGEMENT_MODULE.vr_temp);
     cJSON_AddNumberToObject(root, "maxPower", GLOBAL_STATE.DEVICE_CONFIG.family.max_power);
     cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE.DEVICE_CONFIG.family.nominal_voltage);
-    cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE.SYSTEM_MODULE.current_hashrate);
+    cJSON_AddNumberToObject(root, "hashRate", SYSTEM_MODULE.current_hashrate);
     cJSON_AddNumberToObject(root, "expectedHashrate", expected_hashrate);
-    cJSON_AddStringToObject(root, "bestDiff", GLOBAL_STATE.SYSTEM_MODULE.best_diff_string);
-    cJSON_AddStringToObject(root, "bestSessionDiff", GLOBAL_STATE.SYSTEM_MODULE.best_session_diff_string);
+    cJSON_AddStringToObject(root, "bestDiff", SYSTEM_MODULE.best_diff_string);
+    cJSON_AddStringToObject(root, "bestSessionDiff", SYSTEM_MODULE.best_session_diff_string);
     cJSON_AddNumberToObject(root, "stratumDiff", GLOBAL_STATE.stratum_difficulty);
 
-    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback);
+    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", SYSTEM_MODULE.is_using_fallback);
 
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE.psram_is_available);
 
@@ -588,23 +588,23 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
     cJSON_AddStringToObject(root, "hostname", hostname);
-    cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE.SYSTEM_MODULE.wifi_status);
+    cJSON_AddStringToObject(root, "wifiStatus", SYSTEM_MODULE.wifi_status);
     cJSON_AddNumberToObject(root, "wifiRSSI", wifi_rssi);
-    cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE.SYSTEM_MODULE.ap_enabled);
-    cJSON_AddNumberToObject(root, "sharesAccepted", GLOBAL_STATE.SYSTEM_MODULE.shares_accepted);
-    cJSON_AddNumberToObject(root, "sharesRejected", GLOBAL_STATE.SYSTEM_MODULE.shares_rejected);
+    cJSON_AddNumberToObject(root, "apEnabled", SYSTEM_MODULE.ap_enabled);
+    cJSON_AddNumberToObject(root, "sharesAccepted", SYSTEM_MODULE.shares_accepted);
+    cJSON_AddNumberToObject(root, "sharesRejected", SYSTEM_MODULE.shares_rejected);
 
     cJSON * error_array = cJSON_CreateArray();
     cJSON_AddItemToObject(root, "sharesRejectedReasons", error_array);
 
-    for (int i = 0; i < GLOBAL_STATE.SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+    for (int i = 0; i < SYSTEM_MODULE.rejected_reason_stats_count; i++) {
         cJSON * error_obj = cJSON_CreateObject();
-        cJSON_AddStringToObject(error_obj, "message", GLOBAL_STATE.SYSTEM_MODULE.rejected_reason_stats[i].message);
-        cJSON_AddNumberToObject(error_obj, "count", GLOBAL_STATE.SYSTEM_MODULE.rejected_reason_stats[i].count);
+        cJSON_AddStringToObject(error_obj, "message", SYSTEM_MODULE.rejected_reason_stats[i].message);
+        cJSON_AddNumberToObject(error_obj, "count", SYSTEM_MODULE.rejected_reason_stats[i].count);
         cJSON_AddItemToArray(error_array, error_obj);
     }
 
-    cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - GLOBAL_STATE.SYSTEM_MODULE.start_time) / 1000000);
+    cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - SYSTEM_MODULE.start_time) / 1000000);
     cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE.DEVICE_CONFIG.family.asic_count);
     cJSON_AddNumberToObject(root, "smallCoreCount", GLOBAL_STATE.DEVICE_CONFIG.family.asic.small_core_count);
     cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE.DEVICE_CONFIG.family.asic.name);
@@ -633,11 +633,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_rpm);
-    cJSON_AddNumberToObject(root, "avghashRate", GLOBAL_STATE.SYSTEM_MODULE.avg_hashrate);
+    cJSON_AddNumberToObject(root, "avghashRate", SYSTEM_MODULE.avg_hashrate);
 
     cJSON_AddNumberToObject(root, "statsLimit", nvs_config_get_u16(NVS_CONFIG_STATISTICS_LIMIT, 0));
     cJSON_AddNumberToObject(root, "statsDuration", nvs_config_get_u16(NVS_CONFIG_STATISTICS_DURATION, 1));
-    if (GLOBAL_STATE.SYSTEM_MODULE.power_fault > 0) {
+    if (SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string());
     }
 
@@ -806,9 +806,9 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         return ESP_OK;
     }
 
-    GLOBAL_STATE.SYSTEM_MODULE.is_firmware_update = true;
-    snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_filename, 20, "www.bin");
-    snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
+    SYSTEM_MODULE.is_firmware_update = true;
+    snprintf(SYSTEM_MODULE.firmware_update_filename, 20, "www.bin");
+    snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
 
     char buf[1000];
     int remaining = req->content_len;
@@ -835,28 +835,28 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
             continue;
         } else if (recv_len <= 0) {
-            snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
+            snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
             return ESP_OK;
         }
 
         if (esp_partition_write(www_partition, www_partition->size - remaining, (const void *) buf, recv_len) != ESP_OK) {
-            snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
+            snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
             return ESP_OK;
         }
 
         uint8_t percentage = 100 - ((remaining * 100 / req->content_len));
-        snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Working (%d%%)", percentage);
+        snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Working (%d%%)", percentage);
 
         remaining -= recv_len;
     }
 
     httpd_resp_sendstr(req, "WWW update complete\n");
 
-    snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Finished...");
+    snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Finished...");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-    GLOBAL_STATE.SYSTEM_MODULE.is_firmware_update = false;
+    SYSTEM_MODULE.is_firmware_update = false;
 
     return ESP_OK;
 }
@@ -877,9 +877,9 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         return ESP_OK;
     }
 
-    GLOBAL_STATE.SYSTEM_MODULE.is_firmware_update = true;
-    snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_filename, 20, "esp-miner.bin");
-    snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
+    SYSTEM_MODULE.is_firmware_update = true;
+    snprintf(SYSTEM_MODULE.firmware_update_filename, 20, "esp-miner.bin");
+    snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
 
     char buf[1000];
     esp_ota_handle_t ota_handle;
@@ -897,7 +897,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
             // Serious Error: Abort OTA
         } else if (recv_len <= 0) {
-            snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
+            snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
             return ESP_OK;
         }
@@ -905,26 +905,26 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         // Successful Upload: Flash firmware chunk
         if (esp_ota_write(ota_handle, (const void *) buf, recv_len) != ESP_OK) {
             esp_ota_abort(ota_handle);
-            snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
+            snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
             return ESP_OK;
         }
 
         uint8_t percentage = 100 - ((remaining * 100 / req->content_len));
 
-        snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Working (%d%%)", percentage);
+        snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Working (%d%%)", percentage);
 
         remaining -= recv_len;
     }
 
     // Validate and switch to new OTA image and reboot
     if (esp_ota_end(ota_handle) != ESP_OK || esp_ota_set_boot_partition(ota_partition) != ESP_OK) {
-        snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Validation Error");
+        snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Validation Error");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Validation / Activation Error");
         return ESP_OK;
     }
 
-    snprintf(GLOBAL_STATE.SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
+    snprintf(SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
 
     httpd_resp_sendstr(req, "Firmware update complete, rebooting now!\n");
     ESP_LOGI(TAG, "Restarting System because of Firmware update complete");

@@ -82,7 +82,6 @@ typedef struct
     work_queue stratum_queue;
     work_queue ASIC_jobs_queue;
 
-    SystemModule SYSTEM_MODULE;
     DeviceConfig DEVICE_CONFIG;
     DisplayConfig DISPLAY_CONFIG;
     AsicTaskModule ASIC_TASK_MODULE;
@@ -112,5 +111,6 @@ typedef struct
 } GlobalState;
 
 extern GlobalState GLOBAL_STATE;
+extern SystemModule SYSTEM_MODULE;
 
 #endif /* GLOBAL_STATE_H_ */

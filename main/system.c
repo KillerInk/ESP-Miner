@@ -42,7 +42,7 @@ static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigit
 
 void SYSTEM_init_system()
 {
-    SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
+    SystemModule * module = &SYSTEM_MODULE;
 
     module->duration_start = 0;
     module->historical_hashrate_rolling_index = 0;
@@ -114,7 +114,7 @@ esp_err_t SYSTEM_init_peripherals() {
 
 void SYSTEM_notify_accepted_share()
 {
-    SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
+    SystemModule * module = &SYSTEM_MODULE;
 
     module->shares_accepted++;
 }
@@ -127,7 +127,7 @@ static int compare_rejected_reason_stats(const void *a, const void *b) {
 
 void SYSTEM_notify_rejected_share( char * error_msg)
 {
-    SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
+    SystemModule * module = &SYSTEM_MODULE;
 
     module->shares_rejected++;
 
@@ -155,14 +155,14 @@ void SYSTEM_notify_rejected_share( char * error_msg)
 
 void SYSTEM_notify_mining_started()
 {
-    SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
+    SystemModule * module = &SYSTEM_MODULE;
 
     module->duration_start = esp_timer_get_time();
 }
 
 void SYSTEM_notify_new_ntime( uint32_t ntime)
 {
-    SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
+    SystemModule * module = &SYSTEM_MODULE;
 
     // Hourly clock sync
     if (module->lastClockSync + (60 * 60) > ntime) {
@@ -178,7 +178,7 @@ void SYSTEM_notify_new_ntime( uint32_t ntime)
 
 void SYSTEM_notify_found_nonce( double found_diff, uint8_t job_id)
 {
-    SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
+    SystemModule * module = &SYSTEM_MODULE;
 
     // Calculate the time difference in seconds with sub-second precision
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
@@ -233,7 +233,7 @@ static double _calculate_network_difficulty(uint32_t nBits)
 
 static void _check_for_best_diff( double diff, uint8_t job_id)
 {
-    SystemModule * module = &GLOBAL_STATE.SYSTEM_MODULE;
+    SystemModule * module = &SYSTEM_MODULE;
 
     if ((uint64_t) diff > module->best_session_nonce_diff) {
         module->best_session_nonce_diff = (uint64_t) diff;

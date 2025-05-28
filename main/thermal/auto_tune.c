@@ -44,7 +44,7 @@ void auto_tune_init()
     asic_frequency = last_asic_frequency_auto;
     core_voltage = last_core_voltage_auto;
     GLOBAL_STATE.POWER_MANAGEMENT_MODULE.core_voltage = last_core_voltage_auto;
-    last_hashrate_auto = GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
+    last_hashrate_auto = SYSTEM_MODULE.current_hashrate;
     current_hashrate_auto = last_hashrate_auto;
     state = sleep_bevor_warmup;
 }
@@ -177,18 +177,18 @@ void dowork()
         auto_tune_counter++;
     }
     if (avg_hashrate_auto == 0)
-        avg_hashrate_auto = GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
+        avg_hashrate_auto = SYSTEM_MODULE.current_hashrate;
     else
-        avg_hashrate_auto = 0.995 * avg_hashrate_auto + 0.005 * GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
+        avg_hashrate_auto = 0.995 * avg_hashrate_auto + 0.005 * SYSTEM_MODULE.current_hashrate;
     last_hashrate_auto = current_hashrate_auto;
-    GLOBAL_STATE.SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
+    SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
     core_voltage = last_core_voltage_auto;
     asic_frequency = last_asic_frequency_auto;
 }
 
 void auto_tune(bool pid_control_fanspeed)
 {
-    current_hashrate_auto = GLOBAL_STATE.SYSTEM_MODULE.current_hashrate;
+    current_hashrate_auto = SYSTEM_MODULE.current_hashrate;
     switch (state) {
     case sleep_bevor_warmup: 
         if (waitForStartUp(pid_control_fanspeed))

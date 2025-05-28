@@ -62,7 +62,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
 
     PowerManagementModule * power_management = &GLOBAL_STATE.POWER_MANAGEMENT_MODULE;
-    SystemModule * sys_module = &GLOBAL_STATE.SYSTEM_MODULE;
+    SystemModule * sys_module = &SYSTEM_MODULE;
 
     power_management->frequency_multiplier = 1;
 
@@ -151,7 +151,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
                          pid_input, pid_setPoint, pid_output, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
             } else {
-                if (GLOBAL_STATE.SYSTEM_MODULE.ap_enabled) {
+                if (SYSTEM_MODULE.ap_enabled) {
                     ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%",
                              power_management->chip_temp_avg);
                     power_management->fan_perc = 70;

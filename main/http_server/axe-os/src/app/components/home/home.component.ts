@@ -201,8 +201,8 @@ export class HomeComponent {
           backgroundColor: primaryColor + '30',
           borderColor: primaryColor,
           tension: 0,
-          pointRadius: 1,
-          pointHoverRadius: 1,
+          pointRadius: 0,
+          pointHoverRadius: 0,
           borderWidth: 1,
           yAxisID: 'y',
           fill: false,
@@ -215,8 +215,8 @@ export class HomeComponent {
           backgroundColor: textColorSecondary,
           borderColor: textColorSecondary,
           tension: 0,
-          pointRadius: 1,
-          pointHoverRadius: 1,
+          pointRadius: 0,
+          pointHoverRadius: 0,
           borderWidth: 1,
           yAxisID: 'y2',
         },
@@ -228,8 +228,8 @@ export class HomeComponent {
           backgroundColor: mhzColor,
           borderColor: mhzColor,
           tension: 0,
-          pointRadius: 1,
-          pointHoverRadius: 1,
+          pointRadius: 0,
+          pointHoverRadius: 0,
           borderWidth: 1,
           yAxisID: 'y3',
         },
@@ -241,8 +241,8 @@ export class HomeComponent {
           backgroundColor: coreVoltageColor,
           borderColor: coreVoltageColor,
           tension: 0,
-          pointRadius: 1,
-          pointHoverRadius: 1,
+          pointRadius: 0,
+          pointHoverRadius: 0,
           borderWidth: 1,
           yAxisID: 'y4',
         }
@@ -255,8 +255,8 @@ export class HomeComponent {
           backgroundColor: fanspeedColor,
           borderColor: fanspeedColor,
           tension: 0,
-          pointRadius: 1,
-          pointHoverRadius: 1,
+          pointRadius: 0,
+          pointHoverRadius: 0,
           borderWidth: 1,
           yAxisID: 'y5',
         },
@@ -267,8 +267,8 @@ export class HomeComponent {
           backgroundColor: avghashColor + '30',
           borderColor: avghashColor,
           tension: 0,
-          pointRadius: 1,
-          pointHoverRadius: 1,
+          pointRadius: 0,
+          pointHoverRadius: 0,
           borderWidth: 1,
           yAxisID: 'y6',
           fill: false,
@@ -449,7 +449,7 @@ export class HomeComponent {
         this.coreVoltageData.push(element[idxVoltage]);
         this.mhzData.push(element[idxFreqency]);
         this.fanspeed.push(element[idxFanSpeed]);
-        this.avghashrateData.push(element[idxAvgHashrate]);
+        this.avghashrateData.push(element[idxAvgHashrate] * 1000000000);
 
         if (this.hashrateData.length >= 720) {
           this.hashrateData.shift();
@@ -462,7 +462,7 @@ export class HomeComponent {
           this.avghashrateData.shift();
         }
       }),
-      this.chartData = { ...this.chartData },
+      this.chart?.refresh(),
       this.startGetInfo();
     });
 
