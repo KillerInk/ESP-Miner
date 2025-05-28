@@ -30,6 +30,7 @@ GlobalState GLOBAL_STATE = {
     .ASIC_initalized = false
 };
 SystemModule SYSTEM_MODULE;
+PowerManagementModule POWER_MANAGEMENT_MODULE;
 
 static const char * TAG = "bitaxe";
 
@@ -82,8 +83,8 @@ void app_main(void)
     SYSTEM_init_peripherals(&GLOBAL_STATE);
 
     // This needs to be done before the power management task starts
-    GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
+    POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)POWER_MANAGEMENT_MODULE.frequency_value);
 
     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, NULL,10, NULL);
 

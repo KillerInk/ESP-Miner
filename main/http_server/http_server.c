@@ -551,7 +551,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
-    uint16_t frequency = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value;
+    uint16_t frequency = POWER_MANAGEMENT_MODULE.frequency_value;
     float expected_hashrate =
         frequency * GLOBAL_STATE.DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE.DEVICE_CONFIG.family.asic_count / 1000.0;
 
@@ -564,11 +564,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     get_wifi_current_rssi(&wifi_rssi);
 
     cJSON * root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "power", GLOBAL_STATE.POWER_MANAGEMENT_MODULE.power);
-    cJSON_AddNumberToObject(root, "voltage", GLOBAL_STATE.POWER_MANAGEMENT_MODULE.voltage);
+    cJSON_AddNumberToObject(root, "power", POWER_MANAGEMENT_MODULE.power);
+    cJSON_AddNumberToObject(root, "voltage", POWER_MANAGEMENT_MODULE.voltage);
     cJSON_AddNumberToObject(root, "current", Power_get_current());
-    cJSON_AddNumberToObject(root, "temp", GLOBAL_STATE.POWER_MANAGEMENT_MODULE.chip_temp_avg);
-    cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE.POWER_MANAGEMENT_MODULE.vr_temp);
+    cJSON_AddNumberToObject(root, "temp", POWER_MANAGEMENT_MODULE.chip_temp_avg);
+    cJSON_AddNumberToObject(root, "vrTemp", POWER_MANAGEMENT_MODULE.vr_temp);
     cJSON_AddNumberToObject(root, "maxPower", GLOBAL_STATE.DEVICE_CONFIG.family.max_power);
     cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE.DEVICE_CONFIG.family.nominal_voltage);
     cJSON_AddNumberToObject(root, "hashRate", SYSTEM_MODULE.current_hashrate);
@@ -582,7 +582,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE.psram_is_available);
 
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
-    cJSON_AddNumberToObject(root, "coreVoltage", GLOBAL_STATE.POWER_MANAGEMENT_MODULE.core_voltage);
+    cJSON_AddNumberToObject(root, "coreVoltage", POWER_MANAGEMENT_MODULE.core_voltage);
     cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv());
     cJSON_AddNumberToObject(root, "frequency", frequency);
     cJSON_AddStringToObject(root, "ssid", ssid);
@@ -630,9 +630,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1));
 
-    cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_perc);
+    cJSON_AddNumberToObject(root, "fanspeed", POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
-    cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_rpm);
+    cJSON_AddNumberToObject(root, "fanrpm", POWER_MANAGEMENT_MODULE.fan_rpm);
     cJSON_AddNumberToObject(root, "avghashRate", SYSTEM_MODULE.avg_hashrate);
 
     cJSON_AddNumberToObject(root, "statsLimit", nvs_config_get_u16(NVS_CONFIG_STATISTICS_LIMIT, 0));

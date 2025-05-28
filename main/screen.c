@@ -396,7 +396,7 @@ static void screen_update_cb(lv_timer_t * timer)
 
     current_screen_time_ms += SCREEN_UPDATE_MS;
 
-    PowerManagementModule * power_management = &GLOBAL_STATE.POWER_MANAGEMENT_MODULE;
+    PowerManagementModule * power_management = &POWER_MANAGEMENT_MODULE;
 
     char *pool_url = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
     if (strcmp(lv_label_get_text(mining_url_scr_urls_label), pool_url) != 0) {

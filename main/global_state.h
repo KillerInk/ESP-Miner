@@ -85,7 +85,7 @@ typedef struct
     DeviceConfig DEVICE_CONFIG;
     DisplayConfig DISPLAY_CONFIG;
     AsicTaskModule ASIC_TASK_MODULE;
-    PowerManagementModule POWER_MANAGEMENT_MODULE;
+    
     SelfTestModule SELF_TEST_MODULE;
     StatisticsModule STATISTICS_MODULE;
 
@@ -112,5 +112,6 @@ typedef struct
 
 extern GlobalState GLOBAL_STATE;
 extern SystemModule SYSTEM_MODULE;
+extern PowerManagementModule POWER_MANAGEMENT_MODULE;
 
 #endif /* GLOBAL_STATE_H_ */

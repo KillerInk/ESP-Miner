@@ -43,7 +43,7 @@ void auto_tune_init()
     last_asic_frequency_auto = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     asic_frequency = last_asic_frequency_auto;
     core_voltage = last_core_voltage_auto;
-    GLOBAL_STATE.POWER_MANAGEMENT_MODULE.core_voltage = last_core_voltage_auto;
+    POWER_MANAGEMENT_MODULE.core_voltage = last_core_voltage_auto;
     last_hashrate_auto = SYSTEM_MODULE.current_hashrate;
     current_hashrate_auto = last_hashrate_auto;
     state = sleep_bevor_warmup;
@@ -56,14 +56,14 @@ bool waitForStartUp(bool pid_control_fanspeed)
 
 bool should_do_work()
 {
-    return auto_tune_counter >= 53 || GLOBAL_STATE.POWER_MANAGEMENT_MODULE.chip_temp_avg >= max_asic_temperatur ||
-           GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_perc > autotune_fan_limit;
+    return auto_tune_counter >= 53 || POWER_MANAGEMENT_MODULE.chip_temp_avg >= max_asic_temperatur ||
+           POWER_MANAGEMENT_MODULE.fan_perc > autotune_fan_limit;
 }
 
 bool can_increase_values()
 {
-    return GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_perc < autotune_fan_limit - 2 &&
-           GLOBAL_STATE.POWER_MANAGEMENT_MODULE.power < autotune_power_limit;
+    return POWER_MANAGEMENT_MODULE.fan_perc < autotune_fan_limit - 2 &&
+           POWER_MANAGEMENT_MODULE.power < autotune_power_limit;
 }
 
 bool hashrate_increase()
@@ -91,14 +91,14 @@ void respectLimits()
 
 bool limithit()
 {
-    return GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit +3 ||
-           GLOBAL_STATE.POWER_MANAGEMENT_MODULE.power >= autotune_power_limit ||
-           GLOBAL_STATE.POWER_MANAGEMENT_MODULE.chip_temp_avg >= max_asic_temperatur;
+    return POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit +3 ||
+           POWER_MANAGEMENT_MODULE.power >= autotune_power_limit ||
+           POWER_MANAGEMENT_MODULE.chip_temp_avg >= max_asic_temperatur;
 }
 
 bool critical_limithit()
 {
-    return GLOBAL_STATE.POWER_MANAGEMENT_MODULE.chip_temp_avg > max_asic_temperatur;
+    return POWER_MANAGEMENT_MODULE.chip_temp_avg > max_asic_temperatur;
 }
 
 void increase_values()
@@ -199,7 +199,7 @@ void auto_tune(bool pid_control_fanspeed)
     case warmup:
         autotune_step = autotune_step_freq_rampup;
         dowork();
-        if(GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit)
+        if(POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit)
             state = working;
     break;
     case working:

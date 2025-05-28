@@ -123,18 +123,18 @@ void statistics_task(void * pvParameters)
 
             statsData.timestamp = esp_timer_get_time() / 1000;
             statsData.hashrate = SYSTEM_MODULE.current_hashrate;
-            statsData.chipTemperature = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.chip_temp_avg;
-            statsData.vrTemperature = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.vr_temp;
-            statsData.power = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.power;
-            statsData.voltage = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.voltage;
+            statsData.chipTemperature = POWER_MANAGEMENT_MODULE.chip_temp_avg;
+            statsData.vrTemperature = POWER_MANAGEMENT_MODULE.vr_temp;
+            statsData.power = POWER_MANAGEMENT_MODULE.power;
+            statsData.voltage = POWER_MANAGEMENT_MODULE.voltage;
             statsData.current = Power_get_current();
             statsData.coreVoltageActual = VCORE_get_voltage_mv();
-            statsData.coreVoltage = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.core_voltage;
-            statsData.fanSpeed = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_perc;
-            statsData.fanRPM = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.fan_rpm;
+            statsData.coreVoltage = POWER_MANAGEMENT_MODULE.core_voltage;
+            statsData.fanSpeed = POWER_MANAGEMENT_MODULE.fan_perc;
+            statsData.fanRPM = POWER_MANAGEMENT_MODULE.fan_rpm;
             statsData.wifiRSSI = wifiRSSI;
             statsData.freeHeap = esp_get_free_heap_size();
-            statsData.frequency = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value;
+            statsData.frequency = POWER_MANAGEMENT_MODULE.frequency_value;
             statsData.avghashrate = SYSTEM_MODULE.avg_hashrate;
 
             addStatisticData(&statsData);

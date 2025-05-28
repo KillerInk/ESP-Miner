@@ -311,8 +311,8 @@ void self_test(void * pvParameters)
         tests_done(TESTS_FAILED);
     }
 
-    GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
+    POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)POWER_MANAGEMENT_MODULE.frequency_value);
     uint8_t chips_detected = ASIC_init();
     uint8_t chips_expected = GLOBAL_STATE.DEVICE_CONFIG.family.asic_count;
 
@@ -425,7 +425,7 @@ void self_test(void * pvParameters)
 
     ESP_LOGI(TAG, "Hashrate: %f", hash_rate);
 
-    float expected_hashrate_mhs = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value 
+    float expected_hashrate_mhs = POWER_MANAGEMENT_MODULE.frequency_value 
                                 * GLOBAL_STATE.DEVICE_CONFIG.family.asic.small_core_count 
                                 * GLOBAL_STATE.DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
                                 / 1000.0f;
