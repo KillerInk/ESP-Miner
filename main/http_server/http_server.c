@@ -553,7 +553,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
     uint16_t frequency = POWER_MANAGEMENT_MODULE.frequency_value;
     float expected_hashrate =
-        frequency * GLOBAL_STATE.DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE.DEVICE_CONFIG.family.asic_count / 1000.0;
+        frequency * DEVICE_CONFIG.family.asic.small_core_count * DEVICE_CONFIG.family.asic_count / 1000.0;
 
     uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
@@ -569,8 +569,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "current", Power_get_current());
     cJSON_AddNumberToObject(root, "temp", POWER_MANAGEMENT_MODULE.chip_temp_avg);
     cJSON_AddNumberToObject(root, "vrTemp", POWER_MANAGEMENT_MODULE.vr_temp);
-    cJSON_AddNumberToObject(root, "maxPower", GLOBAL_STATE.DEVICE_CONFIG.family.max_power);
-    cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE.DEVICE_CONFIG.family.nominal_voltage);
+    cJSON_AddNumberToObject(root, "maxPower", DEVICE_CONFIG.family.max_power);
+    cJSON_AddNumberToObject(root, "nominalVoltage", DEVICE_CONFIG.family.nominal_voltage);
     cJSON_AddNumberToObject(root, "hashRate", SYSTEM_MODULE.current_hashrate);
     cJSON_AddNumberToObject(root, "expectedHashrate", expected_hashrate);
     cJSON_AddStringToObject(root, "bestDiff", SYSTEM_MODULE.best_diff_string);
@@ -605,9 +605,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     }
 
     cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - SYSTEM_MODULE.start_time) / 1000000);
-    cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE.DEVICE_CONFIG.family.asic_count);
-    cJSON_AddNumberToObject(root, "smallCoreCount", GLOBAL_STATE.DEVICE_CONFIG.family.asic.small_core_count);
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE.DEVICE_CONFIG.family.asic.name);
+    cJSON_AddNumberToObject(root, "asicCount", DEVICE_CONFIG.family.asic_count);
+    cJSON_AddNumberToObject(root, "smallCoreCount", DEVICE_CONFIG.family.asic.small_core_count);
+    cJSON_AddStringToObject(root, "ASICModel", DEVICE_CONFIG.family.asic.name);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT));
@@ -618,7 +618,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
-    cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE.DEVICE_CONFIG.board_version);
+    cJSON_AddStringToObject(root, "boardVersion", DEVICE_CONFIG.board_version);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
     cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));

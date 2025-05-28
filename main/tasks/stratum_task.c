@@ -151,7 +151,7 @@ void stratum_primary_heartbeat(void * pvParameters)
         }
 
         int send_uid = 1;
-        STRATUM_V1_subscribe(sock, send_uid++, GLOBAL_STATE.DEVICE_CONFIG.family.asic.name);
+        STRATUM_V1_subscribe(sock, send_uid++, DEVICE_CONFIG.family.asic.name);
         STRATUM_V1_authenticate(sock, send_uid++, SYSTEM_MODULE.pool_user, SYSTEM_MODULE.pool_pass);
 
         char recv_buffer[BUFFER_SIZE];
@@ -286,7 +286,7 @@ void stratum_task(void * pvParameters)
         STRATUM_V1_configure_version_rolling(GLOBAL_STATE.sock, GLOBAL_STATE.send_uid++, &GLOBAL_STATE.version_mask);
 
         // mining.subscribe - ID: 2
-        STRATUM_V1_subscribe(GLOBAL_STATE.sock, GLOBAL_STATE.send_uid++, GLOBAL_STATE.DEVICE_CONFIG.family.asic.name);
+        STRATUM_V1_subscribe(GLOBAL_STATE.sock, GLOBAL_STATE.send_uid++, DEVICE_CONFIG.family.asic.name);
 
         char * username = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_user : SYSTEM_MODULE.pool_user;
         char * password = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_pass : SYSTEM_MODULE.pool_pass;

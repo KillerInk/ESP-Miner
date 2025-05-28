@@ -31,6 +31,7 @@ GlobalState GLOBAL_STATE = {
 };
 SystemModule SYSTEM_MODULE;
 PowerManagementModule POWER_MANAGEMENT_MODULE;
+DeviceConfig DEVICE_CONFIG;
 
 static const char * TAG = "bitaxe";
 

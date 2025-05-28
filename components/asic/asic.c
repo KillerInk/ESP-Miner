@@ -16,15 +16,15 @@ static const char *TAG = "asic";
 
 uint8_t ASIC_init()
 {
-    switch (GLOBAL_STATE.DEVICE_CONFIG.family.asic.model) {
+    switch (DEVICE_CONFIG.family.asic.model) {
         case BM1397:
-            return BM1397_init(POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE.DEVICE_CONFIG.family.asic_count, GLOBAL_STATE.DEVICE_CONFIG.family.asic.difficulty);
+            return BM1397_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1366:
-            return BM1366_init(POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE.DEVICE_CONFIG.family.asic_count, GLOBAL_STATE.DEVICE_CONFIG.family.asic.difficulty);
+            return BM1366_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1368:
-            return BM1368_init(POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE.DEVICE_CONFIG.family.asic_count, GLOBAL_STATE.DEVICE_CONFIG.family.asic.difficulty);
+            return BM1368_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1370:
-            return BM1370_init(POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE.DEVICE_CONFIG.family.asic_count, GLOBAL_STATE.DEVICE_CONFIG.family.asic.difficulty);
+            return BM1370_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         default:
     }
     return ESP_OK;
@@ -32,7 +32,7 @@ uint8_t ASIC_init()
 
 task_result * ASIC_process_work()
 {
-    switch (GLOBAL_STATE.DEVICE_CONFIG.family.asic.model) {
+    switch (DEVICE_CONFIG.family.asic.model) {
         case BM1397:
             return BM1397_process_work();
         case BM1366:
@@ -47,7 +47,7 @@ task_result * ASIC_process_work()
 
 int ASIC_set_max_baud()
 {
-    switch (GLOBAL_STATE.DEVICE_CONFIG.family.asic.model) {
+    switch (DEVICE_CONFIG.family.asic.model) {
         case BM1397:
             return BM1397_set_max_baud();
         case BM1366:
@@ -62,7 +62,7 @@ int ASIC_set_max_baud()
 
 void ASIC_set_job_difficulty_mask(uint8_t mask)
 {
-    switch (GLOBAL_STATE.DEVICE_CONFIG.family.asic.model) {
+    switch (DEVICE_CONFIG.family.asic.model) {
         case BM1397:
             BM1397_set_job_difficulty_mask(mask);
             break;
@@ -80,7 +80,7 @@ void ASIC_set_job_difficulty_mask(uint8_t mask)
 
 void ASIC_send_work(void * next_job)
 {
-    switch (GLOBAL_STATE.DEVICE_CONFIG.family.asic.model) {
+    switch (DEVICE_CONFIG.family.asic.model) {
         case BM1397:
             BM1397_send_work(next_job);
             break;
@@ -98,7 +98,7 @@ void ASIC_send_work(void * next_job)
 
 void ASIC_set_version_mask(uint32_t mask)
 {
-    switch (GLOBAL_STATE.DEVICE_CONFIG.family.asic.model) {
+    switch (DEVICE_CONFIG.family.asic.model) {
         case BM1397:
             BM1397_set_version_mask(mask);
             break;
@@ -119,7 +119,7 @@ bool ASIC_set_frequency(float target_frequency)
     ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
     bool success = false;
     
-    switch (GLOBAL_STATE.DEVICE_CONFIG.family.asic.model) {
+    switch (DEVICE_CONFIG.family.asic.model) {
         case BM1366:
             success = BM1366_set_frequency(target_frequency);
             break;
@@ -147,10 +147,10 @@ bool ASIC_set_frequency(float target_frequency)
 
 double ASIC_get_asic_job_frequency_ms()
 {
-    switch (GLOBAL_STATE.DEVICE_CONFIG.family.asic.model) {
+    switch (DEVICE_CONFIG.family.asic.model) {
         case BM1397:
             // no version-rolling so same Nonce Space is splitted between Small Cores
-            return (NONCE_SPACE / (double) (POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE.DEVICE_CONFIG.family.asic.small_core_count * 1000)) / (double) GLOBAL_STATE.DEVICE_CONFIG.family.asic_count;
+            return (NONCE_SPACE / (double) (POWER_MANAGEMENT_MODULE.frequency_value * DEVICE_CONFIG.family.asic.small_core_count * 1000)) / (double) DEVICE_CONFIG.family.asic_count;
         case BM1366:
             return 2000;
         case BM1368:

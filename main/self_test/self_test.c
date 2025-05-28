@@ -56,7 +56,7 @@ SemaphoreHandle_t BootSemaphore;
 static void tests_done(bool test_result);
 
 bool should_test() {
-    bool is_max = GLOBAL_STATE.DEVICE_CONFIG.family.asic.model == BM1397;
+    bool is_max = DEVICE_CONFIG.family.asic.model == BM1397;
     uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
     if (should_self_test == 1 && !is_max && best_diff < 1) {
@@ -78,7 +78,7 @@ static void display_msg(char * msg)
 
 static esp_err_t test_fan_sense()
 {
-    uint16_t fan_speed = Thermal_get_fan_speed(GLOBAL_STATE.DEVICE_CONFIG);
+    uint16_t fan_speed = Thermal_get_fan_speed(DEVICE_CONFIG);
     ESP_LOGI(TAG, "fanSpeed: %d", fan_speed);
     if (fan_speed > FAN_SPEED_TARGET_MIN) {
         return ESP_OK;
@@ -187,7 +187,7 @@ esp_err_t test_vreg_faults() {
 esp_err_t test_voltage_regulator() {
     
     //enable the voltage regulator GPIO on HW that supports it
-    if (GLOBAL_STATE.DEVICE_CONFIG.asic_enable) {
+    if (DEVICE_CONFIG.asic_enable) {
         gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
         gpio_set_level(GPIO_ASIC_ENABLE, 0);
     }
@@ -200,7 +200,7 @@ esp_err_t test_voltage_regulator() {
     }
 
     // VCore regulator testing
-    if (GLOBAL_STATE.DEVICE_CONFIG.DS4432U) {
+    if (DEVICE_CONFIG.DS4432U) {
         if (DS4432U_test() != ESP_OK) {
             ESP_LOGE(TAG, "DS4432 test failed!");
             display_msg("DS4432U:FAIL");
@@ -215,19 +215,19 @@ esp_err_t test_voltage_regulator() {
 
 esp_err_t test_init_peripherals() {
     
-    if (GLOBAL_STATE.DEVICE_CONFIG.EMC2101) {
+    if (DEVICE_CONFIG.EMC2101) {
         ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
         EMC2101_set_fan_speed(1);
 
-        if (GLOBAL_STATE.DEVICE_CONFIG.emc_ideality_factor != 0x00) {
-            EMC2101_set_ideality_factor(GLOBAL_STATE.DEVICE_CONFIG.emc_ideality_factor);
-            EMC2101_set_beta_compensation(GLOBAL_STATE.DEVICE_CONFIG.emc_beta_compensation);
+        if (DEVICE_CONFIG.emc_ideality_factor != 0x00) {
+            EMC2101_set_ideality_factor(DEVICE_CONFIG.emc_ideality_factor);
+            EMC2101_set_beta_compensation(DEVICE_CONFIG.emc_beta_compensation);
         }
     }
 
     // TODO: EMC2103
 
-    if (GLOBAL_STATE.DEVICE_CONFIG.INA260) {
+    if (DEVICE_CONFIG.INA260) {
         ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
     }
 
@@ -314,7 +314,7 @@ void self_test(void * pvParameters)
     POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)POWER_MANAGEMENT_MODULE.frequency_value);
     uint8_t chips_detected = ASIC_init();
-    uint8_t chips_expected = GLOBAL_STATE.DEVICE_CONFIG.family.asic_count;
+    uint8_t chips_expected = DEVICE_CONFIG.family.asic_count;
 
     ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, chips_expected);
 
@@ -426,8 +426,8 @@ void self_test(void * pvParameters)
     ESP_LOGI(TAG, "Hashrate: %f", hash_rate);
 
     float expected_hashrate_mhs = POWER_MANAGEMENT_MODULE.frequency_value 
-                                * GLOBAL_STATE.DEVICE_CONFIG.family.asic.small_core_count 
-                                * GLOBAL_STATE.DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
+                                * DEVICE_CONFIG.family.asic.small_core_count 
+                                * DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
                                 / 1000.0f;
 
     if (hash_rate < expected_hashrate_mhs) {
@@ -443,16 +443,16 @@ void self_test(void * pvParameters)
     }
 
     // TODO: Maybe make a test equivalent for test values
-    if (GLOBAL_STATE.DEVICE_CONFIG.INA260) {
-        if (test_INA260_power_consumption(GLOBAL_STATE.DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-            ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float)GLOBAL_STATE.DEVICE_CONFIG.power_consumption_target);
+    if (DEVICE_CONFIG.INA260) {
+        if (test_INA260_power_consumption(DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
+            ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float)DEVICE_CONFIG.power_consumption_target);
             display_msg("POWER:FAIL");
             tests_done(TESTS_FAILED);
         }
     }
-    if (GLOBAL_STATE.DEVICE_CONFIG.TPS546) {
-        if (test_TPS546_power_consumption(GLOBAL_STATE.DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-            ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)GLOBAL_STATE.DEVICE_CONFIG.power_consumption_target);
+    if (DEVICE_CONFIG.TPS546) {
+        if (test_TPS546_power_consumption(DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
+            ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)DEVICE_CONFIG.power_consumption_target);
             display_msg("POWER:FAIL");
             tests_done(TESTS_FAILED);
         }

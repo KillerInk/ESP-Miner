@@ -113,5 +113,6 @@ typedef struct
 extern GlobalState GLOBAL_STATE;
 extern SystemModule SYSTEM_MODULE;
 extern PowerManagementModule POWER_MANAGEMENT_MODULE;
+extern DeviceConfig DEVICE_CONFIG;
 
 #endif /* GLOBAL_STATE_H_ */
