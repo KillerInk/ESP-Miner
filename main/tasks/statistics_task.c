@@ -86,10 +86,9 @@ StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr 
     return nextNode;
 }
 
-void statistics_init(void * pvParameters)
+void statistics_init()
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-    GLOBAL_STATE->STATISTICS_MODULE.statisticsList = &statisticsDataStart;
+    STATISTICS_MODULE.statisticsList = &statisticsDataStart;
 }
 
 void statistics_task(void * pvParameters)

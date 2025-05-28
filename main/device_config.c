@@ -8,7 +8,7 @@
 
 static const char * TAG = "device_config";
 
-esp_err_t device_config_init(void * pvParameters)
+esp_err_t device_config_init()
 {
 
     // TODO: Read board version from eFuse

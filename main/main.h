@@ -3,6 +3,6 @@
 
 #include "connect.h"
 
-void self_test(void * pvParameters);
+void self_test();
 
 #endif /* MAIN_H_ */

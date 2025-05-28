@@ -53,9 +53,9 @@ static esp_err_t read_display_config()
 
     for (int i = 0 ; i < ARRAY_SIZE(display_configs); i++) {
         if (strcmp(display_configs[i].name, display_config) == 0) {
-            GLOBAL_STATE.DISPLAY_CONFIG = display_configs[i];
+            DISPLAY_CONFIG = display_configs[i];
 
-            ESP_LOGI(TAG, "%s", GLOBAL_STATE.DISPLAY_CONFIG.name);
+            ESP_LOGI(TAG, "%s", DISPLAY_CONFIG.name);
             free(display_config);
             return ESP_OK;
         }
@@ -71,7 +71,7 @@ esp_err_t display_init(void * pvParameters)
 
     const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
 
-    if (GLOBAL_STATE.DISPLAY_CONFIG.display == NONE) {
+    if (DISPLAY_CONFIG.display == NONE) {
         ESP_LOGI(TAG, "Initialize LVGL");
         ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL init failed");
         lv_display_create(1, 1);
@@ -90,7 +90,7 @@ esp_err_t display_init(void * pvParameters)
         .lcd_param_bits = LCD_PARAM_BITS,
     };
 
-    switch (GLOBAL_STATE.DISPLAY_CONFIG.display) {
+    switch (DISPLAY_CONFIG.display) {
         case SSD1306:
         case SSD1309:
             io_config.dc_bit_offset = 6;
@@ -112,11 +112,11 @@ esp_err_t display_init(void * pvParameters)
         .reset_gpio_num = -1,
     };
 
-    switch (GLOBAL_STATE.DISPLAY_CONFIG.display) {
+    switch (DISPLAY_CONFIG.display) {
         case SSD1306:
         case SSD1309:
             esp_lcd_panel_ssd1306_config_t ssd1306_config = {
-        .height = GLOBAL_STATE.DISPLAY_CONFIG.v_res,
+        .height = DISPLAY_CONFIG.v_res,
             };
             panel_config.vendor_config = &ssd1306_config;
             ESP_RETURN_ON_ERROR(esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle), TAG, "No display found");
@@ -146,10 +146,10 @@ esp_err_t display_init(void * pvParameters)
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,
         .panel_handle = panel_handle,
-        .buffer_size = GLOBAL_STATE.DISPLAY_CONFIG.h_res * GLOBAL_STATE.DISPLAY_CONFIG.v_res,
+        .buffer_size = DISPLAY_CONFIG.h_res * DISPLAY_CONFIG.v_res,
         .double_buffer = true,
-        .hres = GLOBAL_STATE.DISPLAY_CONFIG.h_res,
-        .vres = GLOBAL_STATE.DISPLAY_CONFIG.v_res,
+        .hres = DISPLAY_CONFIG.h_res,
+        .vres = DISPLAY_CONFIG.v_res,
         .monochrome = true,
         .color_format = LV_COLOR_FORMAT_RGB565,
         .rotation = {

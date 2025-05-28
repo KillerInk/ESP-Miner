@@ -670,8 +670,8 @@ int create_json_statistics_all(cJSON * root)
 
         cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
 
-        if (NULL != GLOBAL_STATE.STATISTICS_MODULE.statisticsList) {
-            StatisticsNodePtr node = *GLOBAL_STATE.STATISTICS_MODULE.statisticsList; // double pointer
+        if (NULL != STATISTICS_MODULE.statisticsList) {
+            StatisticsNodePtr node = *STATISTICS_MODULE.statisticsList; // double pointer
             struct StatisticsData statsData;
 
             while (NULL != node) {
@@ -709,8 +709,8 @@ int create_json_statistics_dashboard(cJSON * root)
         // create array for dashboard statistics
         cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
 
-        if (NULL != GLOBAL_STATE.STATISTICS_MODULE.statisticsList) {
-            StatisticsNodePtr node = *GLOBAL_STATE.STATISTICS_MODULE.statisticsList; // double pointer
+        if (NULL != STATISTICS_MODULE.statisticsList) {
+            StatisticsNodePtr node = *STATISTICS_MODULE.statisticsList; // double pointer
             struct StatisticsData statsData;
 
             while (NULL != node) {
@@ -1050,7 +1050,7 @@ void websocket_log_handler()
     }
 }
 
-esp_err_t start_rest_server(void * pvParameters)
+esp_err_t start_rest_server()
 {
 
     // Initialize the ASIC API with the global state

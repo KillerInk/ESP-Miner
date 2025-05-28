@@ -73,7 +73,7 @@ static void reset_self_test() {
 
 static void display_msg(char * msg) 
 {
-    GLOBAL_STATE.SELF_TEST_MODULE.message = msg;
+    SELF_TEST_MODULE.message = msg;
 }
 
 static esp_err_t test_fan_sense()
@@ -250,14 +250,13 @@ esp_err_t test_psram(){
  * This function is intended to be run as a task and will execute a series of 
  * diagnostic tests to ensure the system is functioning correctly.
  *
- * @param pvParameters Pointer to the parameters passed to the task (if any).
  */
-void self_test(void * pvParameters)
+void self_test()
 {
 
     ESP_LOGI(TAG, "Running Self Tests");
 
-    GLOBAL_STATE.SELF_TEST_MODULE.active = true;
+    SELF_TEST_MODULE.active = true;
 
     // Create a binary semaphore
     BootSemaphore = xSemaphoreCreateBinary();
@@ -344,11 +343,11 @@ void self_test(void * pvParameters)
         tests_done(TESTS_FAILED);
     }
 
-    GLOBAL_STATE.ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
+    ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
     GLOBAL_STATE.valid_jobs = malloc(sizeof(uint8_t) * 128);
 
     for (int i = 0; i < 128; i++) {
-        GLOBAL_STATE.ASIC_TASK_MODULE.active_jobs[i] = NULL;
+        ASIC_TASK_MODULE.active_jobs[i] = NULL;
         GLOBAL_STATE.valid_jobs[i] = 0;
     }
 
@@ -435,7 +434,7 @@ void self_test(void * pvParameters)
         tests_done(TESTS_FAILED);
     }
 
-    free(GLOBAL_STATE.ASIC_TASK_MODULE.active_jobs);
+    free(ASIC_TASK_MODULE.active_jobs);
     free(GLOBAL_STATE.valid_jobs);
 
     if (test_core_voltage() != ESP_OK) {
@@ -470,8 +469,8 @@ void self_test(void * pvParameters)
 
 static void tests_done(bool test_result) 
 {
-    GLOBAL_STATE.SELF_TEST_MODULE.result = test_result;
-    GLOBAL_STATE.SELF_TEST_MODULE.finished = true;
+    SELF_TEST_MODULE.result = test_result;
+    SELF_TEST_MODULE.finished = true;
     VCORE_set_voltage(0.0f);
 
     if (test_result == TESTS_FAILED) {

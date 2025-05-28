@@ -32,6 +32,11 @@ GlobalState GLOBAL_STATE = {
 SystemModule SYSTEM_MODULE;
 PowerManagementModule POWER_MANAGEMENT_MODULE;
 DeviceConfig DEVICE_CONFIG;
+DisplayConfig DISPLAY_CONFIG;
+AsicTaskModule ASIC_TASK_MODULE;
+SelfTestModule SELF_TEST_MODULE;
+StatisticsModule STATISTICS_MODULE;
+
 
 static const char * TAG = "bitaxe";
 
@@ -62,7 +67,7 @@ void app_main(void)
         return;
     }
 
-    if (device_config_init(&GLOBAL_STATE) != ESP_OK) {
+    if (device_config_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init device config");
         return;
     }
@@ -70,18 +75,18 @@ void app_main(void)
     // Optionally hold the boot button
     bool pressed = gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
     //should we run the self test?
-    if (should_test(&GLOBAL_STATE) || pressed) {
-        self_test((void *) &GLOBAL_STATE);
+    if (should_test() || pressed) {
+        self_test();
         return;
     }
 
-    SYSTEM_init_system(&GLOBAL_STATE);
-    statistics_init(&GLOBAL_STATE);
+    SYSTEM_init_system();
+    statistics_init();
 
     // init AP and connect to wifi
-    wifi_init(&GLOBAL_STATE);
+    wifi_init();
 
-    SYSTEM_init_peripherals(&GLOBAL_STATE);
+    SYSTEM_init_peripherals();
 
     // This needs to be done before the power management task starts
     POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
@@ -90,7 +95,7 @@ void app_main(void)
     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, NULL,10, NULL);
 
     //start the API for AxeOS
-    start_rest_server((void *) &GLOBAL_STATE);
+    start_rest_server();
 
     while (!SYSTEM_MODULE.is_connected) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -107,13 +112,13 @@ void app_main(void)
 
     SERIAL_init();
 
-    if (ASIC_init(&GLOBAL_STATE) == 0) {
+    if (ASIC_init() == 0) {
         SYSTEM_MODULE.asic_status = "Chip count 0";
         ESP_LOGE(TAG, "Chip count 0");
         return;
     }
 
-    SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
+    SERIAL_set_baud(ASIC_set_max_baud());
     SERIAL_clear_buffer();
 
     GLOBAL_STATE.ASIC_initalized = true;
@@ -122,5 +127,5 @@ void app_main(void)
     xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, NULL, 10, NULL);
     xTaskCreate(ASIC_result_task, "asic result", 8192, NULL, 15, NULL);
-    xTaskCreate(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL);
+    xTaskCreate(statistics_task, "statistics", 8192, NULL, 3, NULL);
 }

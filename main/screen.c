@@ -328,11 +328,11 @@ static void screen_update_cb(lv_timer_t * timer)
     
     
 
-    if (GLOBAL_STATE.SELF_TEST_MODULE.active) {
+    if (SELF_TEST_MODULE.active) {
 
         screen_show(SCR_SELF_TEST);
 
-        SelfTestModule * self_test = &GLOBAL_STATE.SELF_TEST_MODULE;
+        SelfTestModule * self_test = &SELF_TEST_MODULE;
 
         lv_label_set_text(self_test_message_label, self_test->message);
 
@@ -474,7 +474,7 @@ void screen_next()
         }
         // If the candidate screen is SCR_WIFI_RSSI AND this is NOT a bigger display,
         // then this screen should be skipped, and the loop will continue to find the next one.
-    } while (next_scr == SCR_WIFI_RSSI && GLOBAL_STATE.DISPLAY_CONFIG.v_res / 8 != 8);
+    } while (next_scr == SCR_WIFI_RSSI && DISPLAY_CONFIG.v_res / 8 != 8);
 
     screen_show(next_scr);
 }

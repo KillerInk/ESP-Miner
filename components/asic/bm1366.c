@@ -398,11 +398,11 @@ void BM1366_send_work(bm_job * next_bm_job)
     memcpy(job.prev_block_hash, next_bm_job->prev_block_hash_be, 32);
     memcpy(&job.version, &next_bm_job->version, 4);
 
-    if (GLOBAL_STATE.ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
-        free_bm_job(GLOBAL_STATE.ASIC_TASK_MODULE.active_jobs[job.job_id]);
+    if (ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
+        free_bm_job(ASIC_TASK_MODULE.active_jobs[job.job_id]);
     }
 
-    GLOBAL_STATE.ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
+    ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
 
     pthread_mutex_lock(&GLOBAL_STATE.valid_jobs_lock);
     GLOBAL_STATE.valid_jobs[job.job_id] = 1;
@@ -436,7 +436,7 @@ task_result * BM1366_process_work()
         return NULL;
     }
 
-    uint32_t rolled_version = GLOBAL_STATE.ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
+    uint32_t rolled_version = ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
 
     result.job_id = job_id;
     result.nonce = asic_result.nonce;
