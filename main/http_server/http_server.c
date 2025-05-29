@@ -564,7 +564,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     get_wifi_current_rssi(&wifi_rssi);
 
     cJSON * root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "power", POWER_MANAGEMENT_MODULE.power);
+    cJSON_AddNumberToObject(root, "power", POWER_MANAGEMENT_MODULE.power * 1.46);
     cJSON_AddNumberToObject(root, "voltage", POWER_MANAGEMENT_MODULE.voltage);
     cJSON_AddNumberToObject(root, "current", Power_get_current());
     cJSON_AddNumberToObject(root, "temp", POWER_MANAGEMENT_MODULE.chip_temp_avg);
@@ -681,7 +681,7 @@ int create_json_statistics_all(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power *1.46));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltage));
@@ -719,7 +719,7 @@ int create_json_statistics_dashboard(cJSON * root)
                 cJSON * valueArray = cJSON_CreateArray();
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power * 1.46));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.frequency));
