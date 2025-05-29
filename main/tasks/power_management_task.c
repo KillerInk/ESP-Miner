@@ -61,8 +61,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     pid_set_output_limits(&pid, 25, 100); // Output limits 25% to 100%
     pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
 
-    PowerManagementModule * power_management = &POWER_MANAGEMENT_MODULE;
-    SystemModule * sys_module = &SYSTEM_MODULE;
 
     POWER_MANAGEMENT_MODULE.frequency_multiplier = 1;
 

@@ -732,7 +732,6 @@ float TPS546_get_vout(void)
 esp_err_t TPS546_check_status() {
 
     uint16_t status;
-    SystemModule * sys_module = &SYSTEM_MODULE;
 
     ESP_RETURN_ON_ERROR(smb_read_word(PMBUS_STATUS_WORD, &status), TAG, "Failed to read STATUS_WORD");
     //determine if this is a fault we care about
