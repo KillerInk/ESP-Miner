@@ -14,8 +14,8 @@ double avg_hashrate_auto;
 uint8_t auto_tune_counter = 0;
 bool lastVoltageSet = false;
 
-double autotune_power_limit = 38.;
-uint16_t autotune_fan_limit = 80;
+double autotune_power_limit = 30.;
+uint16_t autotune_fan_limit = 60;
 uint8_t autotune_step_volt = 1;
 uint8_t autotune_step_freq_rampup = 5;
 uint8_t autotune_step_freq = 2;
