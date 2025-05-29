@@ -411,9 +411,9 @@ static void screen_update_cb(lv_timer_t * timer)
         lv_label_set_text_fmt(hashrate_label, "Gh/s: %.2f", module->current_hashrate);
     }
 
-    if (current_power != power_management->power || current_hashrate != module->current_hashrate) {
-        if (power_management->power > 0 && module->current_hashrate > 0) {
-            float efficiency = power_management->power / (module->current_hashrate / 1000.0);
+    if (current_power != POWER_MANAGEMENT_MODULE.power || current_hashrate != module->current_hashrate) {
+        if (POWER_MANAGEMENT_MODULE.power > 0 && module->current_hashrate > 0) {
+            float efficiency = POWER_MANAGEMENT_MODULE.power / (module->current_hashrate / 1000.0);
             lv_label_set_text_fmt(efficiency_label, "J/Th: %.2f", efficiency);
         }
     }
@@ -433,8 +433,8 @@ static void screen_update_cb(lv_timer_t * timer)
         }
     }
 
-    if (current_chip_temp != power_management->chip_temp_avg && power_management->chip_temp_avg > 0) {
-        lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", power_management->chip_temp_avg);
+    if (current_chip_temp != POWER_MANAGEMENT_MODULE.chip_temp_avg && POWER_MANAGEMENT_MODULE.chip_temp_avg > 0) {
+        lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", POWER_MANAGEMENT_MODULE.chip_temp_avg);
     }
 
     
@@ -451,9 +451,9 @@ static void screen_update_cb(lv_timer_t * timer)
     
 
     current_hashrate = module->current_hashrate;
-    current_power = power_management->power;
+    current_power = POWER_MANAGEMENT_MODULE.power;
     current_difficulty = module->best_session_nonce_diff;
-    current_chip_temp = power_management->chip_temp_avg;
+    current_chip_temp = POWER_MANAGEMENT_MODULE.chip_temp_avg;
 
     if (current_screen_time_ms <= current_screen_delay_ms || found_block) {
         return;
