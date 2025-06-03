@@ -1,4 +1,4 @@
-import { Component, ViewChild } from '@angular/core';
+import { Component, HostListener, ViewChild } from '@angular/core';
 import { Chart } from 'chart.js';
 import { ChartModule, UIChart } from 'primeng/chart';
 import { interval, map, min, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
@@ -45,6 +45,7 @@ export class HomeComponent {
   public activePoolLabel!: 'Primary' | 'Fallback';
   @ViewChild('chart')
   private chart?: UIChart
+  private visibleItemCount = 0;
 
   constructor(
     private systemService: SystemService,
@@ -59,6 +60,35 @@ export class HomeComponent {
     this.themeService.getThemeSettings().subscribe(() => {
       this.updateChartColors();
     });
+  }
+
+  @HostListener('wheel', ['$event'])
+  onMouseWheel(event: WheelEvent) {
+    //todo check target
+    if (event.deltaY > 0)
+      this.visibleItemCount++;
+    else
+      this.visibleItemCount--;
+    if(this.visibleItemCount > this.dataLabel.length)
+      this.visibleItemCount = this.dataLabel.length;
+    if(this.visibleItemCount < 5)
+      this.visibleItemCount = 5;
+    this.setTimeLimits();
+    event.returnValue = false;
+  }
+
+  private setTimeLimits() {
+    this.chartOptions.scales.x.max = this.dataLabel[this.dataLabel.length];
+    var min = this.dataLabel.length - this.visibleItemCount;
+    if (min <= 0) {
+      min = 0
+      this.visibleItemCount = this.dataLabel.length;
+    }
+    if(min >= this.dataLabel.length)
+      min = this.dataLabel.length -5;
+    this.chartOptions.scales.x.min = this.dataLabel[min];
+
+    this.chart?.refresh();
   }
 
   private updateChartColors() {
@@ -112,8 +142,7 @@ export class HomeComponent {
     this.chartData = { ...this.chartData };
   }
 
-  private startGetInfo()
-  {
+  private startGetInfo() {
     this.info$ = interval(5000).pipe(
       startWith(() => this.systemService.getInfo()),
       switchMap(() => {
@@ -130,6 +159,8 @@ export class HomeComponent {
           this.fanspeed.push(info.fanspeed);
           this.avghashrateData.push(info.avghashRate * 1000000000);
           this.dataLabel.push(new Date().getTime());
+          this.visibleItemCount++;
+          this.setTimeLimits();
 
           if (this.hashrateData.length >= 720) {
             this.hashrateData.shift();
@@ -140,6 +171,8 @@ export class HomeComponent {
             this.dataLabel.shift();
             this.fanspeed.shift();
             this.avghashrateData.shift();
+            this.visibleItemCount--;
+            this.setTimeLimits();
           }
           this.chart?.refresh();
         }
@@ -167,10 +200,10 @@ export class HomeComponent {
         return info;
       }),
       shareReplay({ refCount: true, bufferSize: 1 })
-      
+
     );
     // live data
-    
+
     this.quickLink$ = this.info$.pipe(
       map(info => {
         const url = info.isUsingFallbackStratum ? info.fallbackStratumURL : info.stratumURL;
@@ -450,6 +483,8 @@ export class HomeComponent {
         this.mhzData.push(element[idxFreqency]);
         this.fanspeed.push(element[idxFanSpeed]);
         this.avghashrateData.push(element[idxAvgHashrate] * 1000000000);
+        this.visibleItemCount++;
+        this.setTimeLimits();
 
         if (this.hashrateData.length >= 720) {
           this.hashrateData.shift();
@@ -460,13 +495,15 @@ export class HomeComponent {
           this.dataLabel.shift();
           this.fanspeed.shift();
           this.avghashrateData.shift();
+          this.visibleItemCount--;
+          this.setTimeLimits();
         }
       }),
-      this.chart?.refresh(),
-      this.startGetInfo();
+        this.chart?.refresh(),
+        this.startGetInfo();
     });
 
-    
+
   }
 
   getRejectionExplanation(reason: string): string | null {
