@@ -12,10 +12,10 @@ double current_hashrate_auto;
 double avg_hashrate_auto;
 
 uint8_t auto_tune_counter = 0;
-bool lastVoltageSet = false;
+bool lastVoltageSet = true;
 
-double autotune_power_limit = 30.;
-uint16_t autotune_fan_limit = 60;
+double autotune_power_limit = 20.;
+uint16_t autotune_fan_limit = 75;
 uint8_t autotune_step_volt = 1;
 uint8_t autotune_step_freq_rampup = 5;
 uint8_t autotune_step_freq = 2;
@@ -62,7 +62,7 @@ bool should_do_work()
 
 bool can_increase_values()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc < autotune_fan_limit - 2 &&
+    return POWER_MANAGEMENT_MODULE.fan_perc < autotune_fan_limit &&
            POWER_MANAGEMENT_MODULE.power < autotune_power_limit;
 }
 
@@ -91,7 +91,7 @@ void respectLimits()
 
 bool limithit()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit +3 ||
+    return POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit +2 ||
            POWER_MANAGEMENT_MODULE.power >= autotune_power_limit ||
            POWER_MANAGEMENT_MODULE.chip_temp_avg >= max_asic_temperatur;
 }
@@ -199,13 +199,14 @@ void auto_tune(bool pid_control_fanspeed)
     case warmup:
         autotune_step = autotune_step_freq_rampup;
         dowork();
-        if(POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit)
+        if(limithit())
+        {
+            autotune_step = autotune_step_freq;
             state = working;
+        }
     break;
     case working:
-        autotune_step = autotune_step_freq;
         dowork();
-
         break;
     
     }
