@@ -16,7 +16,7 @@
 #include <string.h>
 #include <auto_tune.h>
 
-#define POLL_RATE 1000
+#define POLL_RATE 1800
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
@@ -167,7 +167,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         uint16_t core_voltage;
         uint16_t asic_frequency;
 
-        if (!auto_tune_hashrate) {
+        if (!auto_tune_hashrate || !pid_control_fanspeed) {
             core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
             asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
         } else {
