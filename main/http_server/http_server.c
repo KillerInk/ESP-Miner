@@ -721,7 +721,7 @@ int create_json_statistics_dashboard(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltage));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.frequency));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.avghashrate));
