@@ -1,7 +1,7 @@
-import { Component, HostListener, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
 import { Chart } from 'chart.js';
 import { ChartModule, UIChart } from 'primeng/chart';
-import { interval, map, min, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
+import { fromEvent, interval, map, min, Observable, shareReplay, startWith, switchMap, takeUntil, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
@@ -47,16 +47,70 @@ export class HomeComponent {
   private chart?: UIChart
   private visibleItemCount = 0;
   private itemPosition = 0;
-  private mousebuttonpressed = false;
   private mousestartposition = 0;
+  private stepcount = 0;
 
   constructor(
     private systemService: SystemService,
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
     private shareRejectReasonsService: ShareRejectionExplanationService,
-
+    private el: ElementRef,
   ) {
+    const element = el.nativeElement;
+    const mousedown$ = fromEvent(element, 'mousedown');
+    const mousemove$ = fromEvent(document, 'mousemove');
+    const mouseup$ = fromEvent(element, 'mouseup');
+    const mousewheel$ = fromEvent(element, 'mousewheel');
+
+    mousedown$
+      .pipe(
+        switchMap((x) =>
+          mousemove$.pipe(
+            tap((event: any) => {
+              
+              if (this.stepcount == 5) {
+                if (this.mousestartposition > event.pageX) {
+                  this.itemPosition++;
+                  this.mousestartposition = event.pageX;
+                }
+                else if (this.mousestartposition < event.pageX) {
+                  this.itemPosition--;
+                  this.mousestartposition = event.pageX;
+                }
+                this.stepcount = 0;
+                if (this.itemPosition > 0)
+                  this.itemPosition = 0;
+              }
+              else
+                this.stepcount++;
+              console.log("mousemove " + this.itemPosition);
+              this.setTimeLimits();
+            }),
+            takeUntil(mouseup$)
+          )
+        ),
+      )
+      .subscribe();
+
+    mousewheel$.pipe(
+      tap(
+        (event: any) => {
+          event.preventDefault();
+          if (event.deltaY > 0)
+            this.visibleItemCount++;
+          else
+            this.visibleItemCount--;
+          if (this.visibleItemCount > this.dataLabel.length)
+            this.visibleItemCount = this.dataLabel.length;
+          if (this.visibleItemCount < 5)
+            this.visibleItemCount = 5;
+          this.setTimeLimits();
+
+        }
+      ),
+    ).subscribe();
+
     this.initializeChart();
 
     // Subscribe to theme changes
@@ -65,68 +119,15 @@ export class HomeComponent {
     });
   }
 
-  @HostListener('wheel', ['$event'])
-  onMouseWheel(event: WheelEvent) {
-    //todo check target
-    if (event.deltaY > 0)
-      this.visibleItemCount++;
-    else
-      this.visibleItemCount--;
-    if (this.visibleItemCount > this.dataLabel.length)
-      this.visibleItemCount = this.dataLabel.length;
-    if (this.visibleItemCount < 5)
-      this.visibleItemCount = 5;
-    this.setTimeLimits();
-    event.preventDefault();
-  }
-
-  @HostListener('mousedown', ['$event'])
-  onMouseDown(event: MouseEvent) {
-    this.mousebuttonpressed = true;
-    this.mousestartposition = event.pageX;
-    console.log("mousedown");
-  }
-
-  @HostListener('mouseup', ['$event'])
-  onMouseUp(event: MouseEvent) {
-    this.mousebuttonpressed = false;
-    this.mousestartposition = 0;
-    console.log("mouseup");
-  }
-
-  private stepcount = 0;
-  @HostListener('mousemove', ['$event'])
-  onMouseMove(event: MouseEvent) {
-    if (this.mousebuttonpressed && this.stepcount == 5) {
-      if (this.mousestartposition > event.pageX) {
-        this.itemPosition++;
-        this.mousestartposition = event.pageX;
-      }
-      else if (this.mousestartposition < event.pageX) {
-        this.itemPosition--;
-        this.mousestartposition = event.pageX;
-      }
-      this.stepcount = 0;
-      if (this.itemPosition > 0)
-        this.itemPosition = 0;
-    }
-    else if (this.mousebuttonpressed)
-      this.stepcount++;
-
-
-    console.log("mousemove " + this.itemPosition);
-    this.setTimeLimits();
-  }
-
   private setTimeLimits() {
-    var min = (this.dataLabel.length - this.visibleItemCount)+ this.itemPosition;
+    var min = (this.dataLabel.length - this.visibleItemCount) + this.itemPosition;
     if (min < 0) {
       min = 0
       this.itemPosition++;
       return;
     }
     var max = this.dataLabel.length + this.itemPosition;
-    
+
     if (min >= this.dataLabel.length)
       min = this.dataLabel.length - 5;
     if (max > this.dataLabel.length)
@@ -208,7 +209,7 @@ export class HomeComponent {
           this.avghashrateData.push(info.avghashRate * 1000000000);
           this.dataLabel.push(new Date().getTime());
           this.visibleItemCount++;
-          if(this.itemPosition < 0)
+          if (this.itemPosition < 0)
             this.itemPosition--;
           this.setTimeLimits();
 
