@@ -97,7 +97,7 @@ export class HomeComponent {
   private stepcount = 0;
   @HostListener('mousemove', ['$event'])
   onMouseMove(event: MouseEvent) {
-    if (this.mousebuttonpressed && this.stepcount == 10) {
+    if (this.mousebuttonpressed && this.stepcount == 5) {
       if (this.mousestartposition > event.pageX) {
         this.itemPosition++;
         this.mousestartposition = event.pageX;
@@ -135,6 +135,7 @@ export class HomeComponent {
     this.chartOptions.scales.x.max = this.dataLabel[max];
     console.log("max:" + (max));
     console.log("min:" + (min));
+    console.log("itempos:" + (this.itemPosition));
     this.chart?.refresh();
   }
 
@@ -207,6 +208,8 @@ export class HomeComponent {
           this.avghashrateData.push(info.avghashRate * 1000000000);
           this.dataLabel.push(new Date().getTime());
           this.visibleItemCount++;
+          if(this.itemPosition < 0)
+            this.itemPosition--;
           this.setTimeLimits();
 
           if (this.hashrateData.length >= 720) {
