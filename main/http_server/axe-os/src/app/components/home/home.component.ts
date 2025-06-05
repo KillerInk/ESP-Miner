@@ -46,6 +46,9 @@ export class HomeComponent {
   @ViewChild('chart')
   private chart?: UIChart
   private visibleItemCount = 0;
+  private itemPosition = 0;
+  private mousebuttonpressed = false;
+  private mousestartposition = 0;
 
   constructor(
     private systemService: SystemService,
@@ -69,25 +72,69 @@ export class HomeComponent {
       this.visibleItemCount++;
     else
       this.visibleItemCount--;
-    if(this.visibleItemCount > this.dataLabel.length)
+    if (this.visibleItemCount > this.dataLabel.length)
       this.visibleItemCount = this.dataLabel.length;
-    if(this.visibleItemCount < 5)
+    if (this.visibleItemCount < 5)
       this.visibleItemCount = 5;
     this.setTimeLimits();
-    event.returnValue = false;
+    event.preventDefault();
+  }
+
+  @HostListener('mousedown', ['$event'])
+  onMouseDown(event: MouseEvent) {
+    this.mousebuttonpressed = true;
+    this.mousestartposition = event.pageX;
+    console.log("mousedown");
+  }
+
+  @HostListener('mouseup', ['$event'])
+  onMouseUp(event: MouseEvent) {
+    this.mousebuttonpressed = false;
+    this.mousestartposition = 0;
+    console.log("mouseup");
+  }
+
+  private stepcount = 0;
+  @HostListener('mousemove', ['$event'])
+  onMouseMove(event: MouseEvent) {
+    if (this.mousebuttonpressed && this.stepcount == 10) {
+      if (this.mousestartposition > event.pageX) {
+        this.itemPosition++;
+        this.mousestartposition = event.pageX;
+      }
+      else if (this.mousestartposition < event.pageX) {
+        this.itemPosition--;
+        this.mousestartposition = event.pageX;
+      }
+      this.stepcount = 0;
+      if (this.itemPosition > 0)
+        this.itemPosition = 0;
+    }
+    else if (this.mousebuttonpressed)
+      this.stepcount++;
+
+
+    console.log("mousemove " + this.itemPosition);
+    this.setTimeLimits();
   }
 
   private setTimeLimits() {
-    this.chartOptions.scales.x.max = this.dataLabel[this.dataLabel.length];
-    var min = this.dataLabel.length - this.visibleItemCount;
-    if (min <= 0) {
+    var min = (this.dataLabel.length - this.visibleItemCount)+ this.itemPosition;
+    if (min < 0) {
       min = 0
-      this.visibleItemCount = this.dataLabel.length;
+      this.itemPosition++;
+      return;
     }
-    if(min >= this.dataLabel.length)
-      min = this.dataLabel.length -5;
+    var max = this.dataLabel.length + this.itemPosition;
+    
+    if (min >= this.dataLabel.length)
+      min = this.dataLabel.length - 5;
+    if (max > this.dataLabel.length)
+      max = this.dataLabel.length;
     this.chartOptions.scales.x.min = this.dataLabel[min];
-
+    this.chartOptions.scales.x.max = this.dataLabel[max];
+    console.log("max:" + (max));
+    console.log("min:" + (min));
     this.chart?.refresh();
   }
 
