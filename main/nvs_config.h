@@ -35,6 +35,8 @@
 #define NVS_CONFIG_SWARM "swarmconfig"
 #define NVS_CONFIG_STATISTICS_LIMIT "statsLimit"
 #define NVS_CONFIG_STATISTICS_DURATION "statsDuration"
+#define NVS_CONFIG_POWER_LIMIT "powerlimit"
+#define NVS_CONFIG_FAN_LIMIT "fanlimit"
 
 // Theme configuration
 #define NVS_CONFIG_THEME_SCHEME "themescheme"
