@@ -62,7 +62,8 @@ bool should_do_work()
 
 bool can_increase_values()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc < autotune_fan_limit && POWER_MANAGEMENT_MODULE.power < autotune_power_limit;
+    return POWER_MANAGEMENT_MODULE.fan_perc < autotune_fan_limit && POWER_MANAGEMENT_MODULE.power < autotune_power_limit &&
+           POWER_MANAGEMENT_MODULE.chip_temp_avg < max_asic_temperatur;
 }
 
 bool hashrate_increase()
@@ -90,7 +91,8 @@ void respectLimits()
 
 bool limithit()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit + 2 || POWER_MANAGEMENT_MODULE.power >= autotune_power_limit ||
+    return POWER_MANAGEMENT_MODULE.fan_perc >= autotune_fan_limit + 5 ||
+           POWER_MANAGEMENT_MODULE.power >= autotune_power_limit + 0.03 ||
            POWER_MANAGEMENT_MODULE.chip_temp_avg >= max_asic_temperatur;
 }
 
@@ -113,15 +115,29 @@ void increase_values()
     }
     // hash rate decrased with last set
     else {
-        // last set was voltage, increase now frequency
-        if (lastVoltageSet) {
-            last_asic_frequency_auto += autotune_step;
-            lastVoltageSet = false;
-        }
-        // last set was to frequency, increase voltage
-        else {
-            last_core_voltage_auto += autotune_step_volt;
-            lastVoltageSet = true;
+        if (limithit()) { // last set was voltage, increase now frequency
+            if (lastVoltageSet) {
+                last_core_voltage_auto -= autotune_step_volt;
+
+                lastVoltageSet = false;
+            }
+            // last set was to frequency, increase voltage
+            else {
+                last_asic_frequency_auto -= autotune_step;
+                lastVoltageSet = true;
+            }
+        } else { // last set was voltage, increase now frequency
+            if (lastVoltageSet) {
+                last_asic_frequency_auto += autotune_step;
+
+                lastVoltageSet = false;
+            }
+            // last set was to frequency, increase voltage
+            else {
+                last_core_voltage_auto += autotune_step_volt;
+                
+                lastVoltageSet = true;
+            }
         }
     }
     respectLimits();
@@ -133,11 +149,11 @@ void decrease_values()
         // last set was frequency
         if (!lastVoltageSet) {
             // decrease core voltage and hope that it helps to keep hashrate up
-            last_core_voltage_auto -= autotune_step_volt;
+            last_core_voltage_auto -= autotune_step_volt * 2;
 
         } else {
             // decrase frequency
-            last_asic_frequency_auto -= autotune_step;
+            last_asic_frequency_auto -= autotune_step * 2;
         }
     }
     // hashrate decrease
@@ -145,9 +161,9 @@ void decrease_values()
         // last set was voltage
         if (lastVoltageSet) {
             // undo voltage
-            last_core_voltage_auto -= autotune_step_volt*2;
+            last_core_voltage_auto -= autotune_step_volt * 2;
         } else {
-            last_asic_frequency_auto -= autotune_step*2;
+            last_asic_frequency_auto -= autotune_step * 2;
         }
     }
 }
@@ -167,8 +183,8 @@ void dowork()
                 last_core_voltage_auto -= autotune_step_volt * 2;
             }
         }
-        ESP_LOGI(TAG, "\n######### \n       voltage:%u frequency:%u hash last/cur:%f %f \n#########", last_core_voltage_auto,
-                 last_asic_frequency_auto, last_hashrate_auto, current_hashrate_auto);
+        // ESP_LOGI(TAG, "\n######### \n       voltage:%u frequency:%u hash last/cur:%f %f \n#########", last_core_voltage_auto,
+        //          last_asic_frequency_auto, last_hashrate_auto, current_hashrate_auto);
 
     } else {
         auto_tune_counter++;
@@ -176,7 +192,7 @@ void dowork()
     if (avg_hashrate_auto == 0)
         avg_hashrate_auto = SYSTEM_MODULE.current_hashrate;
     else
-        avg_hashrate_auto = 0.995 * avg_hashrate_auto + 0.005 * SYSTEM_MODULE.current_hashrate;
+        avg_hashrate_auto = 0.997 * avg_hashrate_auto + 0.003 * SYSTEM_MODULE.current_hashrate;
     last_hashrate_auto = current_hashrate_auto;
     SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
     core_voltage = last_core_voltage_auto;
