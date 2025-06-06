@@ -551,9 +551,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
+    char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)");
     uint16_t frequency = POWER_MANAGEMENT_MODULE.frequency_value;
-    float expected_hashrate =
-        frequency * DEVICE_CONFIG.family.asic.small_core_count * DEVICE_CONFIG.family.asic_count / 1000.0;
+    float expected_hashrate = frequency * DEVICE_CONFIG.family.asic.small_core_count * DEVICE_CONFIG.family.asic_count / 1000.0;
 
     uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
@@ -623,7 +623,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED, 0));
-    cJSON_AddStringToObject(root, "display", nvs_config_get_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)"));
+    cJSON_AddStringToObject(root, "display", display);
     cJSON_AddNumberToObject(root, "flipscreen", nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1));
     cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
     cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1));
@@ -647,7 +647,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(fallbackStratumURL);
     free(stratumUser);
     free(fallbackStratumUser);
-
+    free(display);
+    
     const char * sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((char *) sys_info);
@@ -725,6 +726,8 @@ int create_json_statistics_dashboard(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.frequency));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.avghashrate));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap));
 
                 cJSON_AddItemToArray(statsArray, valueArray);
                 prebuffer++;
