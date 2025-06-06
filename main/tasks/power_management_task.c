@@ -40,6 +40,7 @@ double pid_d_startup = 20.0;  // Higher D value for startup
 
 bool pid_startup_phase = true;
 int pid_startup_counter = 0;
+double avg_fanspeed = 35;
 
 // Hold and Ramp startup D-term
 #define PID_STARTUP_HOLD_DURATION 3  // Number of cycles to HOLD pid_d_startup
@@ -143,11 +144,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 pid_compute(&pid);
                 // Uncomment for debugging PID output directly after compute
                 // ESP_LOGD(TAG, "DEBUG: PID raw output: %.2f%%, Input: %.1f, SetPoint: %.1f", pid_output, pid_input, pid_setPoint);
-
-                POWER_MANAGEMENT_MODULE.fan_perc = (uint16_t) pid_output;
-                Thermal_set_fan_percent(DEVICE_CONFIG, pid_output / 100.0);
+                avg_fanspeed = 0.93 * avg_fanspeed + 0.07 * pid_output;
+                POWER_MANAGEMENT_MODULE.fan_perc = (uint16_t) avg_fanspeed;
+                Thermal_set_fan_percent(DEVICE_CONFIG, avg_fanspeed / 100.0);
                 ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
-                         pid_input, pid_setPoint, pid_output, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
+                         pid_input, pid_setPoint, avg_fanspeed, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
             } else {
                 if (SYSTEM_MODULE.ap_enabled) {
                     ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%",
