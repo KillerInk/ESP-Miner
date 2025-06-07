@@ -8,9 +8,9 @@ typedef struct
     double power_limit;
     uint16_t fan_limit;
     uint8_t step_volt;
-    uint8_t step_freq_rampup;
-    uint8_t step_freq;
-    uint8_t autotune_step_frequency;
+    double step_freq_rampup;
+    double step_freq;
+    double autotune_step_frequency;
     uint8_t autotune_read_tick;
     uint16_t max_voltage_asic;
     uint16_t max_frequency_asic;

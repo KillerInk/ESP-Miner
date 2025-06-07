@@ -16,7 +16,7 @@
 #include <string.h>
 #include <auto_tune.h>
 
-#define POLL_RATE 500
+
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)

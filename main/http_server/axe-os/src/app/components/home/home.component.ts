@@ -32,7 +32,7 @@ export class HomeComponent {
   public fanspeed: number[] = [];
   public chartData?: any;
   public avghashrateData: number[] = [];
-   public espRam: number[] = [];
+  public espRam: number[] = [];
 
   public maxPower: number = 0;
   public nominalVoltage: number = 0;
@@ -494,7 +494,8 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          suggestedMax: 60
+          suggestedMax: 60,
+          min: 20
         },
         y3: {
           type: 'linear',
@@ -508,6 +509,7 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
+          min: 400,
           suggestedMax: 600
         }
         ,
@@ -523,7 +525,8 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          suggestedMax: 800
+          min: 800,
+          suggestedMax: 1200
         }
         ,
         y5: {
@@ -538,6 +541,8 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
+          suggestedMax: 80,
+          min: 20
         },
         y6: {
           ticks: {
@@ -565,7 +570,8 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          suggestedMax: 800
+          min:800,
+          suggestedMax: 1200
         }
         ,
         y8: {
@@ -574,13 +580,13 @@ export class HomeComponent {
           position: 'right',
           ticks: {
             color: espRamColor,
-            callback: (value: number) => value + 'byte'
+            callback: (value: number) => value/1024 + '/kb'
           },
           grid: {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          suggestedMax: 800
+          
         }
       }
     };
