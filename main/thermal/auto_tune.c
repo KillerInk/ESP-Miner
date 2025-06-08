@@ -112,31 +112,19 @@ void increase_values()
         else {
             last_core_voltage_auto += AUTO_TUNE.step_volt;
         }
-    } else if (current_hashrate_auto < avg_hashrate_auto) {
-        // hash rate decrased with last set
-        if (lastVoltageSet) {
-            // last_core_voltage_auto -= AUTO_TUNE.step_volt;
-            last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency;
-            lastVoltageSet = false;
-        }
-        // last set was to frequency, increase voltage
-        else {
-            // last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
-            last_core_voltage_auto += AUTO_TUNE.step_volt;
-            lastVoltageSet = true;
-        }
+     
     } else {
         // hash rate decrased with last set
         if (lastVoltageSet) {
             last_core_voltage_auto -= AUTO_TUNE.step_volt;
             last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency;
-            
+            lastVoltageSet = false;
         }
         // last set was to frequency, increase voltage
         else {
             last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
             last_core_voltage_auto += AUTO_TUNE.step_volt;
-            
+            lastVoltageSet = true;
         }
     }
     respectLimits();
@@ -144,16 +132,17 @@ void increase_values()
 
 void decrease_values()
 {
-    if (hashrate_increase()) {
+    if (!hashrate_increase()) {
         if (!lastVoltageSet) {
             // decrease core voltage and hope that it helps to keep hashrate up
-            last_core_voltage_auto -= AUTO_TUNE.step_volt;
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency * 2;
-
+            last_core_voltage_auto -= AUTO_TUNE.step_volt*2;
+            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency * 1;
+            lastVoltageSet = true;
         } else {
             // decrase frequency
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
-            last_core_voltage_auto -= AUTO_TUNE.step_volt * 2;
+            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency*2;
+            last_core_voltage_auto -= AUTO_TUNE.step_volt * 1;
+            lastVoltageSet = false;
         }
     } else {
         if (!lastVoltageSet) {
