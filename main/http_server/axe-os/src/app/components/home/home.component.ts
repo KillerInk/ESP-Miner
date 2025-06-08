@@ -1,6 +1,5 @@
 import { Component, HostListener, ViewChild } from '@angular/core';
 import { Chart } from 'chart.js';
-import { ChartModule, UIChart } from 'primeng/chart';
 import { interval, map, min, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
@@ -9,6 +8,7 @@ import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
+import { UIChart } from 'primeng/chart';
 
 
 @Component({
@@ -202,82 +202,7 @@ export class HomeComponent {
     this.chartData = { ...this.chartData };
   }
 
-  private startGetInfo() {
-    this.info$ = interval(5000).pipe(
-      startWith(() => this.systemService.getInfo()),
-      switchMap(() => {
-        return this.systemService.getInfo()
-      }),
-      tap(info => {
-        // Only collect and update chart data if there's no power fault
-        if (!info.power_fault) {
-          this.hashrateData.push(info.hashRate * 1000000000);
-          this.temperatureData.push(info.temp);
-          this.mhzData.push(info.frequency);
-          this.coreVoltageData.push(info.coreVoltage);
-          this.powerData.push(info.power);
-          this.fanspeed.push(info.fanspeed);
-          this.avghashrateData.push(info.avghashRate * 1000000000);
-          this.dataLabel.push(new Date().getTime());
-          this.coreVoltageCurrentData.push(info.coreVoltageActual);
-          this.espRam.push(info.freeHeap);
-          this.visibleItemCount++;
-          if (this.itemPosition < 0)
-            this.itemPosition--;
-          this.setTimeLimits();
 
-          if (this.hashrateData.length >= 720) {
-            this.hashrateData.shift();
-            this.temperatureData.shift();
-            this.mhzData.shift();
-            this.coreVoltageData.shift();
-            this.powerData.shift();
-            this.dataLabel.shift();
-            this.fanspeed.shift();
-            this.avghashrateData.shift();
-            this.coreVoltageCurrentData.shift();
-            this.espRam.shift();
-            this.visibleItemCount--;
-            this.setTimeLimits();
-          }
-          this.chart?.refresh();
-        }
-
-        this.maxPower = Math.max(info.maxPower, info.power);
-        this.nominalVoltage = info.nominalVoltage;
-        this.maxTemp = Math.max(75, info.temp);
-        this.maxFrequency = Math.max(800, info.frequency);
-
-        const isFallback = info.isUsingFallbackStratum;
-
-        this.activePoolLabel = isFallback ? 'Fallback' : 'Primary';
-        this.activePoolURL = isFallback ? info.fallbackStratumURL : info.stratumURL;
-        this.activePoolUser = isFallback ? info.fallbackStratumUser : info.stratumUser;
-        this.activePoolPort = isFallback ? info.fallbackStratumPort : info.stratumPort;
-      }),
-      map(info => {
-        info.power = parseFloat(info.power.toFixed(1))
-        info.voltage = parseFloat((info.voltage / 1000).toFixed(1));
-        info.current = parseFloat((info.current / 1000).toFixed(1));
-        info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
-        info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
-        info.temp = parseFloat(info.temp.toFixed(1));
-
-        return info;
-      }),
-      shareReplay({ refCount: true, bufferSize: 1 })
-
-    );
-    // live data
-
-    this.quickLink$ = this.info$.pipe(
-      map(info => {
-        const url = info.isUsingFallbackStratum ? info.fallbackStratumURL : info.stratumURL;
-        const user = info.isUsingFallbackStratum ? info.fallbackStratumUser : info.stratumUser;
-        return this.quickLinkService.getQuickLink(url, user);
-      })
-    );
-  }
 
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
@@ -298,7 +223,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'Hashrate',
-          data: this.hashrateData,
+          data: [this.hashrateData],
           backgroundColor: textColorSecondary + '30',
           borderColor: textColorSecondary,
           tension: 0,
@@ -311,7 +236,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'ASIC Temp',
-          data: this.temperatureData,
+          data: [this.temperatureData],
           fill: false,
           backgroundColor: primaryColor,
           borderColor: primaryColor,
@@ -570,7 +495,7 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          min:800,
+          min: 800,
           suggestedMax: 1200
         }
         ,
@@ -580,13 +505,13 @@ export class HomeComponent {
           position: 'right',
           ticks: {
             color: espRamColor,
-            callback: (value: number) => value/1024 + '/kb'
+            callback: (value: number) => value / 1024 + '/kb'
           },
           grid: {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          
+
         }
       }
     };
@@ -628,7 +553,6 @@ export class HomeComponent {
         this.espRam.push(element[idxFreeHeap]);
         this.visibleItemCount++;
         this.setTimeLimits();
-
         if (this.hashrateData.length >= 720) {
           this.hashrateData.shift();
           this.temperatureData.shift();
@@ -646,8 +570,83 @@ export class HomeComponent {
         this.chart?.refresh(),
         this.startGetInfo();
     });
+  }
 
+  private startGetInfo() {
+    this.info$ = interval(5000).pipe(
+      startWith(() => this.systemService.getInfo()),
+      switchMap(() => {
+        return this.systemService.getInfo()
+      }),
+      tap(info => {
+        // Only collect and update chart data if there's no power fault
+        if (!info.power_fault) {
+          this.hashrateData.push(info.hashRate * 1000000000);
+          this.temperatureData.push(info.temp);
+          this.mhzData.push(info.frequency);
+          this.coreVoltageData.push(info.coreVoltage);
+          this.powerData.push(info.power);
+          this.fanspeed.push(info.fanspeed);
+          this.avghashrateData.push(info.avghashRate * 1000000000);
+          this.dataLabel.push(new Date().getTime());
+          this.coreVoltageCurrentData.push(info.coreVoltageActual);
+          this.espRam.push(info.freeHeap);
+          this.visibleItemCount++;
+          if (this.itemPosition < 0)
+            this.itemPosition--;
+          this.setTimeLimits();
 
+          if (this.hashrateData.length >= 720) {
+            this.hashrateData.shift();
+            this.temperatureData.shift();
+            this.mhzData.shift();
+            this.coreVoltageData.shift();
+            this.powerData.shift();
+            this.dataLabel.shift();
+            this.fanspeed.shift();
+            this.avghashrateData.shift();
+            this.coreVoltageCurrentData.shift();
+            this.espRam.shift();
+            this.visibleItemCount--;
+            this.setTimeLimits();
+          }
+          this.chart?.refresh();
+        }
+
+        this.maxPower = Math.max(info.maxPower, info.power);
+        this.nominalVoltage = info.nominalVoltage;
+        this.maxTemp = Math.max(75, info.temp);
+        this.maxFrequency = Math.max(800, info.frequency);
+
+        const isFallback = info.isUsingFallbackStratum;
+
+        this.activePoolLabel = isFallback ? 'Fallback' : 'Primary';
+        this.activePoolURL = isFallback ? info.fallbackStratumURL : info.stratumURL;
+        this.activePoolUser = isFallback ? info.fallbackStratumUser : info.stratumUser;
+        this.activePoolPort = isFallback ? info.fallbackStratumPort : info.stratumPort;
+      }),
+      map(info => {
+        info.power = parseFloat(info.power.toFixed(1))
+        info.voltage = parseFloat((info.voltage / 1000).toFixed(1));
+        info.current = parseFloat((info.current / 1000).toFixed(1));
+        info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
+        info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
+        info.temp = parseFloat(info.temp.toFixed(1));
+
+        return info;
+      }),
+      shareReplay({ refCount: true, bufferSize: 1 })
+
+    );
+    // live data
+
+    this.quickLink$ = this.info$.pipe(
+      map(info => {
+        const url = info.isUsingFallbackStratum ? info.fallbackStratumURL : info.stratumURL;
+        const user = info.isUsingFallbackStratum ? info.fallbackStratumUser : info.stratumUser;
+        return this.quickLinkService.getQuickLink(url, user);
+      })
+    );
   }
 
   getRejectionExplanation(reason: string): string | null {
