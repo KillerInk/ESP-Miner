@@ -10,9 +10,9 @@ static const char * TAG = "auto_tune";
 auto_tune_settings AUTO_TUNE = {.power_limit = 20,
                                 .fan_limit = 75,
                                 .step_volt = 1,
-                                .step_freq_rampup = 4,
+                                .step_freq_rampup = 1.6,
                                 .step_freq = 0.8,
-                                .autotune_step_frequency = 5,
+                                .autotune_step_frequency = 0,
                                 .max_voltage_asic = 1400,
                                 .max_frequency_asic = 1000,
                                 .max_asic_temperatur = 65,
@@ -86,8 +86,16 @@ void respectLimits()
 
     if (last_asic_frequency_auto >= AUTO_TUNE.max_frequency_asic)
         last_asic_frequency_auto = AUTO_TUNE.max_frequency_asic;
-    if (last_asic_frequency_auto <= 401)
-        last_asic_frequency_auto = 401;
+    if (last_asic_frequency_auto <= 401) {
+        last_asic_frequency_auto = 525;
+        last_core_voltage_auto = 1150;
+        lastVoltageSet = false;
+    }
+    if (last_core_voltage_auto <= 1001) {
+        last_asic_frequency_auto = 525;
+        last_core_voltage_auto = 1150;
+        lastVoltageSet = true;
+    }
 }
 
 bool limithit()
@@ -112,7 +120,7 @@ void increase_values()
         else {
             last_core_voltage_auto += AUTO_TUNE.step_volt;
         }
-     
+
     } else {
         // hash rate decrased with last set
         if (lastVoltageSet) {
@@ -136,7 +144,7 @@ void decrease_values()
         if (!lastVoltageSet) {
             // decrease core voltage and hope that it helps to keep hashrate up
             last_core_voltage_auto -= AUTO_TUNE.step_volt;
-            
+
         } else {
             // decrase frequency
             last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
@@ -163,8 +171,7 @@ void dowork()
         }
     } else if (can_increase_values()) {
         increase_values();
-    }
-    else
+    } else
         decrease_values();
 
     if (avg_hashrate_auto == 0)
