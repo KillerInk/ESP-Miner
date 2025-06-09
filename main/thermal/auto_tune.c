@@ -132,27 +132,22 @@ void increase_values()
 
 void decrease_values()
 {
-    if (!hashrate_increase()) {
-        if (!lastVoltageSet) {
-            // decrease core voltage and hope that it helps to keep hashrate up
-            last_core_voltage_auto -= AUTO_TUNE.step_volt*2;
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency * 1;
-            lastVoltageSet = true;
-        } else {
-            // decrase frequency
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency*2;
-            last_core_voltage_auto -= AUTO_TUNE.step_volt * 1;
-            lastVoltageSet = false;
-        }
-    } else {
+    if (hashrate_increase()) {
         if (!lastVoltageSet) {
             // decrease core voltage and hope that it helps to keep hashrate up
             last_core_voltage_auto -= AUTO_TUNE.step_volt;
-            lastVoltageSet = true;
+            
         } else {
             // decrase frequency
             last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
-            lastVoltageSet = false;
+        }
+    } else {
+        if (lastVoltageSet) {
+            // decrease core voltage and hope that it helps to keep hashrate up
+            last_core_voltage_auto -= AUTO_TUNE.step_volt;
+        } else {
+            // decrase frequency
+            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
         }
     }
 }
