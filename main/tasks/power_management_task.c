@@ -40,7 +40,7 @@ double pid_d_startup = 20.0;  // Higher D value for startup
 
 bool pid_startup_phase = true;
 int pid_startup_counter = 0;
-double avg_fanspeed = 35;
+double avg_fanspeed = 15;
 
 // Hold and Ramp startup D-term
 #define PID_STARTUP_HOLD_DURATION 3  // Number of cycles to HOLD pid_d_startup
@@ -59,7 +59,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     // Initialize PID controller with pid_d_startup and PID_REVERSE directly
     pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d_startup, PID_P_ON_E, PID_REVERSE);
     pid_set_sample_time(&pid, POLL_RATE - 1); // Sample time in ms
-    pid_set_output_limits(&pid, 25, 100); // Output limits 25% to 100%
+    pid_set_output_limits(&pid, 10, 100); // Output limits 25% to 100%
     pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
 
 
