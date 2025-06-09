@@ -163,8 +163,8 @@ void dowork()
         if (!critical_limithit()) {
             decrease_values();
         } else {
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency * 6;
-            last_core_voltage_auto -= AUTO_TUNE.step_volt * 6;
+            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
+            last_core_voltage_auto -= AUTO_TUNE.step_volt;
         }
     } else if (can_increase_values()) {
         increase_values();
