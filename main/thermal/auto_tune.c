@@ -28,6 +28,8 @@ double avg_hashrate_auto;
 bool lastVoltageSet = false;
 const int waitTime = 30;
 int waitCounter = 0;
+int falling_diff;
+int last_falling_diff;
 
 enum TuneState
 {
@@ -67,7 +69,7 @@ bool can_increase_values()
 
 bool hashrate_increase()
 {
-    return last_hashrate_auto < current_hashrate_auto;
+    return last_falling_diff < falling_diff;
 }
 
 void respectLimits()
@@ -111,7 +113,7 @@ bool critical_limithit()
 
 void increase_values()
 {
-    if (!hashrate_increase() || state == warmup) {
+    if (hashrate_increase()) {
         // last step was frequency step increase again
         if (!lastVoltageSet) {
             last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency;
@@ -124,13 +126,13 @@ void increase_values()
     } else {
         // hash rate decrased with last set
         if (lastVoltageSet) {
-            last_core_voltage_auto -= AUTO_TUNE.step_volt;
+            //last_core_voltage_auto -= AUTO_TUNE.step_volt;
             last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency;
             lastVoltageSet = false;
         }
         // last set was to frequency, increase voltage
         else {
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
+            //last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
             last_core_voltage_auto += AUTO_TUNE.step_volt;
             lastVoltageSet = true;
         }
@@ -157,11 +159,13 @@ void decrease_values()
             // decrase frequency
             last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
         }
+        lastVoltageSet = !lastVoltageSet;
     }
 }
 
 void dowork()
 {
+    falling_diff = last_hashrate_auto - avg_hashrate_auto;
     if (limithit()) {
         if (!critical_limithit()) {
             decrease_values();
@@ -177,10 +181,11 @@ void dowork()
     if (avg_hashrate_auto == 0)
         avg_hashrate_auto = SYSTEM_MODULE.current_hashrate;
     else
-        avg_hashrate_auto = 0.997 * avg_hashrate_auto + 0.003 * SYSTEM_MODULE.current_hashrate;
-    hashrising = current_hashrate_auto > last_hashrate_auto;
-    last_hashrate_auto = current_hashrate_auto;
+        avg_hashrate_auto = 0.999 * avg_hashrate_auto + 0.001 * SYSTEM_MODULE.current_hashrate;
 
+    
+    last_hashrate_auto = avg_hashrate_auto;
+    last_falling_diff = falling_diff;
     SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
     AUTO_TUNE.voltage = last_core_voltage_auto;
     AUTO_TUNE.frequency = last_asic_frequency_auto;
