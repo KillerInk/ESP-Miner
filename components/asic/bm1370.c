@@ -186,6 +186,7 @@ void BM1370_send_hash_frequency(float target_freq) {
 
     if (fb_divider == 0) {
         ESP_LOGE(TAG, "Failed to find PLL settings for target frequency %.2f", target_freq);
+        BM1370_send_hash_frequency(target_freq+1);
         return;
     }
 
