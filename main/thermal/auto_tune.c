@@ -2,7 +2,7 @@
 #include "esp_log.h"
 #include "global_state.h"
 #include "nvs_config.h"
-#include "pid.h"
+#include "PID.h"
 #include "power_management_task.h"
 
 static const char * TAG = "auto_tune";
