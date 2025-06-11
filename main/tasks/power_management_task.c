@@ -66,8 +66,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     POWER_MANAGEMENT_MODULE.frequency_multiplier = 1;
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
-    uint16_t last_core_voltage = 0.0;
-    uint16_t last_asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    double last_core_voltage = 0.0;
+    double last_asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     POWER_MANAGEMENT_MODULE.frequency_value = last_asic_frequency;
     bool auto_tune_hashrate = true;
     auto_tune_init();
@@ -147,8 +147,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 avg_fanspeed = 0.93 * avg_fanspeed + 0.07 * pid_output;
                 POWER_MANAGEMENT_MODULE.fan_perc = (uint16_t) avg_fanspeed;
                 Thermal_set_fan_percent(DEVICE_CONFIG, avg_fanspeed / 100.0);
-                ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
-                         pid_input, pid_setPoint, avg_fanspeed, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
+                //ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
+                //         pid_input, pid_setPoint, avg_fanspeed, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
             } else {
                 if (SYSTEM_MODULE.ap_enabled) {
                     ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%",
@@ -165,8 +165,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             Thermal_set_fan_percent(DEVICE_CONFIG, (float) fs / 100.0);
         }
 
-        uint16_t core_voltage;
-        uint16_t asic_frequency;
+        double core_voltage;
+        double asic_frequency;
 
         if (!auto_tune_hashrate || !pid_control_fanspeed) {
             core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
@@ -178,14 +178,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         if (core_voltage != last_core_voltage) {
-            ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
+            ESP_LOGI(TAG, "setting new vcore voltage to %fmV", core_voltage);
             VCORE_set_voltage((double) core_voltage / 1000.0);
             last_core_voltage = core_voltage;
             POWER_MANAGEMENT_MODULE.core_voltage = core_voltage;
         }
 
         if (asic_frequency != last_asic_frequency) {
-            ESP_LOGI(TAG, "New ASIC frequency requested: %uMHz (current: %uMHz)", asic_frequency, last_asic_frequency);
+            ESP_LOGI(TAG, "New ASIC frequency requested: %fMHz (current: %fMHz)", asic_frequency, last_asic_frequency);
 
             bool success = ASIC_set_frequency((float) asic_frequency);
 

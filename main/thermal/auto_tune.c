@@ -19,7 +19,7 @@ auto_tune_settings AUTO_TUNE = {.power_limit = 20,
                                 .frequency = 525,
                                 .voltage = 1150};
 
-uint16_t last_core_voltage_auto;
+double last_core_voltage_auto;
 double last_asic_frequency_auto;
 double last_hashrate_auto;
 double current_hashrate_auto;
@@ -165,6 +165,10 @@ void decrease_values()
 
 void dowork()
 {
+    if (avg_hashrate_auto == 0)
+        avg_hashrate_auto = SYSTEM_MODULE.current_hashrate;
+    else
+        avg_hashrate_auto = 0.999 * avg_hashrate_auto + 0.001 * SYSTEM_MODULE.current_hashrate;
     falling_diff = last_hashrate_auto - avg_hashrate_auto;
     if (limithit()) {
         if (!critical_limithit()) {
@@ -178,10 +182,7 @@ void dowork()
     } else
         decrease_values();
 
-    if (avg_hashrate_auto == 0)
-        avg_hashrate_auto = SYSTEM_MODULE.current_hashrate;
-    else
-        avg_hashrate_auto = 0.999 * avg_hashrate_auto + 0.001 * SYSTEM_MODULE.current_hashrate;
+    
 
     
     last_hashrate_auto = avg_hashrate_auto;
@@ -224,12 +225,12 @@ void auto_tune(bool pid_control_fanspeed)
     }
 }
 
-uint16_t auto_tune_get_frequency()
+double auto_tune_get_frequency()
 {
     return AUTO_TUNE.frequency;
 }
 
-uint16_t auto_tune_get_voltage()
+double auto_tune_get_voltage()
 {
     return AUTO_TUNE.voltage;
 }
