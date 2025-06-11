@@ -106,7 +106,7 @@ export class HomeComponent {
   private stepcount = 0;
   @HostListener('mousemove', ['$event'])
   onMouseMove(event: MouseEvent) {
-    if (this.mousebuttonpressed && this.stepcount == 5) {
+    if (this.mousebuttonpressed && this.stepcount == 2) {
       if (this.mousestartposition > event.pageX) {
         this.itemPosition++;
         this.mousestartposition = event.pageX;
