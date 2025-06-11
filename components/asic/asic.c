@@ -17,6 +17,7 @@ static const char *TAG = "asic";
 uint8_t ASIC_init()
 {
     switch (DEVICE_CONFIG.family.asic.model) {
+
         case BM1397:
             return BM1397_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1366:

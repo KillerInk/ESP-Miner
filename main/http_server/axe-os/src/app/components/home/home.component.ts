@@ -1,4 +1,4 @@
-import { Component, HostListener, ViewChild } from '@angular/core';
+import { Component, HostListener, OnInit, ViewChild } from '@angular/core';
 import { Chart } from 'chart.js';
 import { interval, map, min, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
@@ -8,8 +8,8 @@ import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
+import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
-
 
 @Component({
   selector: 'app-home',
@@ -52,11 +52,14 @@ export class HomeComponent {
   private mousebuttonpressed = false;
   private mousestartposition = 0;
 
+  private pageDefaultTitle: string = '';
+
   constructor(
     private systemService: SystemService,
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
     private shareRejectReasonsService: ShareRejectionExplanationService,
+    private titleService: Title,
 
   ) {
     this.initializeChart();
@@ -65,6 +68,10 @@ export class HomeComponent {
     this.themeService.getThemeSettings().subscribe(() => {
       this.updateChartColors();
     });
+  }
+
+  ngOnInit() {
+    this.pageDefaultTitle = this.titleService.getTitle();
   }
 
   @HostListener('wheel', ['$event'])
@@ -647,6 +654,19 @@ export class HomeComponent {
         return this.quickLinkService.getQuickLink(url, user);
       })
     );
+
+    this.info$.subscribe(info => {
+      this.titleService.setTitle(
+        [
+          this.pageDefaultTitle,
+          info.hostname,
+          (info.hashRate ? HashSuffixPipe.transform(info.hashRate * 1000000000) : false),
+          (info.temp ? `${info.temp}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
+          (!info.power_fault ? `${info.power} W` : false),
+          (info.bestDiff ? info.bestDiff : false),
+        ].filter(Boolean).join(' • ')
+      );
+    });
   }
 
   getRejectionExplanation(reason: string): string | null {

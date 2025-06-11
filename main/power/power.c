@@ -4,8 +4,6 @@
 
 #include "power.h"
 
-#define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
-
 float Power_get_current()
 {
     if (DEVICE_CONFIG.TPS546) {

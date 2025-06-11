@@ -21,6 +21,7 @@
 #include "asic.h"
 #include "driver/gpio.h"
 #include "device_config.h"
+#include "asic_reset.h"
 
 GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -109,6 +110,12 @@ void app_main(void)
 
     queue_init(&GLOBAL_STATE.stratum_queue);
     queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
+
+    if (asic_reset() != ESP_OK) {
+        SYSTEM_MODULE.asic_status = "ASIC reset failed";
+        ESP_LOGE(TAG, "ASIC reset failed!");
+        return;
+    }
 
     SERIAL_init();
 
