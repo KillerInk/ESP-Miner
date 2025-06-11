@@ -78,9 +78,9 @@ export class HomeComponent {
   onMouseWheel(event: WheelEvent) {
     //todo check target
     if (event.deltaY > 0)
-      this.visibleItemCount++;
+      this.visibleItemCount+=2;
     else
-      this.visibleItemCount--;
+      this.visibleItemCount-=2;
     if (this.visibleItemCount > this.dataLabel.length)
       this.visibleItemCount = this.dataLabel.length;
     if (this.visibleItemCount < 5)
@@ -106,7 +106,7 @@ export class HomeComponent {
   private stepcount = 0;
   @HostListener('mousemove', ['$event'])
   onMouseMove(event: MouseEvent) {
-    if (this.mousebuttonpressed && this.stepcount == 2) {
+    if (this.mousebuttonpressed && this.stepcount == 1) {
       if (this.mousestartposition > event.pageX) {
         this.itemPosition++;
         this.mousestartposition = event.pageX;
