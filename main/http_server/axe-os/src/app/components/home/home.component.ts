@@ -53,6 +53,7 @@ export class HomeComponent {
   private mousestartposition = 0;
 
   private pageDefaultTitle: string = '';
+  public datasetVisibility: boolean[] = [];
 
   constructor(
     private systemService: SystemService,
@@ -78,9 +79,9 @@ export class HomeComponent {
   onMouseWheel(event: WheelEvent) {
     //todo check target
     if (event.deltaY > 0)
-      this.visibleItemCount+=2;
+      this.visibleItemCount += 2;
     else
-      this.visibleItemCount-=2;
+      this.visibleItemCount -= 2;
     if (this.visibleItemCount > this.dataLabel.length)
       this.visibleItemCount = this.dataLabel.length;
     if (this.visibleItemCount < 5)
@@ -336,6 +337,9 @@ export class HomeComponent {
       ]
     };
 
+    this.datasetVisibility = this.chartData.datasets.map(() => true);
+    this.restoreDatasetVisibility()
+    // Initialize chart options
     this.chartOptions = {
       animation: false,
       maintainAspectRatio: false,
@@ -348,6 +352,16 @@ export class HomeComponent {
         legend: {
           labels: {
             color: textColor
+          },
+          onClick: (e: any, legendItem: any, legend: any) => {
+            const ci = legend.chart;
+            const datasetIndex = legendItem.datasetIndex;
+            // Toggle visibility
+            const meta = ci.getDatasetMeta(datasetIndex);
+            meta.hidden = meta.hidden === null ? !ci.data.datasets[datasetIndex].hidden : null;
+            this.datasetVisibility[datasetIndex] = !meta.hidden;
+            this.saveDatasetVisibility();
+            ci.update();
           }
         },
         tooltip: {
@@ -642,7 +656,7 @@ export class HomeComponent {
 
         return info;
       }),
-      shareReplay({ refCount: true, bufferSize: 1 })
+      shareReplay({ refCount: true, bufferSize: 1 }),
 
     );
     // live data
@@ -667,6 +681,7 @@ export class HomeComponent {
         ].filter(Boolean).join(' • ')
       );
     });
+      
   }
 
   getRejectionExplanation(reason: string): string | null {
@@ -702,4 +717,38 @@ export class HomeComponent {
 
     return this.calculateAverage(efficiencies);
   }
+
+  private saveDatasetVisibility() {
+    localStorage.setItem('datasetVisibility', JSON.stringify(this.datasetVisibility));
+  }
+
+  private loadDatasetVisibility() {
+    const saved = localStorage.getItem('datasetVisibility');
+    if (saved) {
+      try {
+        const arr = JSON.parse(saved);
+        if (Array.isArray(arr) && arr.length === this.chartData.datasets.length) {
+          this.datasetVisibility = arr;
+        }
+      } catch { }
+    }
+  }
+
+  private restoreDatasetVisibility() {
+  this.loadDatasetVisibility();
+  // Wait for chart to be available before applying visibility
+  if (!this.chart?.chart) {
+    // Try again after a short delay if chart is not ready yet
+    setTimeout(() => this.restoreDatasetVisibility(), 100);
+    return;
+  }
+  if (this.datasetVisibility.length) {
+    const chartInstance = (this.chart.chart as any);
+    this.datasetVisibility.forEach((visible, idx) => {
+      const meta = chartInstance.getDatasetMeta(idx);
+      meta.hidden = !visible;
+    });
+    chartInstance.update();
+  }
+}
 }
