@@ -28,8 +28,8 @@ double avg_hashrate_auto;
 bool lastVoltageSet = false;
 const int waitTime = 30;
 int waitCounter = 0;
-int falling_diff;
-int last_falling_diff;
+double falling_diff;
+double last_falling_diff;
 
 enum TuneState
 {
@@ -69,7 +69,7 @@ bool can_increase_values()
 
 bool hashrate_increase()
 {
-    return last_falling_diff < falling_diff;
+    return last_falling_diff > falling_diff;
 }
 
 void respectLimits()
@@ -128,14 +128,14 @@ void increase_values()
         if (lastVoltageSet) {
             //last_core_voltage_auto -= AUTO_TUNE.step_volt;
             last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency;
-            lastVoltageSet = false;
         }
         // last set was to frequency, increase voltage
         else {
             //last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
             last_core_voltage_auto += AUTO_TUNE.step_volt;
-            lastVoltageSet = true;
         }
+       
+        lastVoltageSet = !lastVoltageSet;
     }
     respectLimits();
 }
@@ -159,8 +159,10 @@ void decrease_values()
             // decrase frequency
             last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
         }
+        
         lastVoltageSet = !lastVoltageSet;
     }
+    respectLimits();
 }
 
 void dowork()
@@ -183,7 +185,8 @@ void dowork()
         decrease_values();
 
     
-
+    ESP_LOGI(TAG, "Diff %f Hashrate %f Voltage %f Frequency %f", falling_diff, 
+             avg_hashrate_auto, last_core_voltage_auto, last_asic_frequency_auto);
     
     last_hashrate_auto = avg_hashrate_auto;
     last_falling_diff = falling_diff;
