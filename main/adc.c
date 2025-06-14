@@ -92,11 +92,17 @@ void ADC_init(void)
 // returns the ADC voltage in mV
 uint16_t ADC_get_vcore(void)
 {
-    uint16_t adc_raw = 0;
-    uint16_t voltage = 0;
+    int adc_raw = 0;
+    int voltage = 0;
 
-    ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CHANNEL, &adc_raw));
-    ESP_ERROR_CHECK(adc_cali_raw_to_voltage(adc1_cali_chan1_handle, adc_raw, &voltage));
+    if (adc_oneshot_read(adc1_handle, ADC_CHANNEL, &adc_raw) != ESP_OK) {
+        ESP_LOGE(TAG, "ADC read failed");
+        return 0;
+    }
+    if (adc_cali_raw_to_voltage(adc1_cali_chan1_handle, adc_raw, &voltage) != ESP_OK) {
+        ESP_LOGE(TAG, "ADC calibration failed");
+        return 0;
+    }
 
-    return voltage;
+    return (uint16_t)voltage;
 }
