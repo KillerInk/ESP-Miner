@@ -153,12 +153,57 @@ static void adjust_value(double step_freq, double step_volt, bool increase)
 
 void increase_values()
 {
-    adjust_value(AUTO_TUNE.autotune_step_frequency, AUTO_TUNE.step_volt, true);
+    bool decrease = hashrate_decreased();
+
+    double freq_step = AUTO_TUNE.autotune_step_frequency;
+    double volt_step = AUTO_TUNE.step_volt * 2;
+
+    if (decrease) {
+        // Keep increasing the same parameter
+        if (lastVoltageSet) {
+            last_asic_frequency_auto += freq_step;
+            enforce_voltage_frequency_ratio();
+        } else {
+            last_core_voltage_auto += volt_step;
+        }
+        lastVoltageSet = !lastVoltageSet;
+        // Do NOT switch lastVoltageSet yet
+    } else {
+        // If hashrate dropped, revert the last change more aggressively and switch parameter
+        if (lastVoltageSet) {
+            last_asic_frequency_auto += freq_step * 2;
+            enforce_voltage_frequency_ratio();
+        } else {
+            last_core_voltage_auto += volt_step * 2;
+        }
+         // Switch only on failure
+    }
 }
 
 void decrease_values()
 {
-    adjust_value(AUTO_TUNE.autotune_step_frequency, AUTO_TUNE.step_volt, false);
+    bool decrease = hashrate_decreased();
+
+    double freq_step = AUTO_TUNE.autotune_step_frequency;
+    double volt_step = AUTO_TUNE.step_volt * 2;
+
+    if (decrease) {
+        if (lastVoltageSet) {
+            last_asic_frequency_auto -= freq_step * 2;
+            enforce_voltage_frequency_ratio();
+        } else {
+            last_core_voltage_auto -= volt_step * 2;
+        }
+        lastVoltageSet = !lastVoltageSet; // Switch only on failure
+    } else {
+        if (lastVoltageSet) {
+            last_asic_frequency_auto -= freq_step;
+            enforce_voltage_frequency_ratio();
+        } else {
+            last_core_voltage_auto -= volt_step;
+        }
+        // Do NOT switch lastVoltageSet yet
+    }
 }
 
 void switchvalue()
