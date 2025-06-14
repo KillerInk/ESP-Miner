@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
 import { Chart } from 'chart.js';
 import { interval, map, min, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
@@ -47,6 +47,7 @@ export class HomeComponent {
   public activePoolLabel!: 'Primary' | 'Fallback';
   @ViewChild('chart')
   private chart?: UIChart
+  @ViewChild('chartContainer') chartContainer?: ElementRef;
   private visibleItemCount = 0;
   private itemPosition = 0;
   private mousebuttonpressed = false;
@@ -54,6 +55,8 @@ export class HomeComponent {
 
   private pageDefaultTitle: string = '';
   public datasetVisibility: boolean[] = [];
+
+  public isMouseOverChart = false;
 
   constructor(
     private systemService: SystemService,
@@ -75,8 +78,9 @@ export class HomeComponent {
     this.pageDefaultTitle = this.titleService.getTitle();
   }
 
-  @HostListener('wheel', ['$event'])
+
   onMouseWheel(event: WheelEvent) {
+    if (!this.isMouseOverChart) return;
     //todo check target
     if (event.deltaY > 0)
       this.visibleItemCount += 2;
@@ -90,23 +94,26 @@ export class HomeComponent {
     event.preventDefault();
   }
 
-  @HostListener('mousedown', ['$event'])
+
   onMouseDown(event: MouseEvent) {
+    if (!this.isMouseOverChart) return;
     this.mousebuttonpressed = true;
     this.mousestartposition = event.pageX;
     console.log("mousedown");
   }
 
-  @HostListener('mouseup', ['$event'])
+
   onMouseUp(event: MouseEvent) {
+    if (!this.isMouseOverChart) return;
     this.mousebuttonpressed = false;
     this.mousestartposition = 0;
     console.log("mouseup");
   }
 
   private stepcount = 0;
-  @HostListener('mousemove', ['$event'])
+
   onMouseMove(event: MouseEvent) {
+    if (!this.isMouseOverChart) return;
     if (this.mousebuttonpressed && this.stepcount == 1) {
       if (this.mousestartposition > event.pageX) {
         this.itemPosition++;

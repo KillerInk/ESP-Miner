@@ -7,8 +7,8 @@
         text="Bitaxe has overheated - See settings">
     </p-message>
 
-    <p-message *ngIf="!info.frequency || info.frequency < 400" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Bitaxe frequency is set low - See settings">
+    <p-message *ngIf="!info.frequency || info.frequency < 400" severity="warn"
+        styleClass="w-full mb-4 py-4 border-round-xl" text="Bitaxe frequency is set low - See settings">
     </p-message>
 
     <p-message *ngIf="info.power_fault" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
@@ -91,23 +91,21 @@
                 </div>
                 <div *ngIf="info.sharesRejected > 0">
                     <div *ngFor="let sharesRejectedReason of getSortedRejectionReasons(info); trackBy: trackByReason">
-                        <span
-                        class="inline-block"
-                        pTooltip="{{ getRejectionExplanation(sharesRejectedReason.message) }}"
-                        [tooltipDisabled]="!getRejectionExplanation(sharesRejectedReason.message)"
-                        tooltipPosition="bottom"
-                        >
-                        <span class="text-red-500 font-medium">
-                            {{ sharesRejectedReason.count | number: '1.0-0' }}
-                        </span>
-                        <span class="text-500">
-                            {{ sharesRejectedReason.message }}
-                        </span>
-                        ({{
+                        <span class="inline-block"
+                            pTooltip="{{ getRejectionExplanation(sharesRejectedReason.message) }}"
+                            [tooltipDisabled]="!getRejectionExplanation(sharesRejectedReason.message)"
+                            tooltipPosition="bottom">
+                            <span class="text-red-500 font-medium">
+                                {{ sharesRejectedReason.count | number: '1.0-0' }}
+                            </span>
+                            <span class="text-500">
+                                {{ sharesRejectedReason.message }}
+                            </span>
+                            ({{
                             (sharesRejectedReason.count /
                             (info.sharesAccepted + info.sharesRejected) * 100)
                             | number: '1.2-2'
-                        }}%)
+                            }}%)
                         </span>
                     </div>
                 </div>
@@ -133,16 +131,20 @@
 
         <div class="col-12" *ngIf="!info.power_fault">
             <div class="card">
-                <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
+                <div #chartContainer (wheel)="onMouseWheel($event)" (mousedown)="onMouseDown($event)"
+                    (mouseup)="onMouseUp($event)" (mousemove)="onMouseMove($event)"
+                    (mouseenter)="isMouseOverChart = true" (mouseleave)="isMouseOverChart = false">
+                    <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
+                </div>
             </div>
         </div>
         <div class="col-12 lg:col-6 xl:col-6">
             <div class="card">
-               <h4 style="text-align: center;">Power</h4>
+                <h4 style="text-align: center;">Power</h4>
                 <div class="grid">
                     <div class="col-12">
                         <h6>Power <span style="float: right;">{{info.power}} W</span></h6>
-                        <p-progressBar [value]="(info.power / info.maxPower) * 100" [style]="{ height: '6px' }" >
+                        <p-progressBar [value]="(info.power / info.maxPower) * 100" [style]="{ height: '6px' }">
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
                     </div>
@@ -151,7 +153,8 @@
 
                         <h6>Input Voltage <span style="float: right;">{{info.voltage}} V</span></h6>
                         <div class="relative">
-                            <p-progressBar [value]="(info.voltage / (info.nominalVoltage + .5)) * 100" [style]="{ height: '6px' }">
+                            <p-progressBar [value]="(info.voltage / (info.nominalVoltage + .5)) * 100"
+                                [style]="{ height: '6px' }">
                                 <ng-template pTemplate="content" let-value></ng-template>
                             </p-progressBar>
 
@@ -159,10 +162,12 @@
                             <div class="absolute bg-white"
                                 [style.left]="(info.nominalVoltage / (info.nominalVoltage + .5)) * 100 + '%'"
                                 style="top: 0; width: 3px; height: 6px;">
-                                <small class="absolute text-white" style="top: -1.25rem; transform: translateX(-50%)">{{info.nominalVoltage}}V</small>
+                                <small class="absolute text-white"
+                                    style="top: -1.25rem; transform: translateX(-50%)">{{info.nominalVoltage}}V</small>
                             </div>
                         </div>
-                        <span class="danger" *ngIf="info.voltage < (info.nominalVoltage + .5) * 0.87">&nbsp; Danger: Low voltage</span>
+                        <span class="danger" *ngIf="info.voltage < (info.nominalVoltage + .5) * 0.87">&nbsp; Danger: Low
+                            voltage</span>
                     </div>
 
                     <div class="col-12">
@@ -171,7 +176,7 @@
                         ASIC Frequency (MHz) -->
 
                         <h6>ASIC Frequency <span style="float: right;">{{info.frequency}} MHz</span></h6>
-                        <p-progressBar [value]="(info.frequency / maxFrequency) * 100" [style]="{ height: '6px' }" >
+                        <p-progressBar [value]="(info.frequency / maxFrequency) * 100" [style]="{ height: '6px' }">
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
                     </div>
@@ -180,7 +185,7 @@
                             valueTemplate="{value}V"></p-knob>
                         ASIC Voltage Measured -->
                         <h6>Measured ASIC Voltage <span style="float: right;">{{info.coreVoltageActual}} V</span></h6>
-                        <p-progressBar [value]="(info.coreVoltageActual / 1.8) * 100" [style]="{ height: '6px' }" >
+                        <p-progressBar [value]="(info.coreVoltageActual / 1.8) * 100" [style]="{ height: '6px' }">
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
                     </div>
@@ -204,7 +209,7 @@
                                 </ng-container>
                             </span>
                         </h6>
-                        <p-progressBar [value]="(info.temp / maxTemp) * 100" [style]="{ height: '6px' }" >
+                        <p-progressBar [value]="(info.temp / maxTemp) * 100" [style]="{ height: '6px' }">
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
 
@@ -215,7 +220,7 @@
                     <div class="col-12" *ngIf="info.vrTemp > 0">
 
                         <h6>Voltage Regulator Temperature <span style="float: right;">{{info.vrTemp}}&deg;C</span></h6>
-                        <p-progressBar [value]="(info.vrTemp / 120) * 100" [style]="{ height: '6px' }" >
+                        <p-progressBar [value]="(info.vrTemp / 120) * 100" [style]="{ height: '6px' }">
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
 
@@ -224,8 +229,8 @@
                             High Temperature</span>
                     </div>
                     <div class="col-12">
-                        <h6>Fan Speed<span style="float: right;">{{info.fanspeed}}%  ({{info.fanrpm}} RPM)</span></h6>
-                        <p-progressBar [value]="info.fanspeed" [style]="{ height: '6px' }" >
+                        <h6>Fan Speed<span style="float: right;">{{info.fanspeed}}% ({{info.fanrpm}} RPM)</span></h6>
+                        <p-progressBar [value]="info.fanspeed" [style]="{ height: '6px' }">
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
                     </div>
