@@ -140,7 +140,6 @@ void BM1370_set_version_mask(uint32_t version_mask)
 }
 
 void BM1370_send_hash_frequency(float target_freq) {
-    // Default 200MHz if it fails
     unsigned char freqbuf[6] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41}; // pll0_parameter
     float newf = 200.0f;
 
@@ -148,61 +147,52 @@ void BM1370_send_hash_frequency(float target_freq) {
     float min_difference = 10.0f;
     const float max_diff = 1.0f;
 
-    // Optimize: Precompute some values, unroll loops, and reduce function calls
-    // Try all valid divider combinations, but do not break early, always find the best match
-    for (uint8_t refdiv = 2; refdiv > 0; --refdiv) {
-        float refdiv_f = (float)refdiv;
-        for (uint8_t postdiv1 = 7; postdiv1 > 0; --postdiv1) {
-            float postdiv1_f = (float)postdiv1;
-            for (uint8_t postdiv2 = 7; postdiv2 > 0; --postdiv2) {
-                if (postdiv1 < postdiv2) continue;
-                float postdiv2_f = (float)postdiv2;
-                // Inline calculation, avoid roundf if possible
-                float fb_divider_f = postdiv1_f * postdiv2_f * target_freq * refdiv_f / 25.0f;
-                int temp_fb_divider = (int)(fb_divider_f + 0.5f);
-                if (temp_fb_divider < 0xA0 || temp_fb_divider > 0xEF) continue;
+    // Loop over refdiv and postdiv1, solve for postdiv2 algebraically
+    for (uint8_t refdiv = 1; refdiv <= 2; ++refdiv) {
+        for (uint8_t postdiv1 = 1; postdiv1 <= 7; ++postdiv1) {
+            // postdiv2 = (25 * fb_divider) / (refdiv * postdiv1 * target_freq)
+            // But we want integer postdiv2 in [1, postdiv1]
+            for (uint8_t postdiv2 = 1; postdiv2 <= postdiv1; ++postdiv2) {
+                float fb_divider_f = postdiv1 * postdiv2 * target_freq * refdiv / 25.0f;
+                int fb_divider = (int)(fb_divider_f + 0.5f);
+                if (fb_divider < 0xA0 || fb_divider > 0xEF) continue;
 
-                float temp_freq = 25.0f * temp_fb_divider / (refdiv_f * postdiv2_f * postdiv1_f);
-                float freq_diff = target_freq - temp_freq;
-                if (freq_diff < 0) freq_diff = -freq_diff;
+                // Check if postdiv2 is integer and in range
+                float actual_freq = 25.0f * fb_divider / (refdiv * postdiv1 * postdiv2);
+                float diff = fabsf(target_freq - actual_freq);
 
-                if (freq_diff < min_difference && freq_diff < max_diff) {
-                    best_fb_divider = temp_fb_divider;
+                if (diff < min_difference && diff < max_diff) {
+                    best_fb_divider = fb_divider;
                     best_post_divider1 = postdiv1;
                     best_post_divider2 = postdiv2;
                     best_ref_divider = refdiv;
-                    min_difference = freq_diff;
-                    newf = temp_freq;
+                    min_difference = diff;
+                    newf = actual_freq;
                 }
             }
         }
     }
 
-    // If no valid divider found, try to find the closest possible frequency (even if diff > max_diff)
+    // If no valid divider found, find the closest possible frequency (even if diff > max_diff)
     if (best_fb_divider == 0) {
-        min_difference = 1e6f; // large value
-        for (uint8_t refdiv = 2; refdiv > 0; --refdiv) {
-            float refdiv_f = (float)refdiv;
-            for (uint8_t postdiv1 = 7; postdiv1 > 0; --postdiv1) {
-                float postdiv1_f = (float)postdiv1;
-                for (uint8_t postdiv2 = 7; postdiv2 > 0; --postdiv2) {
-                    if (postdiv1 < postdiv2) continue;
-                    float postdiv2_f = (float)postdiv2;
-                    float fb_divider_f = postdiv1_f * postdiv2_f * target_freq * refdiv_f / 25.0f;
-                    int temp_fb_divider = (int)(fb_divider_f + 0.5f);
-                    if (temp_fb_divider < 0xA0 || temp_fb_divider > 0xEF) continue;
+        min_difference = 1e6f;
+        for (uint8_t refdiv = 1; refdiv <= 2; ++refdiv) {
+            for (uint8_t postdiv1 = 1; postdiv1 <= 7; ++postdiv1) {
+                for (uint8_t postdiv2 = 1; postdiv2 <= postdiv1; ++postdiv2) {
+                    float fb_divider_f = postdiv1 * postdiv2 * target_freq * refdiv / 25.0f;
+                    int fb_divider = (int)(fb_divider_f + 0.5f);
+                    if (fb_divider < 0xA0 || fb_divider > 0xEF) continue;
 
-                    float temp_freq = 25.0f * temp_fb_divider / (refdiv_f * postdiv2_f * postdiv1_f);
-                    float freq_diff = target_freq - temp_freq;
-                    if (freq_diff < 0) freq_diff = -freq_diff;
+                    float actual_freq = 25.0f * fb_divider / (refdiv * postdiv1 * postdiv2);
+                    float diff = fabsf(target_freq - actual_freq);
 
-                    if (freq_diff < min_difference) {
-                        best_fb_divider = temp_fb_divider;
+                    if (diff < min_difference) {
+                        best_fb_divider = fb_divider;
                         best_post_divider1 = postdiv1;
                         best_post_divider2 = postdiv2;
                         best_ref_divider = refdiv;
-                        min_difference = freq_diff;
-                        newf = temp_freq;
+                        min_difference = diff;
+                        newf = actual_freq;
                     }
                 }
             }
@@ -304,7 +294,7 @@ uint8_t BM1370_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty
     //Set the IO Driver Strength on chip 00
     //TX: 55 AA 51 09 [00 58 00 01 11 11] 0D  //command all chips, write chip address 00, register 58, data 01 11 11 11 - Set the IO Driver Strength on chip 00
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x58, 0x00, 0x01, 0x11, 0x11}, 6, BM1370_SERIALTX_DEBUG); //from S21Pro dump
-    //_send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x58, 0x02, 0x11, 0x11, 0x11}, 6, BM1370_SERIALTX_DEBUG); //from S21Pro dump
+    //_send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x58, 0x02, 0x11, 0x11, 0x11}, 6, BM1370_SERIALTX_DEBUG); //from S21 dump
     
 
     for (uint8_t i = 0; i < chip_counter; i++) {
