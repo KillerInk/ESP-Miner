@@ -148,16 +148,23 @@ void BM1370_send_hash_frequency(float target_freq) {
     float min_difference = 10.0f;
     const float max_diff = 1.0f;
 
+    // Optimize: Precompute some values, unroll loops, and reduce function calls
     // Try all valid divider combinations, but do not break early, always find the best match
     for (uint8_t refdiv = 2; refdiv > 0; --refdiv) {
+        float refdiv_f = (float)refdiv;
         for (uint8_t postdiv1 = 7; postdiv1 > 0; --postdiv1) {
+            float postdiv1_f = (float)postdiv1;
             for (uint8_t postdiv2 = 7; postdiv2 > 0; --postdiv2) {
                 if (postdiv1 < postdiv2) continue;
-                int temp_fb_divider = (int)roundf(postdiv1 * postdiv2 * target_freq * refdiv / 25.0f);
+                float postdiv2_f = (float)postdiv2;
+                // Inline calculation, avoid roundf if possible
+                float fb_divider_f = postdiv1_f * postdiv2_f * target_freq * refdiv_f / 25.0f;
+                int temp_fb_divider = (int)(fb_divider_f + 0.5f);
                 if (temp_fb_divider < 0xA0 || temp_fb_divider > 0xEF) continue;
 
-                float temp_freq = 25.0f * temp_fb_divider / (refdiv * postdiv2 * postdiv1);
-                float freq_diff = fabsf(target_freq - temp_freq);
+                float temp_freq = 25.0f * temp_fb_divider / (refdiv_f * postdiv2_f * postdiv1_f);
+                float freq_diff = target_freq - temp_freq;
+                if (freq_diff < 0) freq_diff = -freq_diff;
 
                 if (freq_diff < min_difference && freq_diff < max_diff) {
                     best_fb_divider = temp_fb_divider;
@@ -175,14 +182,19 @@ void BM1370_send_hash_frequency(float target_freq) {
     if (best_fb_divider == 0) {
         min_difference = 1e6f; // large value
         for (uint8_t refdiv = 2; refdiv > 0; --refdiv) {
+            float refdiv_f = (float)refdiv;
             for (uint8_t postdiv1 = 7; postdiv1 > 0; --postdiv1) {
+                float postdiv1_f = (float)postdiv1;
                 for (uint8_t postdiv2 = 7; postdiv2 > 0; --postdiv2) {
                     if (postdiv1 < postdiv2) continue;
-                    int temp_fb_divider = (int)roundf(postdiv1 * postdiv2 * target_freq * refdiv / 25.0f);
+                    float postdiv2_f = (float)postdiv2;
+                    float fb_divider_f = postdiv1_f * postdiv2_f * target_freq * refdiv_f / 25.0f;
+                    int temp_fb_divider = (int)(fb_divider_f + 0.5f);
                     if (temp_fb_divider < 0xA0 || temp_fb_divider > 0xEF) continue;
 
-                    float temp_freq = 25.0f * temp_fb_divider / (refdiv * postdiv2 * postdiv1);
-                    float freq_diff = fabsf(target_freq - temp_freq);
+                    float temp_freq = 25.0f * temp_fb_divider / (refdiv_f * postdiv2_f * postdiv1_f);
+                    float freq_diff = target_freq - temp_freq;
+                    if (freq_diff < 0) freq_diff = -freq_diff;
 
                     if (freq_diff < min_difference) {
                         best_fb_divider = temp_fb_divider;
