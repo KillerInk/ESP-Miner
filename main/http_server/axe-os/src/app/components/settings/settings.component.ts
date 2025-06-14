@@ -1,5 +1,5 @@
 import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
-import { Component, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
@@ -14,7 +14,7 @@ import { eASICModel } from 'src/models/enum/eASICModel';
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.scss']
 })
-export class SettingsComponent {
+export class SettingsComponent implements OnInit {
 
   public form!: FormGroup;
 
@@ -32,6 +32,9 @@ export class SettingsComponent {
 
   @ViewChild('firmwareUpload') firmwareUpload!: FileUpload;
   @ViewChild('websiteUpload') websiteUpload!: FileUpload;
+
+  public autotuneForm!: FormGroup;
+  public autotuneInfo: any = {};
 
   constructor(
     private fb: FormBuilder,
@@ -93,6 +96,31 @@ export class SettingsComponent {
       });
 
   }
+  ngOnInit() {
+    this.autotuneForm = this.fb.group({
+    power_limit: [20, [Validators.required, Validators.min(1)]],
+    fan_limit: [75, [Validators.required, Validators.min(1)]],
+    max_voltage_asic: [1400, [Validators.required, Validators.min(1)]],
+    max_frequency_asic: [1000, [Validators.required, Validators.min(1)]],
+    max_asic_temperatur: [65, [Validators.required, Validators.min(1)]],
+  });
+
+  // Load autotune settings from API and patch the form if available
+  this.systemService.getAutotune().subscribe({
+    next: autotune => {
+      this.autotuneInfo = autotune;
+      this.autotuneForm.patchValue({
+        power_limit: autotune.power_limit ?? 20,
+        fan_limit: autotune.fan_limit ?? 75,
+        max_voltage_asic: autotune.max_voltage_asic ?? 1400,
+        max_frequency_asic: autotune.max_frequency_asic ?? 1000,
+        max_asic_temperatur: autotune.max_asic_temperatur ?? 65,
+      });
+    },
+    error: err => { this.toastr.error('Failed to load autotune settings'); }
+  });
+  }
+
   public updateSystem() {
 
     const form = this.form.getRawValue();
@@ -205,5 +233,14 @@ export class SettingsComponent {
 
     });
     this.toastr.success('Success!', 'Bitaxe restarted');
+  }
+
+  public updateAutotune() {
+    if (!this.autotuneForm.valid) return;
+    this.systemService.updateAutotune(this.autotuneForm.value)
+      .subscribe({
+        next: () => this.toastr.success('Autotune settings saved!', 'Success'),
+        error: (err: HttpErrorResponse) => this.toastr.error('Could not save autotune settings.', err.message)
+      });
   }
 }
