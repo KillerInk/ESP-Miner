@@ -1,8 +1,8 @@
 #include "auto_tune.h"
+#include "PID.h"
 #include "esp_log.h"
 #include "global_state.h"
 #include "nvs_config.h"
-#include "PID.h"
 #include "power_management_task.h"
 
 static const char * TAG = "auto_tune";
@@ -98,29 +98,55 @@ bool limithit()
 
 bool critical_limithit()
 {
-    return POWER_MANAGEMENT_MODULE.chip_temp_avg > AUTO_TUNE.max_asic_temperatur || POWER_MANAGEMENT_MODULE.power >= AUTO_TUNE.power_limit +0.5 ||
+    return POWER_MANAGEMENT_MODULE.chip_temp_avg > AUTO_TUNE.max_asic_temperatur ||
+           POWER_MANAGEMENT_MODULE.power >= AUTO_TUNE.power_limit + 0.5 ||
            POWER_MANAGEMENT_MODULE.fan_perc >= AUTO_TUNE.fan_limit + 5;
+}
+
+// Helper to calculate adjustment factor based on hashrate change
+static double get_hashrate_factor()
+{
+    double diff = current_hashrate_auto - last_hashrate_auto;
+    if (last_hashrate_auto == 0)
+        return 1.0;
+
+    double base = 1.0 + (diff / last_hashrate_auto);
+
+    // Make positive changes more aggressive, negative more conservative
+    if (diff > 0) {
+        base *= 1.5; // Increase factor more on positive change
+    } else if (diff < 0) {
+        base *= 0.7; // Decrease factor more on negative change
+    }
+
+    // Clamp factor between 0.5 and 2.0 for stability
+    if (base < 0.5)
+        base = 0.5;
+    if (base > 2.0)
+        base = 2.0;
+    return base;
 }
 
 void increase_values()
 {
+    double factor = get_hashrate_factor();
     if (hashrate_increase()) {
         // last step was frequency step increase again
         if (!lastVoltageSet) {
-            last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency;
+            last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency * factor;
         }
         // last set was to core voltage
         else {
-            last_core_voltage_auto += AUTO_TUNE.step_volt;
+            last_core_voltage_auto += AUTO_TUNE.step_volt * factor;
         }
 
     } else {
         if (!lastVoltageSet) {
-            last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency;
+            last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency * factor;
         }
         // last set was to core voltage
         else {
-            last_core_voltage_auto += AUTO_TUNE.step_volt;
+            last_core_voltage_auto += AUTO_TUNE.step_volt * factor;
         }
         lastVoltageSet = !lastVoltageSet;
     }
@@ -128,47 +154,47 @@ void increase_values()
 
 void decrease_values()
 {
+    double factor = get_hashrate_factor();
     if (hashrate_increase()) {
         if (!lastVoltageSet) {
             // decrease core voltage and hope that it helps to keep hashrate up
-            last_core_voltage_auto -= AUTO_TUNE.step_volt;
+            last_core_voltage_auto -= AUTO_TUNE.step_volt * factor;
 
         } else {
             // decrase frequency
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
+            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency * factor;
         }
     } else {
-       
+
         if (!lastVoltageSet) {
             // decrease core voltage and hope that it helps to keep hashrate up
-            last_core_voltage_auto -= AUTO_TUNE.step_volt;
+            last_core_voltage_auto -= AUTO_TUNE.step_volt * factor;
 
         } else {
             // decrase frequency
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
+            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency * factor;
         }
         lastVoltageSet = !lastVoltageSet;
     }
-    
 }
 
 void switchvalue()
 {
+    double factor = get_hashrate_factor();
     if (hashrate_increase()) {
         if (!lastVoltageSet) {
             // decrease core voltage and hope that it helps to keep hashrate up
-            last_core_voltage_auto -= AUTO_TUNE.step_volt;
-            last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency;
+            last_core_voltage_auto -= AUTO_TUNE.step_volt * factor;
+            last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency * factor;
 
         } else {
             // decrase frequency
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
-            last_core_voltage_auto += AUTO_TUNE.step_volt;
+            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency * factor;
+            last_core_voltage_auto += AUTO_TUNE.step_volt * factor;
         }
     } else {
         lastVoltageSet = !lastVoltageSet;
     }
-    
 }
 
 void dowork()
@@ -182,18 +208,17 @@ void dowork()
         if (!critical_limithit()) {
             switchvalue();
         } else {
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency*2;
-            last_core_voltage_auto -= AUTO_TUNE.step_volt*2;
+            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency * 2;
+            last_core_voltage_auto -= AUTO_TUNE.step_volt * 2;
         }
-    } else if(can_increase_values()) {
+    } else if (can_increase_values()) {
         increase_values();
-    }
-    else decrease_values();
+    } else
+        decrease_values();
 
-    
-    ESP_LOGI(TAG, "Diff %i Hashrate %f Voltage %f Frequency %f", falling_diff, 
-             avg_hashrate_auto, last_core_voltage_auto, last_asic_frequency_auto);
-    
+    ESP_LOGI(TAG, "Diff %i Hashrate %f Voltage %f Frequency %f", falling_diff, avg_hashrate_auto, last_core_voltage_auto,
+             last_asic_frequency_auto);
+
     last_hashrate_auto = current_hashrate_auto;
     respectLimits();
     last_falling_diff = falling_diff;
