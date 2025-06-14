@@ -168,19 +168,23 @@ void switchvalue()
     double freq_step = AUTO_TUNE.autotune_step_frequency;
     double volt_step = AUTO_TUNE.step_volt * 2;
 
-    if (!decrease) {
-        if (!lastVoltageSet) {
-            last_core_voltage_auto += volt_step;
-        } else {
+    if (decrease) {
+        // If last step was voltage, try increasing frequency next
+        if (lastVoltageSet) {
             last_asic_frequency_auto += freq_step;
             enforce_voltage_frequency_ratio();
+        } else {
+            last_core_voltage_auto += volt_step;
         }
     } else {
-        if (!lastVoltageSet) {
-            last_core_voltage_auto -= volt_step;
-        } else {
-            last_asic_frequency_auto -= freq_step;
+        // If hashrate dropped, revert the last change more aggressively
+        if (lastVoltageSet) {
+            // Last change was frequency, so reduce frequency
+            last_asic_frequency_auto -= freq_step * 2;
             enforce_voltage_frequency_ratio();
+        } else {
+            // Last change was voltage, so reduce voltage
+            last_core_voltage_auto -= volt_step * 2;
         }
     }
     lastVoltageSet = !lastVoltageSet;
