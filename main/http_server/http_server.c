@@ -1066,17 +1066,15 @@ static esp_err_t GET_autotune_info(httpd_req_t * req)
     }
 
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "power_limit", AUTO_TUNE.power_limit);
-    cJSON_AddNumberToObject(root, "fan_limit", AUTO_TUNE.fan_limit);
-    cJSON_AddNumberToObject(root, "step_volt", AUTO_TUNE.step_volt);
-    cJSON_AddNumberToObject(root, "step_freq_rampup", AUTO_TUNE.step_freq_rampup);
-    cJSON_AddNumberToObject(root, "step_freq", AUTO_TUNE.step_freq);
-    cJSON_AddNumberToObject(root, "autotune_step_frequency", AUTO_TUNE.autotune_step_frequency);
-    cJSON_AddNumberToObject(root, "max_voltage_asic", AUTO_TUNE.max_voltage_asic);
-    cJSON_AddNumberToObject(root, "max_frequency_asic", AUTO_TUNE.max_frequency_asic);
-    cJSON_AddNumberToObject(root, "max_asic_temperatur", AUTO_TUNE.max_asic_temperatur);
-    cJSON_AddNumberToObject(root, "frequency", AUTO_TUNE.frequency);
-    cJSON_AddNumberToObject(root, "voltage", AUTO_TUNE.voltage);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_POWER_LIMIT, AUTO_TUNE.power_limit);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_FAN_LIMIT, AUTO_TUNE.fan_limit);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_STEP_VOLT, AUTO_TUNE.step_volt);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_STEP_FREQ_RAMPUP, AUTO_TUNE.step_freq_rampup);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_STEP_FREQ, AUTO_TUNE.step_freq);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_AUTOTUNE_STEP_FREQ, AUTO_TUNE.autotune_step_frequency);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, AUTO_TUNE.max_voltage_asic);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, AUTO_TUNE.max_frequency_asic);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, AUTO_TUNE.max_asic_temperatur);
 
     extern double last_core_voltage_auto, last_asic_frequency_auto, avg_hashrate_auto;
     cJSON_AddNumberToObject(root, "last_core_voltage_auto", last_core_voltage_auto);
@@ -1124,17 +1122,42 @@ static esp_err_t POST_autotune_update(httpd_req_t * req)
     }
 
     cJSON *item;
-    if ((item = cJSON_GetObjectItem(root, "power_limit")) && cJSON_IsNumber(item)) AUTO_TUNE.power_limit = item->valuedouble;
-    if ((item = cJSON_GetObjectItem(root, "fan_limit")) && cJSON_IsNumber(item)) AUTO_TUNE.fan_limit = item->valuedouble;
-    if ((item = cJSON_GetObjectItem(root, "step_volt")) && cJSON_IsNumber(item)) AUTO_TUNE.step_volt = item->valuedouble;
-    if ((item = cJSON_GetObjectItem(root, "step_freq_rampup")) && cJSON_IsNumber(item)) AUTO_TUNE.step_freq_rampup = item->valuedouble;
-    if ((item = cJSON_GetObjectItem(root, "step_freq")) && cJSON_IsNumber(item)) AUTO_TUNE.step_freq = item->valuedouble;
-    if ((item = cJSON_GetObjectItem(root, "autotune_step_frequency")) && cJSON_IsNumber(item)) AUTO_TUNE.autotune_step_frequency = item->valuedouble;
-    if ((item = cJSON_GetObjectItem(root, "max_voltage_asic")) && cJSON_IsNumber(item)) AUTO_TUNE.max_voltage_asic = item->valuedouble;
-    if ((item = cJSON_GetObjectItem(root, "max_frequency_asic")) && cJSON_IsNumber(item)) AUTO_TUNE.max_frequency_asic = item->valuedouble;
-    if ((item = cJSON_GetObjectItem(root, "max_asic_temperatur")) && cJSON_IsNumber(item)) AUTO_TUNE.max_asic_temperatur = item->valuedouble;
-    if ((item = cJSON_GetObjectItem(root, "frequency")) && cJSON_IsNumber(item)) AUTO_TUNE.frequency = item->valuedouble;
-    if ((item = cJSON_GetObjectItem(root, "voltage")) && cJSON_IsNumber(item)) AUTO_TUNE.voltage = item->valuedouble;
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_POWER_LIMIT)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.power_limit = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_POWER_LIMIT, (uint16_t)AUTO_TUNE.power_limit);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_FAN_LIMIT)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.fan_limit = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_FAN_LIMIT, (uint16_t)AUTO_TUNE.fan_limit);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_STEP_VOLT)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.step_volt = item->valuedouble;
+        // Optionally store in NVS if you add a key
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_STEP_FREQ_RAMPUP)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.step_freq_rampup = item->valuedouble;
+        // Optionally store in NVS if you add a key
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_STEP_FREQ)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.step_freq = item->valuedouble;
+        // Optionally store in NVS if you add a key
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_AUTOTUNE_STEP_FREQ)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.autotune_step_frequency = item->valuedouble;
+        // Optionally store in NVS if you add a key
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_voltage_asic = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, (uint16_t)AUTO_TUNE.max_voltage_asic);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_frequency_asic = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, (uint16_t)AUTO_TUNE.max_frequency_asic);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_asic_temperatur = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, (uint16_t)AUTO_TUNE.max_asic_temperatur);
+    }
 
     cJSON_Delete(root);
 

@@ -43,10 +43,14 @@ static int tuning_cycle_count = 0;
 
 void auto_tune_init()
 {
-    AUTO_TUNE.frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    AUTO_TUNE.voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-    AUTO_TUNE.power_limit = nvs_config_get_u16(NVS_CONFIG_POWER_LIMIT, 20);
-    AUTO_TUNE.fan_limit = nvs_config_get_u16(NVS_CONFIG_FAN_LIMIT, 75);
+    AUTO_TUNE.frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, AUTO_TUNE.frequency);
+    AUTO_TUNE.voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, AUTO_TUNE.voltage);
+    AUTO_TUNE.power_limit = nvs_config_get_u16(NVS_CONFIG_KEY_POWER_LIMIT, AUTO_TUNE.power_limit);
+    AUTO_TUNE.fan_limit = nvs_config_get_u16(NVS_CONFIG_KEY_FAN_LIMIT, AUTO_TUNE.fan_limit);
+    AUTO_TUNE.max_voltage_asic = nvs_config_get_u16(NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, AUTO_TUNE.max_voltage_asic);
+    AUTO_TUNE.max_frequency_asic = nvs_config_get_u16(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, AUTO_TUNE.max_frequency_asic);
+    AUTO_TUNE.max_asic_temperatur = nvs_config_get_u16(NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, AUTO_TUNE.max_asic_temperatur);
+
     last_core_voltage_auto = AUTO_TUNE.voltage;
     last_asic_frequency_auto = AUTO_TUNE.frequency;
     POWER_MANAGEMENT_MODULE.core_voltage = last_core_voltage_auto;
@@ -142,7 +146,7 @@ void switchvalue()
     bool decrease = hashrate_decreased();
     // Increase step size when switching direction to avoid overshooting
     double freq_step = AUTO_TUNE.autotune_step_frequency * 1.5; // 1.5x step, adjust as needed
-    double volt_step = AUTO_TUNE.step_volt * 1.5;
+    double volt_step = AUTO_TUNE.step_volt * 2;
     adjust_value(freq_step, volt_step, !decrease);
 }
 

@@ -35,8 +35,15 @@
 #define NVS_CONFIG_SWARM "swarmconfig"
 #define NVS_CONFIG_STATISTICS_LIMIT "statsLimit"
 #define NVS_CONFIG_STATISTICS_DURATION "statsDuration"
-#define NVS_CONFIG_POWER_LIMIT "powerlimit"
-#define NVS_CONFIG_FAN_LIMIT "fanlimit"
+#define NVS_CONFIG_KEY_POWER_LIMIT "power_limit"
+#define NVS_CONFIG_KEY_FAN_LIMIT "fan_limit"
+#define NVS_CONFIG_KEY_STEP_VOLT "step_volt"
+#define NVS_CONFIG_KEY_STEP_FREQ_RAMPUP "step_freq_rampup"
+#define NVS_CONFIG_KEY_STEP_FREQ "step_freq"
+#define NVS_CONFIG_KEY_AUTOTUNE_STEP_FREQ "autotune_step_frequency"
+#define NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC "max_voltage_asic"
+#define NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC "max_frequency_asic"
+#define NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR "max_asic_temperatur"
 
 // Theme configuration
 #define NVS_CONFIG_THEME_SCHEME "themescheme"
