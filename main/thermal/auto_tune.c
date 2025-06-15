@@ -39,7 +39,6 @@ enum TuneState
 
 enum TuneState state;
 
-static int tuning_cycle_count = 0;
 
 void auto_tune_init()
 {
@@ -72,26 +71,6 @@ bool can_increase_values()
            POWER_MANAGEMENT_MODULE.chip_temp_avg < AUTO_TUNE.max_asic_temperatur;
 }
 
-static double get_hashrate_factor()
-{
-    double diff = current_hashrate_auto - last_hashrate_auto;
-    if (last_hashrate_auto == 0)
-        return 1.0;
-
-    double base = 1.0 + (diff / last_hashrate_auto);
-
-    if (diff > 0) {
-        base *= 1.1;
-    } else if (diff < 0) {
-        base *= 1.2;
-    }
-
-    if (base < 0.8)
-        base = 0.8;
-    if (base > 1.5)
-        base = 1.5;
-    return base;
-}
 
 bool limithit()
 {
@@ -111,7 +90,6 @@ bool hashrate_decreased()
     return last_hashrate_auto > current_hashrate_auto;
 }
 
-// Helper to clamp a value between min and max
 static inline double clamp(double val, double min, double max)
 {
     if (val < min)
@@ -123,11 +101,10 @@ static inline double clamp(double val, double min, double max)
 
 static void enforce_voltage_frequency_ratio()
 {
-    double expected_voltage = last_asic_frequency_auto * 2.0;
-    double lower_v = expected_voltage * 0.85;
-    double upper_v = expected_voltage * 1.15;
+    double expected_voltage = last_asic_frequency_auto;
+    double lower_v = expected_voltage * 1.7;
+    double upper_v = expected_voltage * 2.1;
 
-    // Clamp voltage to 15% above or below the ideal value
     if (last_core_voltage_auto > upper_v) {
         last_core_voltage_auto = upper_v;
     }
@@ -135,37 +112,27 @@ static void enforce_voltage_frequency_ratio()
         last_core_voltage_auto = lower_v;
     }
 
-    double expected_frequency = last_core_voltage_auto / 2.0;
-    double lower_f = expected_frequency * 0.85;
-    double upper_f = expected_frequency * 1.15;
+    double expected_frequency = last_core_voltage_auto / 1.7;
+    double lower_f = expected_frequency;
+    double upper_f = last_core_voltage_auto / 2.1;
 
-    // Clamp frequency to 15% above or below the ideal value
-    if (last_asic_frequency_auto > upper_f) {
-        last_asic_frequency_auto = upper_f;
-    }
-    if (last_asic_frequency_auto < lower_f) {
+    // Clamp frequency to match the new ratio
+    if (last_asic_frequency_auto > lower_f) {
         last_asic_frequency_auto = lower_f;
     }
+    if (last_asic_frequency_auto < upper_f) {
+        last_asic_frequency_auto = upper_f;
+    }
 }
 
-// Unified adjustment function
-static void adjust_value(double step_freq, double step_volt, bool increase)
-{
-    if (!lastVoltageSet) {
-        last_asic_frequency_auto += (increase ? step_freq : -step_freq);
-        enforce_voltage_frequency_ratio();
-    } else {
-        last_core_voltage_auto += (increase ? step_volt : -step_volt);
-    }
-    lastVoltageSet = !lastVoltageSet;
-}
+
 
 void increase_values()
 {
     bool decrease = hashrate_decreased();
 
     double freq_step = AUTO_TUNE.autotune_step_frequency;
-    double volt_step = AUTO_TUNE.step_volt * 2;
+    double volt_step = AUTO_TUNE.step_volt;
 
     if (decrease) {
         // Keep increasing the same parameter
@@ -179,7 +146,7 @@ void increase_values()
         // Do NOT switch lastVoltageSet yet
     } else {
         // If hashrate dropped, revert the last change more aggressively and switch parameter
-        if (lastVoltageSet) {
+        if (!lastVoltageSet) {
             last_asic_frequency_auto += freq_step;
             enforce_voltage_frequency_ratio();
         } else {
@@ -194,7 +161,7 @@ void decrease_values()
     bool decrease = hashrate_decreased();
 
     double freq_step = AUTO_TUNE.autotune_step_frequency;
-    double volt_step = AUTO_TUNE.step_volt * 2;
+    double volt_step = AUTO_TUNE.step_volt;
 
     if (decrease) {
         if (lastVoltageSet) {
@@ -205,7 +172,7 @@ void decrease_values()
         }
         lastVoltageSet = !lastVoltageSet; // Switch only on failure
     } else {
-        if (lastVoltageSet) {
+        if (!lastVoltageSet) {
             last_asic_frequency_auto -= freq_step;
             enforce_voltage_frequency_ratio();
         } else {
@@ -220,28 +187,25 @@ void switchvalue()
     bool decrease = hashrate_decreased();
 
     double freq_step = AUTO_TUNE.autotune_step_frequency;
-    double volt_step = AUTO_TUNE.step_volt * 2;
+    double volt_step = AUTO_TUNE.step_volt;
 
     if (decrease) {
-        // If last step was voltage, try increasing frequency next
         if (lastVoltageSet) {
             last_asic_frequency_auto += freq_step;
             enforce_voltage_frequency_ratio();
         } else {
             last_core_voltage_auto += volt_step;
         }
+        lastVoltageSet = !lastVoltageSet;
     } else {
-        // If hashrate dropped, revert the last change more aggressively
         if (lastVoltageSet) {
-            // Last change was frequency, so reduce frequency
-            last_asic_frequency_auto -= freq_step * 2;
+            last_asic_frequency_auto -= freq_step;
             enforce_voltage_frequency_ratio();
         } else {
-            // Last change was voltage, so reduce voltage
-            last_core_voltage_auto -= volt_step * 2;
+            last_core_voltage_auto -= volt_step;
         }
     }
-    lastVoltageSet = !lastVoltageSet;
+    
 }
 
 void respectLimits()
@@ -258,12 +222,6 @@ void respectLimits()
 
 void dowork()
 {
-    tuning_cycle_count++;
-
-    double decay = 1.0 / (1.0 + tuning_cycle_count * 0.005);
-    double factor = get_hashrate_factor();
-    AUTO_TUNE.autotune_step_frequency = fmax(AUTO_TUNE.step_freq * decay * factor, 0.5);
-    AUTO_TUNE.step_volt = fmax((decay * factor), 0.2);
 
     avg_hashrate_auto = (avg_hashrate_auto == 0) ? SYSTEM_MODULE.current_hashrate
                                                  : 0.999 * avg_hashrate_auto + 0.001 * SYSTEM_MODULE.current_hashrate;
