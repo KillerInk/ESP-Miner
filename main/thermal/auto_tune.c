@@ -124,18 +124,27 @@ static inline double clamp(double val, double min, double max)
 static void enforce_voltage_frequency_ratio()
 {
     double expected_voltage = last_asic_frequency_auto * 2.0;
-    double lower_v = expected_voltage * 0.95;
-    double upper_v = expected_voltage * 1.05;
+    double lower_v = expected_voltage * 0.85;
+    double upper_v = expected_voltage * 1.15;
 
-    // If voltage is too high for frequency, bring voltage down
+    // Clamp voltage to 15% above or below the ideal value
     if (last_core_voltage_auto > upper_v) {
         last_core_voltage_auto = upper_v;
     }
-    // If frequency is too high for voltage, bring frequency down
+    if (last_core_voltage_auto < lower_v) {
+        last_core_voltage_auto = lower_v;
+    }
+
     double expected_frequency = last_core_voltage_auto / 2.0;
-    double upper_f = expected_frequency * 1.05;
+    double lower_f = expected_frequency * 0.85;
+    double upper_f = expected_frequency * 1.15;
+
+    // Clamp frequency to 15% above or below the ideal value
     if (last_asic_frequency_auto > upper_f) {
         last_asic_frequency_auto = upper_f;
+    }
+    if (last_asic_frequency_auto < lower_f) {
+        last_asic_frequency_auto = lower_f;
     }
 }
 
@@ -171,10 +180,10 @@ void increase_values()
     } else {
         // If hashrate dropped, revert the last change more aggressively and switch parameter
         if (lastVoltageSet) {
-            last_asic_frequency_auto += freq_step * 2;
+            last_asic_frequency_auto += freq_step;
             enforce_voltage_frequency_ratio();
         } else {
-            last_core_voltage_auto += volt_step * 2;
+            last_core_voltage_auto += volt_step;
         }
          // Switch only on failure
     }
@@ -189,10 +198,10 @@ void decrease_values()
 
     if (decrease) {
         if (lastVoltageSet) {
-            last_asic_frequency_auto -= freq_step * 2;
+            last_asic_frequency_auto -= freq_step;
             enforce_voltage_frequency_ratio();
         } else {
-            last_core_voltage_auto -= volt_step * 2;
+            last_core_voltage_auto -= volt_step;
         }
         lastVoltageSet = !lastVoltageSet; // Switch only on failure
     } else {
