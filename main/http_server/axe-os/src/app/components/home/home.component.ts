@@ -1,5 +1,4 @@
 import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
-import { Chart } from 'chart.js';
 import { interval, map, min, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
@@ -10,6 +9,7 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
+import { Chart } from 'chart.js';
 
 @Component({
   selector: 'app-home',
@@ -79,13 +79,18 @@ export class HomeComponent {
   }
 
 
+  private get zoomPanFactor(): number {
+    // Adjust divisor for desired sensitivity
+    return Math.max(1, Math.floor(this.visibleItemCount / 40));
+  }
+
   onMouseWheel(event: WheelEvent) {
     if (!this.isMouseOverChart) return;
-    //todo check target
+    const factor = this.zoomPanFactor;
     if (event.deltaY > 0)
-      this.visibleItemCount += 2;
+      this.visibleItemCount += factor;
     else
-      this.visibleItemCount -= 2;
+      this.visibleItemCount -= factor;
     if (this.visibleItemCount > this.dataLabel.length)
       this.visibleItemCount = this.dataLabel.length;
     if (this.visibleItemCount < 5)
@@ -100,6 +105,7 @@ export class HomeComponent {
     this.mousebuttonpressed = true;
     this.mousestartposition = event.pageX;
     console.log("mousedown");
+    return false;
   }
 
 
@@ -108,19 +114,21 @@ export class HomeComponent {
     this.mousebuttonpressed = false;
     this.mousestartposition = 0;
     console.log("mouseup");
+    return true
   }
 
   private stepcount = 0;
 
   onMouseMove(event: MouseEvent) {
     if (!this.isMouseOverChart) return;
+    const factor = this.zoomPanFactor;
     if (this.mousebuttonpressed && this.stepcount == 1) {
       if (this.mousestartposition > event.pageX) {
-        this.itemPosition++;
+        this.itemPosition += factor;
         this.mousestartposition = event.pageX;
       }
       else if (this.mousestartposition < event.pageX) {
-        this.itemPosition--;
+        this.itemPosition -= factor;
         this.mousestartposition = event.pageX;
       }
       this.stepcount = 0;
@@ -130,9 +138,8 @@ export class HomeComponent {
     else if (this.mousebuttonpressed)
       this.stepcount++;
 
-
-    console.log("mousemove " + this.itemPosition);
     this.setTimeLimits();
+    return false;
   }
 
   private setTimeLimits() {
@@ -153,7 +160,7 @@ export class HomeComponent {
     console.log("max:" + (max));
     console.log("min:" + (min));
     console.log("itempos:" + (this.itemPosition));
-    this.chart?.refresh();
+    (this.chart?.chart as any)?.update();
   }
 
   private updateChartColors() {
@@ -238,7 +245,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'Hashrate',
-          data: [this.hashrateData],
+          data: this.hashrateData,
           backgroundColor: textColorSecondary + '30',
           borderColor: textColorSecondary,
           tension: 0,
@@ -251,7 +258,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'ASIC Temp',
-          data: [this.temperatureData],
+          data: this.temperatureData,
           fill: false,
           backgroundColor: primaryColor,
           borderColor: primaryColor,
@@ -286,8 +293,7 @@ export class HomeComponent {
           pointHoverRadius: 0,
           borderWidth: 1,
           yAxisID: 'y4',
-        }
-        ,
+        },
         {
           type: 'line',
           label: 'Fan',
@@ -304,7 +310,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'AvgHashrate',
-          data: this.hashrateData,
+          data: this.avghashrateData,
           backgroundColor: avghashColor + '30',
           borderColor: avghashColor,
           tension: 0,
@@ -326,8 +332,7 @@ export class HomeComponent {
           pointHoverRadius: 0,
           borderWidth: 1,
           yAxisID: 'y7',
-        }
-        ,
+        },
         {
           type: 'line',
           label: 'EspRam',
@@ -340,6 +345,19 @@ export class HomeComponent {
           pointHoverRadius: 0,
           borderWidth: 1,
           yAxisID: 'y8',
+        },
+        {
+          type: 'line',
+          label: 'Power',
+          data: this.powerData,
+          fill: false,
+          backgroundColor: coreVoltageColor,
+          borderColor: coreVoltageColor,
+          tension: 0,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          borderWidth: 1,
+          yAxisID: 'y9',
         }
       ]
     };
@@ -358,7 +376,7 @@ export class HomeComponent {
       plugins: {
         legend: {
           labels: {
-            color: textColor
+            color: textColor,
           },
           onClick: (e: any, legendItem: any, legend: any) => {
             const ci = legend.chart;
@@ -399,6 +417,9 @@ export class HomeComponent {
               else if (tooltipItem.dataset.label === 'AvgHashrate') {
                 label += HashSuffixPipe.transform(tooltipItem.raw);
               }
+              else if (tooltipItem.dataset.label === 'Power') {
+                label += tooltipItem.raw + ' W';
+              }
               else {
                 label += HashSuffixPipe.transform(tooltipItem.raw);
               }
@@ -411,7 +432,7 @@ export class HomeComponent {
         x: {
           type: 'time',
           time: {
-            unit: 'minute', // Set the unit to 'minute'
+            unit: 'second', // Set the unit to 'minute'
           },
           ticks: {
             color: textColorSecondary
@@ -540,6 +561,21 @@ export class HomeComponent {
             color: surfaceBorder
           },
 
+        },
+        y9: {
+          type: 'linear',
+          display: false,
+          position: 'right',
+          ticks: {
+            color: coreVoltageCurrentColor,
+            callback: (value: number) => value + 'W'
+          },
+          grid: {
+            drawOnChartArea: false,
+            color: surfaceBorder
+          },
+          min: 0,
+          suggestedMax: 100
         }
       }
     };
@@ -553,6 +589,7 @@ export class HomeComponent {
     this.chartData.datasets[5].data = this.avghashrateData;
     this.chartData.datasets[6].data = this.coreVoltageCurrentData;
     this.chartData.datasets[7].data = this.espRam;
+    this.chartData.datasets[8].data = this.powerData;
 
     // load previous data
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
@@ -571,7 +608,7 @@ export class HomeComponent {
 
         this.hashrateData.push(element[idxHashrate] * 1000000000);
         this.temperatureData.push(element[idxTemperature]);
-        this.powerData.push(element[idxPower]);
+        this.powerData.push(Number(element[idxPower].toFixed(2)));
         this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
         this.coreVoltageData.push(element[idxVoltage]);
         this.mhzData.push(element[idxFreqency]);
@@ -595,6 +632,9 @@ export class HomeComponent {
           this.setTimeLimits();
         }
       }),
+        // Only call these once, after all data is pushed:
+        this.visibleItemCount = this.dataLabel.length;
+      this.setTimeLimits(),
         this.chart?.refresh(),
         this.startGetInfo();
     });
@@ -612,8 +652,8 @@ export class HomeComponent {
           this.hashrateData.push(info.hashRate * 1000000000);
           this.temperatureData.push(info.temp);
           this.mhzData.push(info.frequency);
-          this.coreVoltageData.push(info.coreVoltage);
-          this.powerData.push(info.power);
+          this.coreVoltageData.push(Number(info.coreVoltage.toFixed(2)));
+          this.powerData.push(Number(info.power.toFixed(2)));
           this.fanspeed.push(info.fanspeed);
           this.avghashrateData.push(info.avghashRate * 1000000000);
           this.dataLabel.push(new Date().getTime());
@@ -658,7 +698,7 @@ export class HomeComponent {
         info.voltage = parseFloat((info.voltage / 1000).toFixed(1));
         info.current = parseFloat((info.current / 1000).toFixed(1));
         info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
-        info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
+        info.coreVoltage = parseFloat((info.coreVoltage).toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
 
         return info;
@@ -688,7 +728,7 @@ export class HomeComponent {
         ].filter(Boolean).join(' • ')
       );
     });
-      
+
   }
 
   getRejectionExplanation(reason: string): string | null {
@@ -742,20 +782,147 @@ export class HomeComponent {
   }
 
   private restoreDatasetVisibility() {
-  this.loadDatasetVisibility();
-  // Wait for chart to be available before applying visibility
-  if (!this.chart?.chart) {
-    // Try again after a short delay if chart is not ready yet
-    setTimeout(() => this.restoreDatasetVisibility(), 100);
-    return;
+    this.loadDatasetVisibility();
+    // Wait for chart to be available before applying visibility
+    if (!this.chart?.chart) {
+      // Try again after a short delay if chart is not ready yet
+      setTimeout(() => this.restoreDatasetVisibility(), 100);
+      return;
+    }
+    if (this.datasetVisibility.length) {
+      const chartInstance = (this.chart.chart as any);
+      this.datasetVisibility.forEach((visible, idx) => {
+        const meta = chartInstance.getDatasetMeta(idx);
+        meta.hidden = !visible;
+      });
+      chartInstance.update();
+    }
   }
-  if (this.datasetVisibility.length) {
-    const chartInstance = (this.chart.chart as any);
-    this.datasetVisibility.forEach((visible, idx) => {
-      const meta = chartInstance.getDatasetMeta(idx);
-      meta.hidden = !visible;
+}
+
+Chart.register({
+  id: 'customValueLabels',
+  afterDatasetsDraw: (chart: any) => {
+    const ctx = chart.ctx;
+
+    chart.data.datasets.forEach((dataset: any, i: number) => {
+      const meta = chart.getDatasetMeta(i);
+      if (!chart.isDatasetVisible(i)) return;
+
+      const data = dataset.data;
+      const scale = chart.scales.x;
+      const visibleMin = scale.left;
+      const visibleMax = scale.right;
+
+      // Find valid and visible indices
+      const visibleIndices = data
+        .map((v: any, idx: number) => {
+          const point = meta.data[idx];
+          if (
+            v !== undefined &&
+            v !== null &&
+            v !== '' &&
+            v !== 'NaN' &&
+            v !== 'NaNundefined' &&
+            !(typeof v === 'number' && isNaN(v)) &&
+            point &&
+            point.x >= visibleMin &&
+            point.x <= visibleMax
+          ) {
+            return idx;
+          }
+          return null;
+        })
+        .filter((idx: number | null) => idx !== null) as number[];
+
+      if (visibleIndices.length === 0) return;
+
+      const firstIndex = visibleIndices[0];
+      const lastIndex = visibleIndices[visibleIndices.length - 1];
+
+      // Find min and max value indices in the visible range
+      let minIndex = firstIndex;
+      let maxIndex = firstIndex;
+      let minValue = data[firstIndex];
+      let maxValue = data[firstIndex];
+
+      visibleIndices.forEach(idx => {
+        if (data[idx] < minValue) {
+          minValue = data[idx];
+          minIndex = idx;
+        }
+        if (data[idx] > maxValue) {
+          maxValue = data[idx];
+          maxIndex = idx;
+        }
+      });
+
+      // Collect unique indices to label
+      const labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
+
+      labelIndices.forEach(idx => {
+        let value = data[idx];
+        if (dataset.label === 'Hashrate' || dataset.label === 'AvgHashrate') {
+          value = HashSuffixPipe.transform(value);
+        }
+        const point = meta.data[idx];
+        if (!point) return;
+
+        // Label styling
+        const paddingX = 4;
+        const paddingY = 2;
+        ctx.save();
+        ctx.font = '10px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const text = String(value);
+        const textWidth = ctx.measureText(text).width;
+        const rectWidth = textWidth + paddingX * 2;
+        const rectHeight = 14;
+
+        // Draw background with rounded corners
+        ctx.beginPath();
+        const radius = 5;
+        const x = point.x - rectWidth / 2;
+        const y = point.y - rectHeight - 6;
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + rectWidth - radius, y);
+        ctx.quadraticCurveTo(x + rectWidth, y, x + rectWidth, y + radius);
+        ctx.lineTo(x + rectWidth, y + rectHeight - radius);
+        ctx.quadraticCurveTo(x + rectWidth, y + rectHeight, x + rectWidth - radius, y + rectHeight);
+        ctx.lineTo(x + radius, y + rectHeight);
+        ctx.quadraticCurveTo(x, y + rectHeight, x, y + rectHeight - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+
+        ctx.fillStyle = "#222c";
+        ctx.fill();
+
+        // Draw border
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = dataset.borderColor || '#fff';
+        ctx.stroke();
+
+        // Draw text
+        ctx.fillStyle = "#fff";
+        ctx.fillText(text, point.x, y + rectHeight / 2 + paddingY / 2);
+
+        ctx.restore();
+      });
     });
-    chartInstance.update();
   }
-}
-}
+});
+
+Chart.register({
+  id: 'legendMargin',
+  beforeInit(chart) {
+    if (!chart.legend) return; // Safeguard for undefined legend
+    const originalFit = chart.legend.fit;
+    chart.legend.fit = function fit() {
+      originalFit.bind(chart.legend)();
+      this.height += 20; // <-- Adjust this value for more/less space
+    };
+  }
+});
