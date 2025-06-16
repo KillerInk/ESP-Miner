@@ -10,6 +10,7 @@ import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
 import { Chart } from 'chart.js';
+import { saveAs } from 'file-saver';
 
 @Component({
   selector: 'app-home',
@@ -797,6 +798,28 @@ export class HomeComponent {
       });
       chartInstance.update();
     }
+  }
+
+  public saveChartDataAsJson() {
+    // Prepare the data to save
+    const exportData = {
+      date: new Date().toISOString(),
+      labels: this.dataLabel,
+      hashrateData: this.hashrateData,
+      temperatureData: this.temperatureData,
+      mhzData: this.mhzData,
+      coreVoltageData: this.coreVoltageData,
+      coreVoltageCurrentData: this.coreVoltageCurrentData,
+      powerData: this.powerData,
+      fanspeed: this.fanspeed,
+      avghashrateData: this.avghashrateData,
+      espRam: this.espRam
+    };
+
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
+    saveAs(blob, `esp32-miner-data-${dateStr}.json`);
   }
 }
 

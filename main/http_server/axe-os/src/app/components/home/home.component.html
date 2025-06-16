@@ -131,6 +131,7 @@
 
         <div class="col-12" *ngIf="!info.power_fault">
             <div class="card">
+                <button type="button" (click)="saveChartDataAsJson()">Save Chart Data</button>
                 <div #chartContainer (wheel)="onMouseWheel($event)" (mousedown)="onMouseDown($event)"
                     (mouseup)="onMouseUp($event)" (mousemove)="onMouseMove($event)"
                     (mouseenter)="isMouseOverChart = true" (mouseleave)="isMouseOverChart = false">
