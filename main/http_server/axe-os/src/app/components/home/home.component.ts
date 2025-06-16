@@ -367,8 +367,8 @@ export class HomeComponent {
           type: 'line',
           label: 'V/F Ratio',
           data: this.diffData,
-          backgroundColor: diffColor,
-          borderColor: diffColor,
+          backgroundColor: '#a259f7',
+          borderColor: '#a259f7',
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
@@ -381,7 +381,8 @@ export class HomeComponent {
     };
 
     this.datasetVisibility = this.chartData.datasets.map(() => true);
-    this.restoreDatasetVisibility()
+    this.restoreDatasetVisibility();
+
     // Initialize chart options
     this.chartOptions = {
       animation: false,
@@ -629,106 +630,82 @@ export class HomeComponent {
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
     this.stats$.subscribe(stats => {
       stats.statistics.forEach(element => {
-        const idxHashrate = 0;
-        const idxTemperature = 1;
-        const idxPower = 2;
-        const idxTimestamp = 3;
-        const idxVoltage = 4;
-        const idxFreqency = 5;
-        const idxFanSpeed = 6;
-        const idxAvgHashrate = 7;
-        const idxVoltageCur = 8;
-        const idxFreeHeap = 9;
-
-        this.hashrateData.push(element[idxHashrate] * 1000000000);
-        this.temperatureData.push(element[idxTemperature]);
-        this.powerData.push(Number(element[idxPower].toFixed(2)));
-        this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
-        this.coreVoltageData.push(element[idxVoltage]);
-        this.mhzData.push(element[idxFreqency]);
-        this.fanspeed.push(element[idxFanSpeed]);
-        this.avghashrateData.push(element[idxAvgHashrate] * 1000000000);
-        this.coreVoltageCurrentData.push(element[idxVoltageCur]);
-        this.espRam.push(element[idxFreeHeap]);
-        this.visibleItemCount++;
-        this.setTimeLimits();
-        // Calculate V/F ratio for each new point
-        const lastIdx = this.coreVoltageData.length - 1;
-        if (lastIdx >= 0 && this.mhzData[lastIdx]) {
-          this.diffData[lastIdx] = this.coreVoltageData[lastIdx] / this.mhzData[lastIdx];
-        } else {
-          this.diffData[lastIdx] = 0;
-        }
-
-        if (this.hashrateData.length >= 720) {
-          this.hashrateData.shift();
-          this.temperatureData.shift();
-          this.mhzData.shift();
-          this.coreVoltageData.shift();
-          this.powerData.shift();
-          this.dataLabel.shift();
-          this.fanspeed.shift();
-          this.avghashrateData.shift();
-          this.espRam.shift();
-          this.diffData.shift();
-          this.visibleItemCount--;
-          this.setTimeLimits();
-        }
-      }),
-        // Only call these once, after all data is pushed:
-        this.visibleItemCount = this.dataLabel.length;
-      this.setTimeLimits(),
-        this.chart?.refresh(),
-        this.startGetInfo();
+        this.addDataPoint(element, true, stats);
+      });
+      this.visibleItemCount = this.dataLabel.length;
+      this.setTimeLimits();
+      this.chart?.refresh();
+      this.startGetInfo();
     });
+  }
+
+  private addDataPoint(info: ISystemInfo | number[], isStats = false, stats?: ISystemStatistics) {
+    if (isStats && Array.isArray(info) && stats) {
+      // For stats$ subscription
+      const [
+        hashrate, temperature, power, timestamp, voltage, freq, fanspeed, avghashrate, voltageCur, freeHeap
+      ] = info as number[];
+
+      this.hashrateData.push(hashrate * 1000000000);
+      this.temperatureData.push(temperature);
+      this.powerData.push(Number(power.toFixed(2)));
+      this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + timestamp);
+      this.coreVoltageData.push(voltage);
+      this.mhzData.push(freq);
+      this.fanspeed.push(fanspeed);
+      this.avghashrateData.push(avghashrate * 1000000000);
+      this.coreVoltageCurrentData.push(voltageCur);
+      this.espRam.push(freeHeap);
+    } else if (!isStats && !Array.isArray(info)) {
+      // For info$ subscription
+      this.hashrateData.push(info.hashRate * 1000000000);
+      this.temperatureData.push(info.temp);
+      this.mhzData.push(info.frequency);
+      this.coreVoltageData.push(Number(info.coreVoltage.toFixed(2)));
+      this.powerData.push(Number(info.power.toFixed(2)));
+      this.fanspeed.push(info.fanspeed);
+      this.avghashrateData.push(info.avghashRate * 1000000000);
+      this.dataLabel.push(new Date().getTime());
+      this.coreVoltageCurrentData.push(info.coreVoltageActual);
+      this.espRam.push(info.freeHeap);
+    }
+
+    // Calculate V/F ratio for each new point
+    const lastIdx = this.coreVoltageData.length - 1;
+    if (lastIdx >= 0 && this.mhzData[lastIdx]) {
+      this.diffData[lastIdx] = this.coreVoltageData[lastIdx] / this.mhzData[lastIdx];
+    } else {
+      this.diffData[lastIdx] = 0;
+    }
+
+    this.visibleItemCount++;
+    this.itemPosition--;
+
+    // Shift arrays if needed
+    if (this.hashrateData.length >= 720) {
+      this.hashrateData.shift();
+      this.temperatureData.shift();
+      this.mhzData.shift();
+      this.coreVoltageData.shift();
+      this.powerData.shift();
+      this.dataLabel.shift();
+      this.fanspeed.shift();
+      this.avghashrateData.shift();
+      this.coreVoltageCurrentData.shift();
+      this.espRam.shift();
+      this.diffData.shift();
+      this.visibleItemCount--;
+    }
+    this.setTimeLimits();
   }
 
   private startGetInfo() {
     this.info$ = interval(5000).pipe(
       startWith(() => this.systemService.getInfo()),
-      switchMap(() => {
-        return this.systemService.getInfo()
-      }),
+      switchMap(() => this.systemService.getInfo()),
       tap(info => {
-        // Only collect and update chart data if there's no power fault
         if (!info.power_fault) {
-          this.hashrateData.push(info.hashRate * 1000000000);
-          this.temperatureData.push(info.temp);
-          this.mhzData.push(info.frequency);
-          this.coreVoltageData.push(Number(info.coreVoltage.toFixed(2)));
-          this.powerData.push(Number(info.power.toFixed(2)));
-          this.fanspeed.push(info.fanspeed);
-          this.avghashrateData.push(info.avghashRate * 1000000000);
-          this.dataLabel.push(new Date().getTime());
-          this.coreVoltageCurrentData.push(info.coreVoltageActual);
-          this.espRam.push(info.freeHeap);
-          this.visibleItemCount++;
-            this.itemPosition--;
-          this.setTimeLimits();
-
-          // Calculate V/F ratio for each new point
-          const lastIdx = this.coreVoltageData.length - 1;
-          if (lastIdx >= 0 && this.mhzData[lastIdx]) {
-            this.diffData[lastIdx] = this.coreVoltageData[lastIdx] / this.mhzData[lastIdx];
-          } else {
-            this.diffData[lastIdx] = 0;
-          }
-
-          if (this.hashrateData.length >= 720) {
-            this.hashrateData.shift();
-            this.temperatureData.shift();
-            this.mhzData.shift();
-            this.coreVoltageData.shift();
-            this.powerData.shift();
-            this.dataLabel.shift();
-            this.fanspeed.shift();
-            this.avghashrateData.shift();
-            this.coreVoltageCurrentData.shift();
-            this.espRam.shift();
-            this.diffData.shift();
-            this.visibleItemCount--;
-            this.setTimeLimits();
-          }
+          this.addDataPoint(info);
           this.chart?.refresh();
         }
 
