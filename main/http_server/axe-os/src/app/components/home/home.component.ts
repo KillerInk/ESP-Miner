@@ -59,6 +59,8 @@ export class HomeComponent {
 
   public isMouseOverChart = false;
 
+  public diffData: number[] = [];
+
   constructor(
     private systemService: SystemService,
     private themeService: ThemeService,
@@ -239,6 +241,7 @@ export class HomeComponent {
     const avghashColor = documentStyle.getPropertyValue('--pink-300');
     const coreVoltageCurrentColor = documentStyle.getPropertyValue('--yellow-800');
     const espRamColor = documentStyle.getPropertyValue('--teal-600');
+    const diffColor = '#a259f7'; // purple
 
     this.chartData = {
       labels: [],
@@ -359,7 +362,21 @@ export class HomeComponent {
           pointHoverRadius: 0,
           borderWidth: 1,
           yAxisID: 'y9',
-        }
+        },
+        {
+          type: 'line',
+          label: 'V/F Ratio',
+          data: this.diffData,
+          backgroundColor: diffColor,
+          borderColor: diffColor,
+          tension: 0,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          borderWidth: 0.5,
+          yAxisID: 'y10',
+          fill: false,
+          spanGaps: false
+        },
       ]
     };
 
@@ -577,6 +594,21 @@ export class HomeComponent {
           },
           min: 0,
           suggestedMax: 100
+        },
+        y10: {
+          type: 'linear',
+          display: false,
+          position: 'right',
+          ticks: {
+            color: diffColor,
+            callback: (value: number) => value.toFixed(2)
+          },
+          grid: {
+            drawOnChartArea: false,
+            color: diffColor + '22'
+          },
+          min: 0,
+          suggestedMax: 3
         }
       }
     };
@@ -591,6 +623,7 @@ export class HomeComponent {
     this.chartData.datasets[6].data = this.coreVoltageCurrentData;
     this.chartData.datasets[7].data = this.espRam;
     this.chartData.datasets[8].data = this.powerData;
+    this.chartData.datasets[9].data = this.diffData;
 
     // load previous data
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
@@ -619,6 +652,14 @@ export class HomeComponent {
         this.espRam.push(element[idxFreeHeap]);
         this.visibleItemCount++;
         this.setTimeLimits();
+        // Calculate V/F ratio for each new point
+        const lastIdx = this.coreVoltageData.length - 1;
+        if (lastIdx >= 0 && this.mhzData[lastIdx]) {
+          this.diffData[lastIdx] = this.coreVoltageData[lastIdx] / this.mhzData[lastIdx];
+        } else {
+          this.diffData[lastIdx] = 0;
+        }
+
         if (this.hashrateData.length >= 720) {
           this.hashrateData.shift();
           this.temperatureData.shift();
@@ -629,6 +670,7 @@ export class HomeComponent {
           this.fanspeed.shift();
           this.avghashrateData.shift();
           this.espRam.shift();
+          this.diffData.shift();
           this.visibleItemCount--;
           this.setTimeLimits();
         }
@@ -661,9 +703,16 @@ export class HomeComponent {
           this.coreVoltageCurrentData.push(info.coreVoltageActual);
           this.espRam.push(info.freeHeap);
           this.visibleItemCount++;
-          if (this.itemPosition < 0)
             this.itemPosition--;
           this.setTimeLimits();
+
+          // Calculate V/F ratio for each new point
+          const lastIdx = this.coreVoltageData.length - 1;
+          if (lastIdx >= 0 && this.mhzData[lastIdx]) {
+            this.diffData[lastIdx] = this.coreVoltageData[lastIdx] / this.mhzData[lastIdx];
+          } else {
+            this.diffData[lastIdx] = 0;
+          }
 
           if (this.hashrateData.length >= 720) {
             this.hashrateData.shift();
@@ -676,6 +725,7 @@ export class HomeComponent {
             this.avghashrateData.shift();
             this.coreVoltageCurrentData.shift();
             this.espRam.shift();
+            this.diffData.shift();
             this.visibleItemCount--;
             this.setTimeLimits();
           }
@@ -887,6 +937,9 @@ Chart.register({
         let value = data[idx];
         if (dataset.label === 'Hashrate' || dataset.label === 'AvgHashrate') {
           value = HashSuffixPipe.transform(value);
+        }
+        else if (dataset.label === 'V/F Ratio') {
+          value = value.toFixed(2);
         }
         const point = meta.data[idx];
         if (!point) return;
