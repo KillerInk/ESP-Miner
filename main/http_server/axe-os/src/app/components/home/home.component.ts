@@ -244,7 +244,7 @@ export class HomeComponent {
     const diffColor = '#a259f7'; // purple
 
     this.chartData = {
-      labels: [],
+      labels: this.dataLabel,
       datasets: [
         {
           type: 'line',
@@ -367,8 +367,8 @@ export class HomeComponent {
           type: 'line',
           label: 'V/F Ratio',
           data: this.diffData,
-          backgroundColor: '#a259f7',
-          borderColor: '#a259f7',
+          backgroundColor: diffColor,
+          borderColor: diffColor,
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
@@ -447,6 +447,12 @@ export class HomeComponent {
           }
         },
       },
+      layout: {
+        padding: {
+          right: 60,
+          left: 60 // <-- Add this line to add padding to the right side of the chart
+        }
+      },
       scales: {
         x: {
           type: 'time',
@@ -463,6 +469,7 @@ export class HomeComponent {
           }
         },
         y: {
+          display: false, // <-- Hide hashrate scale display
           ticks: {
             color: textColorSecondary,
             callback: (value: number) => HashSuffixPipe.transform(value)
@@ -471,13 +478,11 @@ export class HomeComponent {
             color: surfaceBorder,
             drawBorder: false
           },
-          min: 0,
-          suggestedMax: 2000000000000
         },
         y2: {
           drawOnChartArea: false,
           type: 'linear',
-          display: true,
+          display: false,
           position: 'right',
           ticks: {
             color: primaryColor,
@@ -487,8 +492,6 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          suggestedMax: 60,
-          min: 20
         },
         y3: {
           type: 'linear',
@@ -502,8 +505,6 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          min: 400,
-          suggestedMax: 600
         }
         ,
         y4: {
@@ -518,8 +519,6 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          min: 800,
-          suggestedMax: 1200
         }
         ,
         y5: {
@@ -534,8 +533,6 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          suggestedMax: 80,
-          min: 20
         },
         y6: {
           ticks: {
@@ -547,8 +544,6 @@ export class HomeComponent {
             color: surfaceBorder,
             drawOnChartArea: false,
           },
-          min: 0,
-          suggestedMax: 2000000000000
         }
         ,
         y7: {
@@ -563,8 +558,6 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          min: 800,
-          suggestedMax: 1200
         }
         ,
         y8: {
@@ -593,8 +586,6 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: surfaceBorder
           },
-          min: 0,
-          suggestedMax: 100
         },
         y10: {
           type: 'linear',
@@ -608,8 +599,6 @@ export class HomeComponent {
             drawOnChartArea: false,
             color: diffColor + '22'
           },
-          min: 0,
-          suggestedMax: 3
         }
       }
     };
@@ -639,6 +628,10 @@ export class HomeComponent {
     });
   }
 
+  /**
+   * Adds a new data point from either live info or statistics.
+   * Handles all arrays and diffData, and manages shifting if needed.
+   */
   private addDataPoint(info: ISystemInfo | number[], isStats = false, stats?: ISystemStatistics) {
     if (isStats && Array.isArray(info) && stats) {
       // For stats$ subscription
@@ -646,25 +639,25 @@ export class HomeComponent {
         hashrate, temperature, power, timestamp, voltage, freq, fanspeed, avghashrate, voltageCur, freeHeap
       ] = info as number[];
 
-      this.hashrateData.push(hashrate * 1000000000);
+      this.hashrateData.push(hashrate * 1e9);
       this.temperatureData.push(temperature);
       this.powerData.push(Number(power.toFixed(2)));
       this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + timestamp);
       this.coreVoltageData.push(voltage);
       this.mhzData.push(freq);
       this.fanspeed.push(fanspeed);
-      this.avghashrateData.push(avghashrate * 1000000000);
+      this.avghashrateData.push(avghashrate * 1e9);
       this.coreVoltageCurrentData.push(voltageCur);
       this.espRam.push(freeHeap);
     } else if (!isStats && !Array.isArray(info)) {
       // For info$ subscription
-      this.hashrateData.push(info.hashRate * 1000000000);
+      this.hashrateData.push(info.hashRate * 1e9);
       this.temperatureData.push(info.temp);
       this.mhzData.push(info.frequency);
       this.coreVoltageData.push(Number(info.coreVoltage.toFixed(2)));
       this.powerData.push(Number(info.power.toFixed(2)));
       this.fanspeed.push(info.fanspeed);
-      this.avghashrateData.push(info.avghashRate * 1000000000);
+      this.avghashrateData.push(info.avghashRate * 1e9);
       this.dataLabel.push(new Date().getTime());
       this.coreVoltageCurrentData.push(info.coreVoltageActual);
       this.espRam.push(info.freeHeap);
@@ -678,8 +671,11 @@ export class HomeComponent {
       this.diffData[lastIdx] = 0;
     }
 
-    this.visibleItemCount++;
-    this.itemPosition--;
+    if(this.itemPosition == 0)
+      this.visibleItemCount++;
+    else
+      this.visibleItemCount--;
+    //this.itemPosition--;
 
     // Shift arrays if needed
     if (this.hashrateData.length >= 720) {
@@ -907,16 +903,41 @@ Chart.register({
         }
       });
 
-      // Collect unique indices to label
-      const labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
+      // Always show label for oldest (firstIndex) and newest (lastIndex) data,
+      // even if they are not min/max, plus min/max (no duplicates)
+      let labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
+
+      // --- Avoid overlapping: shift labels horizontally and vertically as needed ---
+      // Store label positions to check for overlap
+      const labelPositions: { x: number, y: number, w: number, h: number }[] = [];
 
       labelIndices.forEach(idx => {
         let value = data[idx];
+        let suffix = '';
         if (dataset.label === 'Hashrate' || dataset.label === 'AvgHashrate') {
           value = HashSuffixPipe.transform(value);
+          suffix = '';
         }
         else if (dataset.label === 'V/F Ratio') {
-          value = value.toFixed(2);
+          value = value.toFixed(4);
+        }
+        else if (dataset.label === 'ASIC Temp') {
+          suffix = '°C';
+        }
+        else if (dataset.label === 'ASIC Freq') {
+          suffix = 'MHz';
+        }
+        else if (dataset.label === 'VoltSet' || dataset.label === 'VoltCurrent') {
+          suffix = 'mV';
+        }
+        else if (dataset.label === 'Fan') {
+          suffix = '%';
+        }
+        else if (dataset.label === 'EspRam') {
+          suffix = 'B';
+        }
+        else if (dataset.label === 'Power') {
+          suffix = 'W';
         }
         const point = meta.data[idx];
         if (!point) return;
@@ -929,16 +950,49 @@ Chart.register({
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        const text = String(value);
+        const text = String(value) + (suffix ? ' ' + suffix : '');
         const textWidth = ctx.measureText(text).width;
         const rectWidth = textWidth + paddingX * 2;
         const rectHeight = 14;
+        
+
+
+        // Initial position (no horizontal shift, only vertical)
+        let x = point.x - rectWidth / 2;
+        let y = point.y - rectHeight /2;
+        if(idx ==firstIndex)
+          x -= rectWidth *0.6;
+        if(idx ==lastIndex)
+          x += rectWidth*0.6;
+        // Try to find a non-overlapping position by shifting vertically (y-direction) only
+        let tryCount = 0;
+        let found = false;
+        const verticalShift = rectHeight +4; // <-- Increased from 4 to 12 for more space
+        while (!found && tryCount < 5) {     // <-- Increased max tries for safety
+          found = true;
+          for (const pos of labelPositions) {
+            // Check for rectangle overlap
+            if (
+              x < pos.x + pos.w &&
+              x + rectWidth > pos.x &&
+              y < pos.y + pos.h&&
+              y + rectHeight > pos.y
+            ) {
+              // Overlap detected, shift down (y-direction only)
+              y += verticalShift;
+              found = false;
+              break;
+            }
+          }
+          tryCount++;
+        }
+
+        // Save this label's position
+        labelPositions.push({ x, y, w: rectWidth, h: rectHeight });
 
         // Draw background with rounded corners
         ctx.beginPath();
         const radius = 5;
-        const x = point.x - rectWidth / 2;
-        const y = point.y - rectHeight - 6;
         ctx.moveTo(x + radius, y);
         ctx.lineTo(x + rectWidth - radius, y);
         ctx.quadraticCurveTo(x + rectWidth, y, x + rectWidth, y + radius);
@@ -960,7 +1014,7 @@ Chart.register({
 
         // Draw text
         ctx.fillStyle = "#fff";
-        ctx.fillText(text, point.x, y + rectHeight / 2 + paddingY / 2);
+        ctx.fillText(text, x + rectWidth / 2, y + rectHeight / 2 + paddingY / 2);
 
         ctx.restore();
       });
