@@ -100,29 +100,26 @@ static inline double clamp(double val, double min, double max)
     return val;
 }
 
-static void enforce_voltage_frequency_ratio()
-{
-    double min_voltage = last_asic_frequency_auto * 1.85;
-    double max_voltage = last_asic_frequency_auto * 2.1;
+static void enforce_voltage_frequency_ratio() {
+    double min_voltage = last_asic_frequency_auto * 1.8;
+    double max_voltage = last_asic_frequency_auto * 2;
 
-    // Clamp voltage to ensure 1.9 <= voltage/frequency <= 2.1
+    // Clamp voltage to ensure the ratio is within the desired range
     if (last_core_voltage_auto < min_voltage) {
         last_core_voltage_auto = min_voltage;
         lastVoltageSet = true;
-    }
-    if (last_core_voltage_auto > max_voltage) {
+    } else if (last_core_voltage_auto > max_voltage) {
         last_core_voltage_auto = max_voltage;
         lastVoltageSet = false;
     }
 
-    // Optionally, clamp frequency so 1.9 <= voltage/frequency <= 2.1
-    double min_frequency = last_core_voltage_auto / 2.1;
-    double max_frequency = last_core_voltage_auto / 1.85;
+    // Clamp frequency to ensure the ratio is within the desired range
+    double min_frequency = last_core_voltage_auto / 2;
+    double max_frequency = last_core_voltage_auto / 1.8;
     if (last_asic_frequency_auto < min_frequency) {
         last_asic_frequency_auto = min_frequency;
         lastVoltageSet = false;
-    }
-    if (last_asic_frequency_auto > max_frequency) {
+    } else if (last_asic_frequency_auto > max_frequency) {
         last_asic_frequency_auto = max_frequency;
         lastVoltageSet = true;
     }
