@@ -440,7 +440,7 @@ export class HomeComponent {
                 label += tooltipItem.raw + ' W';
               }
               else if (tooltipItem.dataset.label === 'V/F Ratio') {
-                label += tooltipItem.raw.toFixed(4); 
+                label += tooltipItem.raw.toFixed(4);
               }
               else {
                 label += HashSuffixPipe.transform(tooltipItem.raw);
@@ -674,7 +674,7 @@ export class HomeComponent {
       this.diffData[lastIdx] = 0;
     }
 
-    if(this.itemPosition == 0)
+    if (this.itemPosition == 0)
       this.visibleItemCount++;
     else
       this.visibleItemCount--;
@@ -851,38 +851,70 @@ export class HomeComponent {
 
 Chart.register({
   id: 'customValueLabels',
-  afterDatasetsDraw: (chart: any) => {
+  afterDatasetsDraw: (chart) => {
     const ctx = chart.ctx;
 
-    chart.data.datasets.forEach((dataset: any, i: number) => {
+    type Dataset = {
+      label: string;
+      borderColor?: string;
+    };
+
+    type Point = { x: number; y: number };
+
+    type BubbleDataPoint = {
+      x: number;
+      y: number;
+      r: number;
+    };
+
+    const getSuffix = (dataset: any, value: number): string => {
+      if (!value || isNaN(value)) return '';
+      switch (dataset.label) {
+        case 'Hashrate':
+        case 'AvgHashrate':
+          return HashSuffixPipe.transform(value);
+        case 'V/F Ratio':
+          return value.toFixed(4);
+        case 'ASIC Temp':
+          return '°C';
+        case 'ASIC Freq':
+          return 'MHz';
+        case 'VoltSet':
+        case 'VoltCurrent':
+          return 'mV';
+        case 'Fan':
+          return '%';
+        case 'EspRam':
+          return 'B';
+        case 'Power':
+          return 'W';
+        default:
+          return '';
+      }
+    };
+
+    chart.data.datasets.forEach((dataset, i) => {
       const meta = chart.getDatasetMeta(i);
       if (!chart.isDatasetVisible(i)) return;
 
-      const data = dataset.data;
-      const scale = chart.scales.x;
+      const data = dataset.data as (number | [number, number] | Point | BubbleDataPoint)[];
+      const scale = chart.scales['x'];
       const visibleMin = scale.left;
       const visibleMax = scale.right;
 
       // Find valid and visible indices
       const visibleIndices = data
-        .map((v: any, idx: number) => {
-          const point = meta.data[idx];
-          if (
-            v !== undefined &&
-            v !== null &&
-            v !== '' &&
-            v !== 'NaN' &&
-            v !== 'NaNundefined' &&
-            !(typeof v === 'number' && isNaN(v)) &&
-            point &&
-            point.x >= visibleMin &&
-            point.x <= visibleMax
-          ) {
-            return idx;
+        .map((v, idx) => {
+          if (typeof v === 'number' && typeof v !== 'string') {
+            const point: Point | BubbleDataPoint = meta.data[idx];
+            if (!point) return null;
+            if ('x' in point && 'y' in point) {
+              return idx;
+            }
           }
           return null;
         })
-        .filter((idx: number | null) => idx !== null) as number[];
+        .filter((idx) => idx !== null) as number[];
 
       if (visibleIndices.length === 0) return;
 
@@ -892,96 +924,69 @@ Chart.register({
       // Find min and max value indices in the visible range
       let minIndex = firstIndex;
       let maxIndex = firstIndex;
-      let minValue = data[firstIndex];
-      let maxValue = data[firstIndex];
+      let minValue = data[firstIndex] as number;
+      let maxValue = data[firstIndex] as number;
 
-      visibleIndices.forEach(idx => {
-        if (data[idx] < minValue) {
-          minValue = data[idx];
+      visibleIndices.forEach((idx) => {
+        const value = data[idx] as number;
+        if (value < minValue) {
+          minValue = value;
           minIndex = idx;
         }
-        if (data[idx] > maxValue) {
-          maxValue = data[idx];
+        if (value > maxValue) {
+          maxValue = value;
           maxIndex = idx;
         }
       });
 
-      // Always show label for oldest (firstIndex) and newest (lastIndex) data,
-      // even if they are not min/max, plus min/max (no duplicates)
+      // Always show label for oldest (firstIndex) and newest (lastIndex), plus min/max (no duplicates)
       let labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
 
-      // --- Avoid overlapping: shift labels horizontally and vertically as needed ---
-      // Store label positions to check for overlap
-      const labelPositions: { x: number, y: number, w: number, h: number }[] = [];
+      const paddingX = 4;
+      const paddingY = 2;
+      const verticalShift = 12; // Increased space between labels
 
-      labelIndices.forEach(idx => {
-        let value = data[idx];
-        let suffix = '';
-        if (dataset.label === 'Hashrate' || dataset.label === 'AvgHashrate') {
-          value = HashSuffixPipe.transform(value);
-          suffix = '';
-        }
-        else if (dataset.label === 'V/F Ratio') {
-          value = value.toFixed(4);
-        }
-        else if (dataset.label === 'ASIC Temp') {
-          suffix = '°C';
-        }
-        else if (dataset.label === 'ASIC Freq') {
-          suffix = 'MHz';
-        }
-        else if (dataset.label === 'VoltSet' || dataset.label === 'VoltCurrent') {
-          suffix = 'mV';
-        }
-        else if (dataset.label === 'Fan') {
-          suffix = '%';
-        }
-        else if (dataset.label === 'EspRam') {
-          suffix = 'B';
-        }
-        else if (dataset.label === 'Power') {
-          suffix = 'W';
-        }
-        const point = meta.data[idx];
+      const labelPositions: { x: number; y: number; w: number; h: number }[] = [];
+
+      labelIndices.forEach((idx) => {
+        let value = data[idx] as number | null;
+        if (value === null || value === undefined) return; // Skip rendering if value is null or undefined
+        const suffix = getSuffix(dataset, value);
+        const point: Point | BubbleDataPoint = meta.data[idx];
         if (!point) return;
 
-        // Label styling
-        const paddingX = 4;
-        const paddingY = 2;
         ctx.save();
         ctx.font = '10px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-
-        const text = String(value) + (suffix ? ' ' + suffix : '');
+        var tt = "";
+        switch (dataset.label) {
+          case 'Hashrate':
+          case 'AvgHashrate':
+          case 'V/F Ratio':
+            tt = suffix;
+            break;
+          default:
+            tt = value.toString() + suffix;
+            break;
+        }
+        const text = tt
         const textWidth = ctx.measureText(text).width;
         const rectWidth = textWidth + paddingX * 2;
         const rectHeight = 14;
-        
 
-
-        // Initial position (no horizontal shift, only vertical)
         let x = point.x - rectWidth / 2;
-        let y = point.y - rectHeight /2;
-        if(idx ==firstIndex)
-          x -= rectWidth *0.6;
-        if(idx ==lastIndex)
-          x += rectWidth*0.6;
+        let y = point.y - rectHeight / 2;
+        if (idx == firstIndex) x -= rectWidth * 0.6;
+        if (idx == lastIndex) x += rectWidth * 0.6;
+
         // Try to find a non-overlapping position by shifting vertically (y-direction) only
         let tryCount = 0;
         let found = false;
-        const verticalShift = rectHeight +4; // <-- Increased from 4 to 12 for more space
-        while (!found && tryCount < 5) {     // <-- Increased max tries for safety
+        while (!found && tryCount < 5) {
           found = true;
           for (const pos of labelPositions) {
-            // Check for rectangle overlap
-            if (
-              x < pos.x + pos.w &&
-              x + rectWidth > pos.x &&
-              y < pos.y + pos.h&&
-              y + rectHeight > pos.y
-            ) {
-              // Overlap detected, shift down (y-direction only)
+            if (x < pos.x + pos.w && x + rectWidth > pos.x && y < pos.y + pos.h && y + rectHeight > pos.y) {
               y += verticalShift;
               found = false;
               break;
@@ -993,7 +998,6 @@ Chart.register({
         // Save this label's position
         labelPositions.push({ x, y, w: rectWidth, h: rectHeight });
 
-        // Draw background with rounded corners
         ctx.beginPath();
         const radius = 5;
         ctx.moveTo(x + radius, y);
@@ -1010,12 +1014,14 @@ Chart.register({
         ctx.fillStyle = "#222c";
         ctx.fill();
 
-        // Draw border
         ctx.lineWidth = 1;
-        ctx.strokeStyle = dataset.borderColor || '#fff';
+        if (dataset.borderColor !== undefined) {
+          ctx.strokeStyle = dataset.borderColor.toString();
+        } else {
+          ctx.strokeStyle = '#fff'; // Default stroke style if borderColor is not defined
+        }
         ctx.stroke();
 
-        // Draw text
         ctx.fillStyle = "#fff";
         ctx.fillText(text, x + rectWidth / 2, y + rectHeight / 2 + paddingY / 2);
 
