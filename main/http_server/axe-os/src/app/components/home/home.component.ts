@@ -439,6 +439,9 @@ export class HomeComponent {
               else if (tooltipItem.dataset.label === 'Power') {
                 label += tooltipItem.raw + ' W';
               }
+              else if (tooltipItem.dataset.label === 'V/F Ratio') {
+                label += tooltipItem.raw.toFixed(4); 
+              }
               else {
                 label += HashSuffixPipe.transform(tooltipItem.raw);
               }
