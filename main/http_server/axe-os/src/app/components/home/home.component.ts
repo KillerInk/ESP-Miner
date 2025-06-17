@@ -402,10 +402,14 @@ export class HomeComponent {
             const datasetIndex = legendItem.datasetIndex;
             // Toggle visibility
             const meta = ci.getDatasetMeta(datasetIndex);
-            meta.hidden = meta.hidden === null ? !ci.data.datasets[datasetIndex].hidden : null;
-            this.datasetVisibility[datasetIndex] = !meta.hidden;
+            if (meta.hidden === null) {
+              meta.hidden = !ci.data.datasets[datasetIndex].hidden;
+            } else {
+              meta.hidden = !meta.hidden;
+            }
             this.saveDatasetVisibility();
             ci.update();
+            return false;
           }
         },
         tooltip: {
