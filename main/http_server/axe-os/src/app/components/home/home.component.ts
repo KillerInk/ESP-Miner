@@ -173,10 +173,10 @@ export class HomeComponent {
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
     const mhzColor = documentStyle.getPropertyValue('--green-800');
-    const coreVoltageColor = documentStyle.getPropertyValue('--yellow-500');
+    const coreVoltageColor = documentStyle.getPropertyValue('--orange-800');
     const fanspeedColor = documentStyle.getPropertyValue('--indigo-600');
     const avghashColor = documentStyle.getPropertyValue('--pink-300');
-    const coreVoltageCurrentColor = documentStyle.getPropertyValue('--yellow-800');
+    const coreVoltageCurrentColor = documentStyle.getPropertyValue('--orange-900');
     const espRamColor = documentStyle.getPropertyValue('--teal-600');
 
 
@@ -236,12 +236,13 @@ export class HomeComponent {
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
     const mhzColor = documentStyle.getPropertyValue('--green-800');
-    const coreVoltageColor = documentStyle.getPropertyValue('--yellow-500');
+    const coreVoltageColor = documentStyle.getPropertyValue('--orange-800');
     const fanspeedColor = documentStyle.getPropertyValue('--indigo-600');
     const avghashColor = documentStyle.getPropertyValue('--pink-300');
-    const coreVoltageCurrentColor = documentStyle.getPropertyValue('--yellow-800');
+    const coreVoltageCurrentColor = documentStyle.getPropertyValue('--orange-900');
     const espRamColor = documentStyle.getPropertyValue('--teal-600');
     const diffColor = '#a259f7'; // purple
+    const borderWidth = 0.8;
 
     this.chartData = {
       labels: this.dataLabel,
@@ -255,7 +256,7 @@ export class HomeComponent {
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
-          borderWidth: 1.5,
+          borderWidth: borderWidth,
           yAxisID: 'y',
           fill: false,
         },
@@ -269,7 +270,7 @@ export class HomeComponent {
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
-          borderWidth: 1,
+          borderWidth: borderWidth,
           yAxisID: 'y2',
         },
         {
@@ -282,7 +283,7 @@ export class HomeComponent {
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
-          borderWidth: 1,
+          borderWidth: borderWidth,
           yAxisID: 'y3',
         },
         {
@@ -295,7 +296,7 @@ export class HomeComponent {
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
-          borderWidth: 1,
+          borderWidth: borderWidth,
           yAxisID: 'y4',
         },
         {
@@ -308,7 +309,7 @@ export class HomeComponent {
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
-          borderWidth: 1,
+          borderWidth: borderWidth,
           yAxisID: 'y5',
         },
         {
@@ -320,7 +321,7 @@ export class HomeComponent {
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
-          borderWidth: 1,
+          borderWidth: borderWidth,
           yAxisID: 'y6',
           fill: false,
         },
@@ -334,7 +335,7 @@ export class HomeComponent {
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
-          borderWidth: 1,
+          borderWidth: borderWidth,
           yAxisID: 'y7',
         },
         {
@@ -347,7 +348,7 @@ export class HomeComponent {
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
-          borderWidth: 1,
+          borderWidth: borderWidth,
           yAxisID: 'y8',
         },
         {
@@ -360,7 +361,7 @@ export class HomeComponent {
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
-          borderWidth: 1,
+          borderWidth: borderWidth,
           yAxisID: 'y9',
         },
         {
@@ -372,7 +373,7 @@ export class HomeComponent {
           tension: 0,
           pointRadius: 0,
           pointHoverRadius: 0,
-          borderWidth: 0.5,
+          borderWidth: borderWidth,
           yAxisID: 'y10',
           fill: false,
           spanGaps: false
@@ -607,7 +608,12 @@ export class HomeComponent {
             color: diffColor + '22'
           },
         }
-      }
+      },
+      yAxes: [{
+        ticks: {
+          beginAtZero: true
+        }
+      }]
     };
 
     this.chartData.labels = this.dataLabel;
@@ -699,6 +705,7 @@ export class HomeComponent {
       this.diffData.shift();
       this.visibleItemCount--;
     }
+    this.calculateMinMax();
     this.setTimeLimits();
   }
 
@@ -851,6 +858,28 @@ export class HomeComponent {
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
     saveAs(blob, `esp32-miner-data-${dateStr}.json`);
   }
+
+  calculateMinMax() {
+    if (this.hashrateData.length > 0) {
+      const minHashrate = Math.min(...this.hashrateData);
+      const maxHashrate = Math.max(...this.hashrateData);
+      this.chartOptions.scales.y.min = minHashrate;
+      this.chartOptions.scales.y.max = maxHashrate;
+      this.chartOptions.scales.y6.min = minHashrate;
+      this.chartOptions.scales.y6.max = maxHashrate;
+    }
+
+    /*if (this.coreVoltageData.length > 0) {
+      const minVoltage = Math.min(...this.coreVoltageData);
+      const maxVoltage = Math.max(...this.coreVoltageData);
+
+      // Set frequency scale's minimum and maximum values
+      this.chartOptions.scales.y2.min = minVoltage/2;
+      this.chartOptions.scales.y2.max = maxVoltage/2;
+      this.chartOptions.scales.y3.min = minVoltage;
+      this.chartOptions.scales.y3.max = maxVoltage;
+    }*/
+  }
 }
 
 Chart.register({
@@ -861,17 +890,13 @@ Chart.register({
     type Dataset = {
       label: string;
       borderColor?: string;
+      data: number[];
     };
 
     type Point = { x: number; y: number };
 
-    type BubbleDataPoint = {
-      x: number;
-      y: number;
-      r: number;
-    };
-
-    const getSuffix = (dataset: any, value: number): string => {
+    // Get suffix based on dataset and value
+    const getSuffix = (dataset: Dataset, value: number): string => {
       if (!value || isNaN(value)) return '';
       switch (dataset.label) {
         case 'Hashrate':
@@ -901,24 +926,17 @@ Chart.register({
       const meta = chart.getDatasetMeta(i);
       if (!chart.isDatasetVisible(i)) return;
 
-      const data = dataset.data as (number | [number, number] | Point | BubbleDataPoint)[];
+      const data = dataset.data;
       const scale = chart.scales['x'];
       const visibleMin = scale.left;
       const visibleMax = scale.right;
 
       // Find valid and visible indices
-      const visibleIndices = data
-        .map((v, idx) => {
-          if (typeof v === 'number' && typeof v !== 'string') {
-            const point: Point | BubbleDataPoint = meta.data[idx];
-            if (!point) return null;
-            if ('x' in point && 'y' in point) {
-              return idx;
-            }
-          }
-          return null;
-        })
-        .filter((idx) => idx !== null) as number[];
+      const visibleIndices = data.map((v, idx) => {
+        if (typeof v === 'number') return idx;
+        return null;
+      })
+      .filter((idx) => idx !== null) as number[];
 
       if (visibleIndices.length === 0) return;
 
@@ -928,22 +946,31 @@ Chart.register({
       // Find min and max value indices in the visible range
       let minIndex = firstIndex;
       let maxIndex = firstIndex;
-      let minValue = data[firstIndex] as number;
-      let maxValue = data[firstIndex] as number;
+      let minValue: number = data[firstIndex] as number;
+      let maxValue: number = data[firstIndex] as number;
 
       visibleIndices.forEach((idx) => {
-        const value = data[idx] as number;
-        if (value < minValue) {
-          minValue = value;
-          minIndex = idx;
-        }
-        if (value > maxValue) {
-          maxValue = value;
-          maxIndex = idx;
+        const value = data[idx];
+      
+        // Check if the value is a number
+        if (typeof value === 'number') {
+          // Update minValue and minIndex if the current value is smaller
+          if (value < minValue || minValue === null) {
+            minValue = value;
+            minIndex = idx;
+          }
+      
+          // Update maxValue and maxIndex if the current value is larger
+          if (value > maxValue || maxValue === null) {
+            maxValue = value;
+            maxIndex = idx;
+          }
+        } else {
+          console.warn(`Invalid data point at index ${idx}: ${data[idx]}`);
         }
       });
 
-      // Always show label for oldest (firstIndex) and newest (lastIndex), plus min/max (no duplicates)
+      // Always show label for oldest (firstIndex), newest (lastIndex), plus min/max (no duplicates)
       let labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
 
       const paddingX = 4;
@@ -953,16 +980,17 @@ Chart.register({
       const labelPositions: { x: number; y: number; w: number; h: number }[] = [];
 
       labelIndices.forEach((idx) => {
-        let value = data[idx] as number | null;
+        let value = data[idx];
         if (value === null || value === undefined) return; // Skip rendering if value is null or undefined
-        const suffix = getSuffix(dataset, value);
-        const point: Point | BubbleDataPoint = meta.data[idx];
+        const suffix = getSuffix(dataset as Dataset, value as number);
+        const point = meta.data[idx];
         if (!point) return;
 
         ctx.save();
         ctx.font = '10px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+
         var tt = "";
         switch (dataset.label) {
           case 'Hashrate':
@@ -1018,12 +1046,16 @@ Chart.register({
         ctx.fillStyle = "#222c";
         ctx.fill();
 
-        ctx.lineWidth = 1;
+        // Set stroke style based on dataset.borderColor
+        let strokeStyle;
         if (dataset.borderColor !== undefined) {
-          ctx.strokeStyle = dataset.borderColor.toString();
+          strokeStyle = dataset.borderColor.toString();
         } else {
-          ctx.strokeStyle = '#fff'; // Default stroke style if borderColor is not defined
+          strokeStyle = '#fff'; // Default stroke style if borderColor is not defined
         }
+
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = strokeStyle;
         ctx.stroke();
 
         ctx.fillStyle = "#fff";
