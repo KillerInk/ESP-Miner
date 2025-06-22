@@ -33,6 +33,11 @@ int waitCounter = 0;
 double freq_step;
 double volt_step;
 
+#define INIT_FREQ 525
+#define INIT_VOLTAGE 1150
+#define MIN_FREQ 401
+#define MIN_VOLTAGE 1001
+
 enum TuneState
 {
     sleep_before_warmup,
@@ -91,20 +96,14 @@ bool hashrate_decreased()
     return last_hashrate_auto > current_hashrate_auto;
 }
 
-static inline double clamp(double val, double min, double max)
-{
-    if (val < min)
-        return min;
-    if (val > max)
-        return max;
-    return val;
+static inline double clamp(double val, double min, double max) {
+    return (val < min) ? min : ((val > max) ? max : val);
 }
 
 static void enforce_voltage_frequency_ratio() {
     double min_voltage = last_asic_frequency_auto * 1.8;
     double max_voltage = last_asic_frequency_auto * 2;
 
-    // Clamp voltage to ensure the ratio is within the desired range
     if (last_core_voltage_auto < min_voltage) {
         last_core_voltage_auto = min_voltage;
         lastVoltageSet = true;
@@ -113,9 +112,9 @@ static void enforce_voltage_frequency_ratio() {
         lastVoltageSet = false;
     }
 
-    // Clamp frequency to ensure the ratio is within the desired range
-    double min_frequency = last_core_voltage_auto / 2;
+    double min_frequency = last_core_voltage_auto / 2.0;
     double max_frequency = last_core_voltage_auto / 1.8;
+
     if (last_asic_frequency_auto < min_frequency) {
         last_asic_frequency_auto = min_frequency;
         lastVoltageSet = false;
@@ -144,45 +143,38 @@ void decrease_values() {
 void switchvalue() {
     if (avg_hashrate_auto > 0) {
         double current_step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
-        bool shouldSwitchToFreq = lastVoltageSet && (last_asic_frequency_auto + current_step > last_asic_frequency_auto);
-        bool shouldSwitchToVolt = !lastVoltageSet && (last_core_voltage_auto - volt_step < last_core_voltage_auto);
 
-        if (shouldSwitchToFreq) {
+        if (lastVoltageSet && (last_asic_frequency_auto + current_step > last_asic_frequency_auto)) {
             last_asic_frequency_auto += current_step;
             last_core_voltage_auto -= volt_step;
-        } else if (shouldSwitchToVolt) {
+        } else if (!lastVoltageSet && (last_core_voltage_auto - volt_step < last_core_voltage_auto)) {
             last_asic_frequency_auto -= current_step;
             last_core_voltage_auto += volt_step;
         }
     }
+
     enforce_voltage_frequency_ratio();
     lastVoltageSet = !lastVoltageSet;
 }
 
-void respectLimits()
-{
-    last_asic_frequency_auto = clamp(last_asic_frequency_auto, 401, AUTO_TUNE.max_frequency_asic);
-    last_core_voltage_auto = clamp(last_core_voltage_auto, 1001, AUTO_TUNE.max_voltage_asic);
+void respectLimits() {
+    last_asic_frequency_auto = clamp(last_asic_frequency_auto, MIN_FREQ, AUTO_TUNE.max_frequency_asic);
+    last_core_voltage_auto = clamp(last_core_voltage_auto, MIN_VOLTAGE, AUTO_TUNE.max_voltage_asic);
 
-    if (last_asic_frequency_auto == 401 || last_core_voltage_auto == 1001) {
-        last_asic_frequency_auto = 525;
-        last_core_voltage_auto = 1150;
-        lastVoltageSet = (last_core_voltage_auto == 1150);
+    if (last_asic_frequency_auto == MIN_FREQ || last_core_voltage_auto == MIN_VOLTAGE) {
+        last_asic_frequency_auto = INIT_FREQ;
+        last_core_voltage_auto = INIT_VOLTAGE;
+        lastVoltageSet = true;  // Assuming default voltage set to be initial value
     }
 }
 
-void dowork()
-{
+void dowork() {
+    avg_hashrate_auto = (avg_hashrate_auto == 0) ? SYSTEM_MODULE.current_hashrate :
+                                                               0.999 * avg_hashrate_auto + 0.001 * SYSTEM_MODULE.current_hashrate;
 
-    avg_hashrate_auto = (avg_hashrate_auto == 0) ? SYSTEM_MODULE.current_hashrate
-                                                 : 0.999 * avg_hashrate_auto + 0.001 * SYSTEM_MODULE.current_hashrate;
-
-    // Calculate hashrate delta and scale factors once
     double hashrate_delta = current_hashrate_auto - last_hashrate_auto;
     double base = (last_hashrate_auto == 0) ? 1 : last_hashrate_auto;
-    // Clamp scale to [0.5, 2.0] for stability
     double step_scale = clamp(1.0 + hashrate_delta / base, 0.1, 2.0);
-
 
     freq_step = AUTO_TUNE.autotune_step_frequency * step_scale;
     volt_step = AUTO_TUNE.step_volt * step_scale;
@@ -209,36 +201,37 @@ void dowork()
     AUTO_TUNE.frequency = last_asic_frequency_auto;
 }
 
-void auto_tune(bool pid_control_fanspeed)
-{
+void auto_tune(bool pid_control_fanspeed) {
     current_hashrate_auto = SYSTEM_MODULE.current_hashrate;
+
     switch (state) {
-    case sleep_before_warmup:
-        if (POWER_MANAGEMENT_MODULE.chip_temp_avg == -1) {
+        case sleep_before_warmup:
+            if (POWER_MANAGEMENT_MODULE.chip_temp_avg == -1) {
+                break;
+            }
+
+            if (waitCounter-- > 0) {
+                ESP_LOGI(TAG, "state sleep_bevor_warmup %i", waitCounter);
+                break;
+            }
+
+            if (waitForStartUp(pid_control_fanspeed)) {
+                state = warmup;
+            }
             break;
-        }
 
-        if (waitCounter-- > 0) {
-            ESP_LOGI(TAG, "state sleep_bevor_warmup %i", waitCounter);
+        case warmup:
+            AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq_rampup;
+            dowork();
+            if (limithit()) {
+                AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq;
+                state = working;
+            }
             break;
-        }
 
-        if (waitForStartUp(pid_control_fanspeed))
-            state = warmup;
-        break;
-
-    case warmup:
-        // ESP_LOGI(TAG, "state_warmup");
-        AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq_rampup;
-        dowork();
-        if (limithit()) {
-            AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq;
-            state = working;
-        }
-        break;
-    case working:
-        dowork();
-        break;
+        case working:
+            dowork();
+            break;
     }
 }
 
