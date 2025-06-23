@@ -887,13 +887,7 @@ Chart.register({
   afterDatasetsDraw: (chart) => {
     const ctx = chart.ctx;
 
-    type Dataset = {
-      label: string;
-      borderColor?: string;
-      data: number[];
-    };
-
-    type Point = { x: number; y: number };
+    type Dataset = { label: string; borderColor?: string; data: number[] };
 
     // Get suffix based on dataset and value
     const getSuffix = (dataset: Dataset, value: number): string => {
@@ -935,8 +929,7 @@ Chart.register({
       const visibleIndices = data.map((v, idx) => {
         if (typeof v === 'number') return idx;
         return null;
-      })
-      .filter((idx) => idx !== null) as number[];
+      }).filter((idx) => idx !== null) as number[];
 
       if (visibleIndices.length === 0) return;
 
@@ -951,7 +944,7 @@ Chart.register({
 
       visibleIndices.forEach((idx) => {
         const value = data[idx];
-      
+
         // Check if the value is a number
         if (typeof value === 'number') {
           // Update minValue and minIndex if the current value is smaller
@@ -959,7 +952,7 @@ Chart.register({
             minValue = value;
             minIndex = idx;
           }
-      
+
           // Update maxValue and maxIndex if the current value is larger
           if (value > maxValue || maxValue === null) {
             maxValue = value;
@@ -991,7 +984,7 @@ Chart.register({
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        var tt = "";
+        let tt = "";
         switch (dataset.label) {
           case 'Hashrate':
           case 'AvgHashrate':
@@ -1012,19 +1005,22 @@ Chart.register({
         if (idx == firstIndex) x -= rectWidth * 0.6;
         if (idx == lastIndex) x += rectWidth * 0.6;
 
-        // Try to find a non-overlapping position by shifting vertically (y-direction) only
-        let tryCount = 0;
-        let found = false;
-        while (!found && tryCount < 5) {
-          found = true;
-          for (const pos of labelPositions) {
-            if (x < pos.x + pos.w && x + rectWidth > pos.x && y < pos.y + pos.h && y + rectHeight > pos.y) {
+        // Find a non-overlapping position
+        for (let i = 0; i < labelPositions.length; i++) {
+          const pos = labelPositions[i];
+          while (
+            x < pos.x + pos.w &&
+            x + rectWidth > pos.x &&
+            y < pos.y + pos.h &&
+            y + rectHeight > pos.y
+          ) {
+            // Shift position
+            if (Math.abs(x - pos.x) < Math.abs(y - pos.y)) {
+              x += verticalShift;
+            } else {
               y += verticalShift;
-              found = false;
-              break;
             }
           }
-          tryCount++;
         }
 
         // Save this label's position
