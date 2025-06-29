@@ -4,8 +4,8 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "power_management_task.h"
-#include <float.h>
 #include <math.h>
+#include <float.h>
 
 static const char * TAG = "auto_tune";
 
@@ -96,16 +96,13 @@ bool hashrate_decreased()
     return last_hashrate_auto > current_hashrate_auto;
 }
 
-static inline double clamp(double val, double min, double max)
-{
+static inline double clamp(double val, double min, double max) {
     return (val < min) ? min : ((val > max) ? max : val);
 }
 
-// Enforce voltage-frequency ratio - optimized to avoid redundant checks and calculations
-static void enforce_voltage_frequency_ratio()
-{
+static void enforce_voltage_frequency_ratio() {
     double min_voltage = last_asic_frequency_auto * 1.75;
-    double max_voltage = last_asic_frequency_auto * 2.1;
+    double max_voltage = last_asic_frequency_auto * 2.2;
 
     if (last_core_voltage_auto < min_voltage) {
         last_core_voltage_auto = min_voltage;
@@ -115,7 +112,7 @@ static void enforce_voltage_frequency_ratio()
         lastVoltageSet = false;
     }
 
-    double min_frequency = last_core_voltage_auto / 2.1;
+    double min_frequency = last_core_voltage_auto / 2.2;
     double max_frequency = last_core_voltage_auto / 1.75;
 
     if (last_asic_frequency_auto < min_frequency) {
@@ -127,49 +124,23 @@ static void enforce_voltage_frequency_ratio()
     }
 }
 
-void increase_values()
-{
+void increase_values() {
     if (avg_hashrate_auto > 0) {
-        double current_step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
-
-        // Only adjust frequency
-        last_asic_frequency_auto += current_step;
+        double step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
+        last_asic_frequency_auto += step;
     }
     enforce_voltage_frequency_ratio();
 }
 
-// Check for hashrate drop
-static double previous_hashrate = 0;
-void decrease_values()
-{
+void decrease_values() {
     if (avg_hashrate_auto > 0) {
-        double current_step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
-
-        if (SYSTEM_MODULE.current_hashrate < previous_hashrate) {
-            // Switch between frequency and voltage adjustments when hashrate drops
-            if (lastVoltageSet) {
-                last_asic_frequency_auto -= current_step;
-                last_core_voltage_auto += volt_step;
-            } else {
-                last_asic_frequency_auto += current_step;
-                last_core_voltage_auto -= volt_step;
-            }
-
-            // Update the state after switching
-            lastVoltageSet = !lastVoltageSet;
-        } else {
-            // Only adjust frequency if hashrate didn't drop
-            last_asic_frequency_auto -= current_step;
-        }
-
-        // Store current hashrate for next comparison
-        previous_hashrate = SYSTEM_MODULE.current_hashrate;
+        double step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
+        last_asic_frequency_auto -= step;
     }
     enforce_voltage_frequency_ratio();
 }
 
-void switchvalue()
-{
+void switchvalue() {
     if (avg_hashrate_auto > 0) {
         double current_step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
 
@@ -186,26 +157,24 @@ void switchvalue()
     lastVoltageSet = !lastVoltageSet;
 }
 
-void respectLimits()
-{
+void respectLimits() {
     last_asic_frequency_auto = clamp(last_asic_frequency_auto, MIN_FREQ, AUTO_TUNE.max_frequency_asic);
     last_core_voltage_auto = clamp(last_core_voltage_auto, MIN_VOLTAGE, AUTO_TUNE.max_voltage_asic);
 
     if (last_asic_frequency_auto == MIN_FREQ || last_core_voltage_auto == MIN_VOLTAGE) {
         last_asic_frequency_auto = INIT_FREQ;
         last_core_voltage_auto = INIT_VOLTAGE;
-        lastVoltageSet = true; // Assuming default voltage set to be initial value
+        lastVoltageSet = true;  // Assuming default voltage set to be initial value
     }
 }
 
-void dowork()
-{
-    avg_hashrate_auto = (avg_hashrate_auto == 0) ? SYSTEM_MODULE.current_hashrate
-                                                 : 0.999 * avg_hashrate_auto + 0.001 * SYSTEM_MODULE.current_hashrate;
+void dowork() {
+    avg_hashrate_auto = (avg_hashrate_auto == 0) ? SYSTEM_MODULE.current_hashrate :
+                                                               0.999 * avg_hashrate_auto + 0.001 * SYSTEM_MODULE.current_hashrate;
 
     double hashrate_delta = current_hashrate_auto - last_hashrate_auto;
     double base = (last_hashrate_auto == 0) ? 1 : last_hashrate_auto;
-    double step_scale = clamp(1.0 + hashrate_delta / base, 0.1, 2.0);
+    double step_scale = clamp(1.0 + hashrate_delta / base, 0.0, 2.0);
 
     freq_step = AUTO_TUNE.autotune_step_frequency * step_scale;
     volt_step = AUTO_TUNE.step_volt * step_scale;
@@ -232,38 +201,37 @@ void dowork()
     AUTO_TUNE.frequency = last_asic_frequency_auto;
 }
 
-void auto_tune(bool pid_control_fanspeed)
-{
+void auto_tune(bool pid_control_fanspeed) {
     current_hashrate_auto = SYSTEM_MODULE.current_hashrate;
 
     switch (state) {
-    case sleep_before_warmup:
-        if (POWER_MANAGEMENT_MODULE.chip_temp_avg == -1) {
+        case sleep_before_warmup:
+            if (POWER_MANAGEMENT_MODULE.chip_temp_avg == -1) {
+                break;
+            }
+
+            if (waitCounter-- > 0) {
+                ESP_LOGI(TAG, "state sleep_bevor_warmup %i", waitCounter);
+                break;
+            }
+
+            if (waitForStartUp(pid_control_fanspeed)) {
+                state = warmup;
+            }
             break;
-        }
 
-        if (waitCounter-- > 0) {
-            ESP_LOGI(TAG, "state sleep_bevor_warmup %i", waitCounter);
+        case warmup:
+            AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq_rampup;
+            dowork();
+            if (limithit()) {
+                AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq;
+                state = working;
+            }
             break;
-        }
 
-        if (waitForStartUp(pid_control_fanspeed)) {
-            state = warmup;
-        }
-        break;
-
-    case warmup:
-        AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq_rampup;
-        dowork();
-        if (limithit()) {
-            AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq;
-            state = working;
-        }
-        break;
-
-    case working:
-        dowork();
-        break;
+        case working:
+            dowork();
+            break;
     }
 }
 
