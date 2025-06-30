@@ -34,6 +34,8 @@ export class HomeComponent {
   public chartData?: any;
   public avghashrateData: number[] = [];
   public espRam: number[] = [];
+  public hashrate_no_error: number[] = [];
+  public hashrate_error: number[] = [];
 
   public maxPower: number = 0;
   public nominalVoltage: number = 0;
@@ -160,9 +162,9 @@ export class HomeComponent {
       max = this.dataLabel.length;
     this.chartOptions.scales.x.min = this.dataLabel[min];
     this.chartOptions.scales.x.max = this.dataLabel[max];
-    console.log("max:" + (max));
-    console.log("min:" + (min));
-    console.log("itempos:" + (this.itemPosition));
+    //console.log("max:" + (max));
+    //console.log("min:" + (min));
+    //console.log("itempos:" + (this.itemPosition));
     (this.chart?.chart as any)?.update();
   }
 
@@ -178,49 +180,93 @@ export class HomeComponent {
     const avghashColor = documentStyle.getPropertyValue('--pink-300');
     const coreVoltageCurrentColor = documentStyle.getPropertyValue('--orange-900');
     const espRamColor = documentStyle.getPropertyValue('--teal-600');
+    const diffColor = '#a259f7'; // purple
+     const hahsratenoerrorcolor = '#3f51b5'
+    const hahsrateerrorcolor = '#36459a'
 
 
     // Update chart colors
     if (this.chartData && this.chartData.datasets) {
+      //hashrate
       this.chartData.datasets[0].backgroundColor = textColorSecondary + '30';
       this.chartData.datasets[0].borderColor = textColorSecondary;
+      //temperatur
       this.chartData.datasets[1].backgroundColor = primaryColor;
       this.chartData.datasets[1].borderColor = primaryColor;
+      //frequency
       this.chartData.datasets[2].backgroundColor = mhzColor;
       this.chartData.datasets[2].borderColor = mhzColor;
+      //voltage set
       this.chartData.datasets[3].backgroundColor = coreVoltageColor;
       this.chartData.datasets[3].borderColor = coreVoltageColor;
+      //fan speed
       this.chartData.datasets[4].backgroundColor = fanspeedColor;
       this.chartData.datasets[4].borderColor = fanspeedColor;
+      //avg hashrate
       this.chartData.datasets[5].borderColor = avghashColor;
       this.chartData.datasets[5].backgroundColor = avghashColor;
+      //core voltage
       this.chartData.datasets[6].borderColor = coreVoltageCurrentColor;
       this.chartData.datasets[6].backgroundColor = coreVoltageCurrentColor;
+      //esp ram
       this.chartData.datasets[7].borderColor = espRamColor;
       this.chartData.datasets[7].backgroundColor = espRamColor;
+      //power
+      this.chartData.datasets[8].borderColor = coreVoltageColor;
+      this.chartData.datasets[8].backgroundColor = coreVoltageColor;
+      //vf ratio
+      this.chartData.datasets[9].backgroundColor = diffColor;
+      this.chartData.datasets[9].borderColor = diffColor;
+      //hashrate no error
+      this.chartData.datasets[10].backgroundColor = textColorSecondary;
+      this.chartData.datasets[10].borderColor = textColorSecondary;
+      //hashrate error
+      this.chartData.datasets[11].backgroundColor = textColorSecondary;
+      this.chartData.datasets[11].borderColor = textColorSecondary;
     }
 
     // Update chart options
     if (this.chartOptions) {
       this.chartOptions.plugins.legend.labels.color = textColor;
+      //time
       this.chartOptions.scales.x.ticks.color = textColorSecondary;
       this.chartOptions.scales.x.grid.color = surfaceBorder;
+      //hashrate
       this.chartOptions.scales.y.ticks.color = textColorSecondary;
       this.chartOptions.scales.y.grid.color = surfaceBorder;
+      //temperatur
       this.chartOptions.scales.y2.ticks.color = primaryColor;
       this.chartOptions.scales.y2.grid.color = surfaceBorder;
+      //frequency
       this.chartOptions.scales.y3.ticks.color = mhzColor;
       this.chartOptions.scales.y3.grid.color = surfaceBorder;
+      //voltage set
       this.chartOptions.scales.y4.ticks.color = coreVoltageColor;
       this.chartOptions.scales.y4.grid.color = surfaceBorder;
+      //fanspeed
       this.chartOptions.scales.y5.ticks.color = fanspeedColor;
       this.chartOptions.scales.y5.grid.color = surfaceBorder;
+      //avg hashrate
       this.chartOptions.scales.y6.ticks.color = avghashColor;
       this.chartOptions.scales.y6.grid.color = surfaceBorder;
+      //corevoltage
       this.chartOptions.scales.y7.ticks.color = coreVoltageCurrentColor;
       this.chartOptions.scales.y7.grid.color = surfaceBorder;
+      //ram
       this.chartOptions.scales.y8.ticks.color = espRamColor;
       this.chartOptions.scales.y8.grid.color = surfaceBorder;
+      //power
+      this.chartOptions.scales.y9.ticks.color = coreVoltageColor;
+      this.chartOptions.scales.y9.grid.color = surfaceBorder;
+      //vf ratio
+      this.chartOptions.scales.y10.ticks.color = diffColor;
+      this.chartOptions.scales.y10.grid.color = surfaceBorder;
+      //hashrate no error
+      this.chartOptions.scales.y11.ticks.color = hahsratenoerrorcolor;
+      this.chartOptions.scales.y11.grid.color = surfaceBorder;
+      //hashrate error
+      this.chartOptions.scales.y12.ticks.color = hahsrateerrorcolor;
+      this.chartOptions.scales.y12.grid.color = surfaceBorder;
     }
 
     // Force chart update
@@ -242,6 +288,8 @@ export class HomeComponent {
     const coreVoltageCurrentColor = documentStyle.getPropertyValue('--orange-900');
     const espRamColor = documentStyle.getPropertyValue('--teal-600');
     const diffColor = '#a259f7'; // purple
+    const hahsratenoerrorcolor = '#3f51b5'
+    const hahsrateerrorcolor = '#36459a'
     const borderWidth = 0.8;
 
     this.chartData = {
@@ -376,7 +424,32 @@ export class HomeComponent {
           borderWidth: borderWidth,
           yAxisID: 'y10',
           fill: false,
-          spanGaps: false
+        },
+        {
+          type: 'line',
+          label: 'Hashrate no error',
+          data: this.hashrate_no_error,
+          backgroundColor: hahsratenoerrorcolor,
+          borderColor: hahsratenoerrorcolor,
+          tension: 0,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          borderWidth: borderWidth,
+          yAxisID: 'y11',
+          fill: false,
+        },
+        {
+          type: 'line',
+          label: 'Hashrate error',
+          data: this.hashrate_error,
+          backgroundColor: hahsrateerrorcolor,
+          borderColor: hahsrateerrorcolor,
+          tension: 0,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          borderWidth: borderWidth,
+          yAxisID: 'y12',
+          fill: false,
         },
       ]
     };
@@ -438,9 +511,6 @@ export class HomeComponent {
               else if (tooltipItem.dataset.label === 'EspRam') {
                 label += tooltipItem.raw + 'byte';
               }
-              else if (tooltipItem.dataset.label === 'AvgHashrate') {
-                label += HashSuffixPipe.transform(tooltipItem.raw);
-              }
               else if (tooltipItem.dataset.label === 'Power') {
                 label += tooltipItem.raw + ' W';
               }
@@ -468,144 +538,108 @@ export class HomeComponent {
             unit: 'second', // Set the unit to 'minute'
           },
           ticks: {
-            color: textColorSecondary
+            color: textColorSecondary,
           },
           grid: {
             color: surfaceBorder,
             drawBorder: false,
-            display: true
+            display: true,
           }
         },
+        //hashrate
         y: {
           display: false, // <-- Hide hashrate scale display
           ticks: {
             color: textColorSecondary,
-            callback: (value: number) => HashSuffixPipe.transform(value)
-          },
-          grid: {
-            color: surfaceBorder,
-            drawBorder: false
+            callback: (value: number) => HashSuffixPipe.transform(value),
           },
         },
+        //temperatur
         y2: {
-          drawOnChartArea: false,
-          type: 'linear',
           display: false,
-          position: 'right',
           ticks: {
             color: primaryColor,
-            callback: (value: number) => value + '°C'
-          },
-          grid: {
-            drawOnChartArea: false,
-            color: surfaceBorder
+            callback: (value: number) => value + '°C',
           },
         },
+        //frequency
         y3: {
-          type: 'linear',
           display: false,
-          position: 'right',
           ticks: {
             color: mhzColor,
-            callback: (value: number) => value + 'mHz'
-          },
-          grid: {
-            drawOnChartArea: false,
-            color: surfaceBorder
-          },
-        }
-        ,
-        y4: {
-          type: 'linear',
-          display: false,
-          position: 'right',
-          ticks: {
-            color: coreVoltageColor,
-            callback: (value: number) => value + 'mv'
-          },
-          grid: {
-            drawOnChartArea: false,
-            color: surfaceBorder
-          },
-        }
-        ,
-        y5: {
-          type: 'linear',
-          display: false,
-          position: 'right',
-          ticks: {
-            color: coreVoltageColor,
-            callback: (value: number) => value + '%'
-          },
-          grid: {
-            drawOnChartArea: false,
-            color: surfaceBorder
+            callback: (value: number) => value + 'mHz',
           },
         },
+        //voltage set
+        y4: {
+          display: false,
+          ticks: {
+            color: coreVoltageColor,
+            callback: (value: number) => value + 'mv',
+          },
+        },
+        //fanspeed
+        y5: {
+          display: false,
+          ticks: {
+            color: coreVoltageColor,
+            callback: (value: number) => value + '%',
+          },
+        },
+        //avg hashrate
         y6: {
           ticks: {
             color: avghashColor,
             display: false,
-            callback: (value: number) => ''
+            callback: (value: number) => '',
           },
-          grid: {
-            color: surfaceBorder,
-            drawOnChartArea: false,
-          },
-        }
-        ,
+        },
+        //corevoltage
         y7: {
-          type: 'linear',
           display: false,
-          position: 'right',
           ticks: {
             color: coreVoltageCurrentColor,
-            callback: (value: number) => value + 'mv'
+            callback: (value: number) => value + 'mv',
           },
-          grid: {
-            drawOnChartArea: false,
-            color: surfaceBorder
-          },
-        }
-        ,
+        },
+        //ram
         y8: {
-          type: 'linear',
           display: false,
-          position: 'right',
           ticks: {
             color: espRamColor,
-            callback: (value: number) => value / 1024 + '/kb'
+            callback: (value: number) => value / 1024 + '/kb',
           },
-          grid: {
-            drawOnChartArea: false,
-            color: surfaceBorder
-          },
-
         },
+        //power
         y9: {
-          type: 'linear',
           display: false,
-          position: 'right',
           ticks: {
             color: coreVoltageCurrentColor,
-            callback: (value: number) => value + 'W'
-          },
-          grid: {
-            drawOnChartArea: false,
-            color: surfaceBorder
+            callback: (value: number) => value + 'W',
           },
         },
+        //vf ratio
         y10: {
-          type: 'linear',
           display: false,
-          position: 'right',
           ticks: {
             color: diffColor,
-            callback: (value: number) => value.toFixed(2)
+            callback: (value: number) => value.toFixed(2),
           },
-          grid: {
-            drawOnChartArea: false,
-            color: diffColor + '22'
+        },
+        //hashrate no error
+        y11: {
+          display: false,
+          ticks: {
+            color: hahsratenoerrorcolor,
+            callback: (value: number) => HashSuffixPipe.transform(value),
+          },
+        },
+        //hashrate error
+        y12: {
+          display: false,
+          ticks: {
+            color: hahsrateerrorcolor,
+            callback: (value: number) => HashSuffixPipe.transform(value)
           },
         }
       },
@@ -627,12 +661,15 @@ export class HomeComponent {
     this.chartData.datasets[7].data = this.espRam;
     this.chartData.datasets[8].data = this.powerData;
     this.chartData.datasets[9].data = this.diffData;
+    this.chartData.datasets[10].data = this.hashrate_no_error;
+    this.chartData.datasets[11].data = this.hashrate_error;
 
     // load previous data
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
     this.stats$.subscribe(stats => {
       stats.statistics.forEach(element => {
         this.addDataPoint(element, true, stats);
+        console.log("element:" + (element));
       });
       this.visibleItemCount = this.dataLabel.length;
       this.setTimeLimits();
@@ -649,7 +686,7 @@ export class HomeComponent {
     if (isStats && Array.isArray(info) && stats) {
       // For stats$ subscription
       const [
-        hashrate, temperature, power, timestamp, voltage, freq, fanspeed, avghashrate, voltageCur, freeHeap
+        hashrate, temperature, power, timestamp, voltage, freq, fanspeed, avghashrate, voltageCur, freeHeap, hashrate_no_error, hashrate_error
       ] = info as number[];
 
       this.hashrateData.push(hashrate * 1e9);
@@ -662,6 +699,8 @@ export class HomeComponent {
       this.avghashrateData.push(avghashrate * 1e9);
       this.coreVoltageCurrentData.push(voltageCur);
       this.espRam.push(freeHeap);
+      this.hashrate_no_error.push(hashrate_no_error * 1e9);
+      this.hashrate_error.push(hashrate_error * 1e9);
     } else if (!isStats && !Array.isArray(info)) {
       // For info$ subscription
       this.hashrateData.push(info.hashRate * 1e9);
@@ -674,6 +713,8 @@ export class HomeComponent {
       this.dataLabel.push(new Date().getTime());
       this.coreVoltageCurrentData.push(info.coreVoltageActual);
       this.espRam.push(info.freeHeap);
+      this.hashrate_no_error.push(info.hashRate_no_error * 1e9);
+      this.hashrate_error.push(info.hashRate_error * 1e9);
     }
 
     // Calculate V/F ratio for each new point
@@ -703,6 +744,8 @@ export class HomeComponent {
       this.coreVoltageCurrentData.shift();
       this.espRam.shift();
       this.diffData.shift();
+      this.hashrate_no_error.shift();
+      this.hashrate_error.shift();
       this.visibleItemCount--;
     }
     this.calculateMinMax();
@@ -850,7 +893,9 @@ export class HomeComponent {
       powerData: this.powerData,
       fanspeed: this.fanspeed,
       avghashrateData: this.avghashrateData,
-      espRam: this.espRam
+      espRam: this.espRam,
+      hashrate_no_error: this.hashrate_no_error,
+      hashrate_error: this.hashrate_error,
     };
 
     const json = JSON.stringify(exportData, null, 2);
@@ -867,6 +912,10 @@ export class HomeComponent {
       this.chartOptions.scales.y.max = maxHashrate;
       this.chartOptions.scales.y6.min = minHashrate;
       this.chartOptions.scales.y6.max = maxHashrate;
+      //this.chartOptions.scales.y11.min = minHashrate;
+      //this.chartOptions.scales.y11.max = maxHashrate;
+      //this.chartOptions.scales.y12.min = minHashrate;
+      //this.chartOptions.scales.y12.max = maxHashrate;
     }
 
     /*if (this.coreVoltageData.length > 0) {
@@ -895,6 +944,8 @@ Chart.register({
       switch (dataset.label) {
         case 'Hashrate':
         case 'AvgHashrate':
+        case 'Hashrate no error':
+        case 'Hashrate error':
           return HashSuffixPipe.transform(value);
         case 'V/F Ratio':
           return value.toFixed(4);
@@ -989,6 +1040,8 @@ Chart.register({
           case 'Hashrate':
           case 'AvgHashrate':
           case 'V/F Ratio':
+          case 'Hashrate no error':
+          case 'Hashrate error':
             tt = suffix;
             break;
           default:

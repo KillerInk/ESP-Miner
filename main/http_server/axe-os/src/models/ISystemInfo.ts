@@ -61,5 +61,7 @@ export interface ISystemInfo {
     overheat_mode: number,
     power_fault?: string
     overclockEnabled?: number,
-    avghashRate: number
+    avghashRate: number,
+    hashRate_no_error: number,
+    hashRate_error: number,
 }

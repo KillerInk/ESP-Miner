@@ -573,6 +573,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "maxPower", DEVICE_CONFIG.family.max_power);
     cJSON_AddNumberToObject(root, "nominalVoltage", DEVICE_CONFIG.family.nominal_voltage);
     cJSON_AddNumberToObject(root, "hashRate", SYSTEM_MODULE.current_hashrate);
+    cJSON_AddNumberToObject(root, "hashRate_no_error", SYSTEM_MODULE.hashrate_no_error);
+    cJSON_AddNumberToObject(root, "hashRate_error", SYSTEM_MODULE.hashrate_error);
     cJSON_AddNumberToObject(root, "expectedHashrate", expected_hashrate);
     cJSON_AddStringToObject(root, "bestDiff", SYSTEM_MODULE.best_diff_string);
     cJSON_AddStringToObject(root, "bestSessionDiff", SYSTEM_MODULE.best_session_diff_string);
@@ -663,10 +665,10 @@ int create_json_statistics_all(cJSON * root)
 
     if (root) {
         // create array for all statistics
-        const char * label[12] = {"hashRate",          "temp",     "vrTemp", "power",    "voltage",  "current",
-                                  "coreVoltageActual", "fanspeed", "fanrpm", "wifiRSSI", "freeHeap", "timestamp"};
+        const char * label[15] = {"hashRate",          "temp",     "vrTemp", "power",    "voltage",  "current",
+                                  "coreVoltageActual", "fanspeed", "fanrpm", "wifiRSSI", "freeHeap", "timestamp","avghashRate", "hashRate_no_error", "hashRate_error"};
 
-        cJSON * statsLabelArray = cJSON_CreateStringArray(label, 12);
+        cJSON * statsLabelArray = cJSON_CreateStringArray(label, 15);
         cJSON_AddItemToObject(root, "labels", statsLabelArray);
         prebuffer++;
 
@@ -693,6 +695,8 @@ int create_json_statistics_all(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.avghashrate));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate_no_error));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate_error));
 
                 cJSON_AddItemToArray(statsArray, valueArray);
                 prebuffer++;
@@ -1075,11 +1079,6 @@ static esp_err_t GET_autotune_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, AUTO_TUNE.max_voltage_asic);
     cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, AUTO_TUNE.max_frequency_asic);
     cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, AUTO_TUNE.max_asic_temperatur);
-
-    extern double last_core_voltage_auto, last_asic_frequency_auto, avg_hashrate_auto;
-    cJSON_AddNumberToObject(root, "last_core_voltage_auto", last_core_voltage_auto);
-    cJSON_AddNumberToObject(root, "last_asic_frequency_auto", last_asic_frequency_auto);
-    cJSON_AddNumberToObject(root, "avg_hashrate_auto", avg_hashrate_auto);
 
     const char *response = cJSON_Print(root);
     httpd_resp_sendstr(req, response);

@@ -135,6 +135,8 @@ void statistics_task(void * pvParameters)
             statsData.freeHeap = esp_get_free_heap_size();
             statsData.frequency = POWER_MANAGEMENT_MODULE.frequency_value;
             statsData.avghashrate = SYSTEM_MODULE.avg_hashrate;
+            statsData.hashrate_no_error = SYSTEM_MODULE.hashrate_no_error;
+            statsData.hashrate_error = SYSTEM_MODULE.hashrate_error;
 
             addStatisticData(&statsData);
 

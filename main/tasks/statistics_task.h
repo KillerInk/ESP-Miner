@@ -21,6 +21,8 @@ struct StatisticsData
     uint16_t fanRPM;
     int8_t wifiRSSI;
     uint32_t freeHeap;
+    double hashrate_no_error;
+    double hashrate_error;
 
     StatisticsNextNodePtr next;
 };

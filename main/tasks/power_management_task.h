@@ -1,7 +1,7 @@
 #ifndef POWER_MANAGEMENT_TASK_H_
 #define POWER_MANAGEMENT_TASK_H_
 
-#define POLL_RATE 500
+#define POLL_RATE 1000
 typedef struct
 {
     uint16_t fan_perc;
