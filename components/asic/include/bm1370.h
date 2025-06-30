@@ -30,5 +30,8 @@ int BM1370_set_default_baud(void);
 void BM1370_send_hash_frequency(double frequency);
 bool BM1370_set_frequency(double target_freq);
 task_result * BM1370_process_work();
+float get_hashrate_cnt();
+float get_hashrate_error_cnt();
+void reset_counters();
 
 #endif /* BM1370_H_ */

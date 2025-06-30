@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 #define BM1370_CHIP_ID 0x1370
 #define BM1370_CHIP_ID_RESPONSE_LENGTH 11
@@ -47,6 +48,15 @@
 #define FAST_UART_CONFIGURATION 0x28
 #define TICKET_MASK 0x14
 #define MISC_CONTROL 0x18
+
+#define BM_NONCE_ERROR_CNT  0x4C
+#define BM_UNK_CNT_88       0x88
+#define BM_UNK_CNT_89       0x89
+#define BM_UNK_CNT_8A       0x8A
+#define BM_UNK_CNT_8B       0x8B
+#define BM_NONCE_TOTAL_CNT  0x8C
+#define BM_UNK_CNT_90       0x90
+#define BM_GOLDEN_NONCE_CNT 0x94
 
 typedef struct __attribute__((__packed__))
 {
@@ -175,9 +185,9 @@ void BM1370_send_hash_frequency(double target_freq)
                         *min_difference = diff;
                         *newf = actual_freq;
 
-                        ESP_LOGI(TAG,
-                            "Found better match: fb_divider=%d, postdiv1=%d, postdiv2=%d, refdiv=%d, smallest_refdiv=%d, diff=%.6f",
-                            *best_fb_divider, *best_post_divider1, *best_post_divider2, *best_ref_divider, smallest_refdiv, *min_difference);
+                        //ESP_LOGI(TAG,
+                        //    "Found better match: fb_divider=%d, postdiv1=%d, postdiv2=%d, refdiv=%d, smallest_refdiv=%d, diff=%.6f",
+                        //    *best_fb_divider, *best_post_divider1, *best_post_divider2, *best_ref_divider, smallest_refdiv, *min_difference);
 
                         return true;
                     }
@@ -198,12 +208,12 @@ void BM1370_send_hash_frequency(double target_freq)
         if (!find_best_match(true, &min_difference, &newf,
                              &best_fb_divider, &best_post_divider1, &best_post_divider2,
                              &best_ref_divider, target_freq)) {
-            ESP_LOGE(TAG, "Failed to find any PLL settings for target frequency %.2f", target_freq);
+            //ESP_LOGE(TAG, "Failed to find any PLL settings for target frequency %.2f", target_freq);
             return;
         }
 
-        ESP_LOGW(TAG, "Using next best PLL settings for frequency %.2f (actual %.2f, diff %.2f)", target_freq, newf,
-                 min_difference);
+        //ESP_LOGW(TAG, "Using next best PLL settings for frequency %.2f (actual %.2f, diff %.2f)", target_freq, newf,
+        //         min_difference);
     }
 
     freqbuf[3] = best_fb_divider;
@@ -353,6 +363,34 @@ uint8_t BM1370_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1370_SERIALTX_DEBUG);
 
     return chip_counter;
+}
+
+
+float get_hashrate_cnt() {
+    uint8_t buf[9] = {0};
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){0x00, BM_UNK_CNT_90}, 2, true);
+    int resp = SERIAL_rx(buf, 11, 10);
+    int value = (int)((buf[4] << 8) + buf[5]);
+    ESP_LOGI(TAG, "CNT     %02X: [%02x %02x %02x %02x %02x %02x %02x %02x %02x]", BM_UNK_CNT_90, buf[0], buf[1], buf[2], buf[3], buf[4],buf[5],buf[6],buf[7], buf[8]);
+    float hashes = 4.096*(float)value;
+    ESP_LOGW(TAG,"hashes %f",hashes);
+    return hashes;
+}
+
+float get_hashrate_error_cnt() {
+    uint8_t buf[9] = {0};
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){0x00, BM_NONCE_ERROR_CNT}, 2, true);
+    int resp = SERIAL_rx(buf, 11, 10);
+    int value = (int)((buf[4] << 8) + buf[5]);
+    ESP_LOGI(TAG, "CNT ERR %02X: [%02x %02x %02x %02x %02x %02x %02x %02x %02x]", BM_NONCE_ERROR_CNT, buf[0], buf[1], buf[2], buf[3], buf[4],buf[5],buf[6],buf[7], buf[8]);
+    float hashes_error = 4.096*(float)value;
+    ESP_LOGW(TAG,"hashes error %f",hashes_error);
+    return hashes_error;
+}
+
+void reset_counters() {
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){0x00, BM_UNK_CNT_90,0x00,0x00,0x00,0x00}, 6, true);
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){0x00, BM_NONCE_ERROR_CNT,0x00,0x00,0x00,0x00}, 6, true);
 }
 
 // static void _send_read_address(void)

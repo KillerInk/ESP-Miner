@@ -117,7 +117,7 @@ void ASIC_set_version_mask(uint32_t mask)
 
 bool ASIC_set_frequency(float target_frequency)
 {
-    ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
+    //ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
     bool success = false;
     
     switch (DEVICE_CONFIG.family.asic.model) {

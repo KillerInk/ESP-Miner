@@ -34,6 +34,8 @@ typedef struct
     int historical_hashrate_init;
     double current_hashrate;
     double avg_hashrate;
+    double hashrate_no_error;
+    double hashrate_error;
     int64_t start_time;
     uint64_t shares_accepted;
     uint64_t shares_rejected;
