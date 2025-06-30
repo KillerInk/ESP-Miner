@@ -230,7 +230,12 @@ void auto_tune(bool pid_control_fanspeed) {
             break;
 
         case working:
-            dowork();
+            if (limithit() && !critical_limithit()) {
+                break;  // Added this line to stop adjusting when limit is hit
+
+            } else {
+                dowork();  // Resume adjustments once limits are no longer breached
+            }
             break;
     }
 }
