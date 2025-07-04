@@ -1,5 +1,5 @@
 import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
-import { interval, map, min, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
+import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
@@ -17,11 +17,9 @@ import { saveAs } from 'file-saver';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent {
-
+export class HomeComponent implements OnInit {
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
-
   public chartOptions: any;
   public dataLabel: number[] = [];
   public hashrateData: number[] = [];
@@ -36,31 +34,28 @@ export class HomeComponent {
   public espRam: number[] = [];
   public hashrate_no_error: number[] = [];
   public hashrate_error: number[] = [];
-
   public maxPower: number = 0;
   public nominalVoltage: number = 0;
   public maxTemp: number = 75;
   public maxFrequency: number = 800;
-
   public quickLink$!: Observable<string | undefined>;
-
   public activePoolURL!: string;
   public activePoolPort!: number;
   public activePoolUser!: string;
   public activePoolLabel!: 'Primary' | 'Fallback';
+
   @ViewChild('chart')
-  private chart?: UIChart
+  private chart?: UIChart;
+
   @ViewChild('chartContainer') chartContainer?: ElementRef;
+
   private visibleItemCount = 0;
   private itemPosition = 0;
   private mousebuttonpressed = false;
   private mousestartposition = 0;
-
   private pageDefaultTitle: string = '';
   public datasetVisibility: boolean[] = [];
-
   public isMouseOverChart = false;
-
   public diffData: number[] = [];
 
   constructor(
@@ -68,8 +63,7 @@ export class HomeComponent {
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
     private shareRejectReasonsService: ShareRejectionExplanationService,
-    private titleService: Title,
-
+    private titleService: Title
   ) {
     this.initializeChart();
 
@@ -83,9 +77,7 @@ export class HomeComponent {
     this.pageDefaultTitle = this.titleService.getTitle();
   }
 
-
   private get zoomPanFactor(): number {
-    // Adjust divisor for desired sensitivity
     return Math.max(1, Math.floor(this.visibleItemCount / 40));
   }
 
@@ -96,14 +88,11 @@ export class HomeComponent {
       this.visibleItemCount += factor;
     else
       this.visibleItemCount -= factor;
-    if (this.visibleItemCount > this.dataLabel.length)
-      this.visibleItemCount = this.dataLabel.length;
-    if (this.visibleItemCount < 5)
-      this.visibleItemCount = 5;
+
+    this.enforceVisibleItemBounds();
     this.setTimeLimits();
     event.preventDefault();
   }
-
 
   onMouseDown(event: MouseEvent) {
     if (!this.isMouseOverChart) return;
@@ -112,7 +101,6 @@ export class HomeComponent {
     console.log("mousedown");
     return false;
   }
-
 
   onMouseUp(event: MouseEvent) {
     if (!this.isMouseOverChart) return;
@@ -137,555 +125,169 @@ export class HomeComponent {
         this.mousestartposition = event.pageX;
       }
       this.stepcount = 0;
+
       if (this.itemPosition > 0)
         this.itemPosition = 0;
-    }
-    else if (this.mousebuttonpressed)
+    } else if (this.mousebuttonpressed)
       this.stepcount++;
 
     this.setTimeLimits();
     return false;
   }
 
+  private enforceVisibleItemBounds() {
+    if (this.visibleItemCount > this.dataLabel.length) this.visibleItemCount = this.dataLabel.length;
+    if (this.visibleItemCount < 5) this.visibleItemCount = 5;
+  }
+
   private setTimeLimits() {
-    var min = (this.dataLabel.length - this.visibleItemCount) + this.itemPosition;
-    if (min < 0) {
-      min = 0
+    let minIndex = (this.dataLabel.length - this.visibleItemCount) + this.itemPosition;
+
+    if (minIndex < 0) {
+      minIndex = 0;
       this.itemPosition++;
       return;
     }
-    var max = this.dataLabel.length + this.itemPosition;
+    let maxIndex = this.dataLabel.length + this.itemPosition;
 
-    if (min >= this.dataLabel.length)
-      min = this.dataLabel.length - 5;
-    if (max > this.dataLabel.length)
-      max = this.dataLabel.length;
-    this.chartOptions.scales.x.min = this.dataLabel[min];
-    this.chartOptions.scales.x.max = this.dataLabel[max];
-    //console.log("max:" + (max));
-    //console.log("min:" + (min));
-    //console.log("itempos:" + (this.itemPosition));
+    if (maxIndex > this.dataLabel.length)
+      maxIndex = this.dataLabel.length;
+
+    const minLabel = this.dataLabel[minIndex];
+    const maxLabel = this.dataLabel[maxIndex];
+
+    this.chartOptions.scales.x.min = minLabel;
+    this.chartOptions.scales.x.max = maxLabel;
+
     (this.chart?.chart as any)?.update();
   }
 
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColor = documentStyle.getPropertyValue('--text-color');
-    const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
-    const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
-    const primaryColor = documentStyle.getPropertyValue('--primary-color');
-    const mhzColor = documentStyle.getPropertyValue('--green-800');
-    const coreVoltageColor = documentStyle.getPropertyValue('--orange-800');
-    const fanspeedColor = documentStyle.getPropertyValue('--indigo-600');
-    const avghashColor = documentStyle.getPropertyValue('--pink-300');
-    const coreVoltageCurrentColor = documentStyle.getPropertyValue('--orange-900');
-    const espRamColor = documentStyle.getPropertyValue('--teal-600');
-    const diffColor = '#a259f7'; // purple
-    const hahsratenoerrorcolor = '#3f51b5'
-    const hahsrateerrorcolor = '#36459a'
+    const colors = this.getThemeColors(documentStyle);
 
-
-    // Update chart colors
-    if (this.chartData && this.chartData.datasets) {
-      //hashrate
-      this.chartData.datasets[0].backgroundColor = textColorSecondary + '30';
-      this.chartData.datasets[0].borderColor = textColorSecondary;
-      //temperatur
-      this.chartData.datasets[1].backgroundColor = primaryColor;
-      this.chartData.datasets[1].borderColor = primaryColor;
-      //frequency
-      this.chartData.datasets[2].backgroundColor = mhzColor;
-      this.chartData.datasets[2].borderColor = mhzColor;
-      //voltage set
-      this.chartData.datasets[3].backgroundColor = coreVoltageColor;
-      this.chartData.datasets[3].borderColor = coreVoltageColor;
-      //fan speed
-      this.chartData.datasets[4].backgroundColor = fanspeedColor;
-      this.chartData.datasets[4].borderColor = fanspeedColor;
-      //avg hashrate
-      this.chartData.datasets[5].borderColor = avghashColor;
-      this.chartData.datasets[5].backgroundColor = avghashColor;
-      //core voltage
-      this.chartData.datasets[6].borderColor = coreVoltageCurrentColor;
-      this.chartData.datasets[6].backgroundColor = coreVoltageCurrentColor;
-      //esp ram
-      this.chartData.datasets[7].borderColor = espRamColor;
-      this.chartData.datasets[7].backgroundColor = espRamColor;
-      //power
-      this.chartData.datasets[8].borderColor = coreVoltageColor;
-      this.chartData.datasets[8].backgroundColor = coreVoltageColor;
-      //vf ratio
-      this.chartData.datasets[9].backgroundColor = diffColor;
-      this.chartData.datasets[9].borderColor = diffColor;
-      //hashrate no error
-      this.chartData.datasets[10].backgroundColor = textColorSecondary;
-      this.chartData.datasets[10].borderColor = textColorSecondary;
-      //hashrate error
-      this.chartData.datasets[11].backgroundColor = textColorSecondary;
-      this.chartData.datasets[11].borderColor = textColorSecondary;
-    }
-
-    // Update chart options
-    if (this.chartOptions) {
-      this.chartOptions.plugins.legend.labels.color = textColor;
-      //time
-      this.chartOptions.scales.x.ticks.color = textColorSecondary;
-      this.chartOptions.scales.x.grid.color = surfaceBorder;
-      //hashrate
-      this.chartOptions.scales.y.ticks.color = textColorSecondary;
-      this.chartOptions.scales.y.grid.color = surfaceBorder;
-      //temperatur
-      this.chartOptions.scales.y2.ticks.color = primaryColor;
-      this.chartOptions.scales.y2.grid.color = surfaceBorder;
-      //frequency
-      this.chartOptions.scales.y3.ticks.color = mhzColor;
-      this.chartOptions.scales.y3.grid.color = surfaceBorder;
-      //voltage set
-      this.chartOptions.scales.y4.ticks.color = coreVoltageColor;
-      this.chartOptions.scales.y4.grid.color = surfaceBorder;
-      //fanspeed
-      this.chartOptions.scales.y5.ticks.color = fanspeedColor;
-      this.chartOptions.scales.y5.grid.color = surfaceBorder;
-      //avg hashrate
-      this.chartOptions.scales.y6.ticks.color = avghashColor;
-      this.chartOptions.scales.y6.grid.color = surfaceBorder;
-      //corevoltage
-      this.chartOptions.scales.y7.ticks.color = coreVoltageCurrentColor;
-      this.chartOptions.scales.y7.grid.color = surfaceBorder;
-      //ram
-      this.chartOptions.scales.y8.ticks.color = espRamColor;
-      this.chartOptions.scales.y8.grid.color = surfaceBorder;
-      //power
-      this.chartOptions.scales.y9.ticks.color = coreVoltageColor;
-      this.chartOptions.scales.y9.grid.color = surfaceBorder;
-      //vf ratio
-      this.chartOptions.scales.y10.ticks.color = diffColor;
-      this.chartOptions.scales.y10.grid.color = surfaceBorder;
-      //hashrate no error
-      this.chartOptions.scales.y11.ticks.color = hahsratenoerrorcolor;
-      this.chartOptions.scales.y11.grid.color = surfaceBorder;
-      //hashrate error
-      this.chartOptions.scales.y12.ticks.color = hahsrateerrorcolor;
-      this.chartOptions.scales.y12.grid.color = surfaceBorder;
-    }
-
-    // Force chart update
+    this.applyColorsToDatasets(colors);
+    this.applyColorsToOptions(colors, documentStyle);
     this.chartData = { ...this.chartData };
   }
 
-
-
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColor = documentStyle.getPropertyValue('--text-color');
-    const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
-    const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
-    const primaryColor = documentStyle.getPropertyValue('--primary-color');
-    const mhzColor = documentStyle.getPropertyValue('--green-800');
-    const coreVoltageColor = documentStyle.getPropertyValue('--orange-800');
-    const fanspeedColor = documentStyle.getPropertyValue('--indigo-600');
-    const avghashColor = documentStyle.getPropertyValue('--pink-300');
-    const coreVoltageCurrentColor = documentStyle.getPropertyValue('--orange-900');
-    const espRamColor = documentStyle.getPropertyValue('--teal-600');
-    const diffColor = '#a259f7'; // purple
-    const hahsratenoerrorcolor = '#3f51b5'
-    const hahsrateerrorcolor = '#36459a'
-    const borderWidth = 0.8;
+    const colors = this.getThemeColors(documentStyle);
 
-    this.chartData = {
-      labels: this.dataLabel,
-      datasets: [
-        {
-          type: 'line',
-          label: 'Hashrate',
-          data: this.hashrateData,
-          backgroundColor: textColorSecondary + '30',
-          borderColor: textColorSecondary,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y',
-          fill: false,
-        },
-        {
-          type: 'line',
-          label: 'ASIC Temp',
-          data: this.temperatureData,
-          fill: false,
-          backgroundColor: primaryColor,
-          borderColor: primaryColor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y2',
-        },
-        {
-          type: 'line',
-          label: 'ASIC Freq',
-          data: this.mhzData,
-          fill: false,
-          backgroundColor: mhzColor,
-          borderColor: mhzColor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y3',
-        },
-        {
-          type: 'line',
-          label: 'VoltSet',
-          data: this.coreVoltageData,
-          fill: false,
-          backgroundColor: coreVoltageColor,
-          borderColor: coreVoltageColor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y4',
-        },
-        {
-          type: 'line',
-          label: 'Fan',
-          data: this.fanspeed,
-          fill: false,
-          backgroundColor: fanspeedColor,
-          borderColor: fanspeedColor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y5',
-        },
-        {
-          type: 'line',
-          label: 'AvgHashrate',
-          data: this.avghashrateData,
-          backgroundColor: avghashColor + '30',
-          borderColor: avghashColor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y6',
-          fill: false,
-        },
-        {
-          type: 'line',
-          label: 'VoltCurrent',
-          data: this.coreVoltageCurrentData,
-          fill: false,
-          backgroundColor: coreVoltageColor,
-          borderColor: coreVoltageColor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y7',
-        },
-        {
-          type: 'line',
-          label: 'EspRam',
-          data: this.espRam,
-          fill: false,
-          backgroundColor: espRamColor,
-          borderColor: espRamColor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y8',
-        },
-        {
-          type: 'line',
-          label: 'Power',
-          data: this.powerData,
-          fill: false,
-          backgroundColor: coreVoltageColor,
-          borderColor: coreVoltageColor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y9',
-        },
-        {
-          type: 'line',
-          label: 'V/F Ratio',
-          data: this.diffData,
-          backgroundColor: diffColor,
-          borderColor: diffColor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y10',
-          fill: false,
-        },
-        {
-          type: 'line',
-          label: 'Hashrate no error',
-          data: this.hashrate_no_error,
-          backgroundColor: hahsratenoerrorcolor,
-          borderColor: hahsratenoerrorcolor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y11',
-          fill: false,
-        },
-        {
-          type: 'line',
-          label: 'Hashrate error',
-          data: this.hashrate_error,
-          backgroundColor: hahsrateerrorcolor,
-          borderColor: hahsrateerrorcolor,
-          tension: 0,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderWidth: borderWidth,
-          yAxisID: 'y12',
-          fill: false,
-        },
-      ]
-    };
+    this.initializeChartData(colors);
+    this.initializeChartOptions(colors, documentStyle);
 
-
-
-    // Initialize chart options
-    this.chartOptions = {
-      animation: false,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'nearest',
-        axis: 'x',
-        intersect: false
-      },
-      plugins: {
-        legend: {
-          labels: {
-            color: textColor,
-          },
-          onClick: (e: any, legendItem: any, legend: any) => {
-            const ci = legend.chart;
-            const datasetIndex = legendItem.datasetIndex;
-            // Toggle visibility
-            const meta = ci.getDatasetMeta(datasetIndex);
-            if (meta.hidden === null) {
-              meta.hidden = !ci.data.datasets[datasetIndex].hidden;
-            } else {
-              meta.hidden = !meta.hidden;
-            }
-            this.saveDatasetVisibility();
-            ci.update();
-            return false;
-          }
-        },
-        tooltip: {
-          callbacks: {
-            label: function (tooltipItem: any) {
-              let label = tooltipItem.dataset.label || '';
-              if (label) {
-                label += ': ';
-              }
-              if (tooltipItem.dataset.label === 'ASIC Temp') {
-                label += tooltipItem.raw + '°C';
-              }
-              else if (tooltipItem.dataset.label === 'ASIC Freq') {
-                label += tooltipItem.raw + 'mHz';
-              }
-              else if (tooltipItem.dataset.label === 'VoltSet') {
-                label += tooltipItem.raw + 'mv';
-              }
-              else if (tooltipItem.dataset.label === 'VoltCurrent') {
-                label += tooltipItem.raw + 'mv';
-              }
-              else if (tooltipItem.dataset.label === 'Fan') {
-                label += tooltipItem.raw + '%';
-              }
-              else if (tooltipItem.dataset.label === 'EspRam') {
-                label += tooltipItem.raw + 'byte';
-              }
-              else if (tooltipItem.dataset.label === 'Power') {
-                label += tooltipItem.raw + ' W';
-              }
-              else if (tooltipItem.dataset.label === 'V/F Ratio') {
-                label += tooltipItem.raw.toFixed(4);
-              }
-              else {
-                label += HashSuffixPipe.transform(tooltipItem.raw);
-              }
-              return label;
-            }
-          }
-        },
-      },
-      layout: {
-        padding: {
-          right: 60,
-          left: 60 // <-- Add this line to add padding to the right side of the chart
-        }
-      },
-      scales: {
-        x: {
-          type: 'time',
-          time: {
-            unit: 'second', // Set the unit to 'minute'
-          },
-          ticks: {
-            color: textColorSecondary,
-          },
-          grid: {
-            color: surfaceBorder,
-            drawBorder: false,
-            display: true,
-          }
-        },
-        //hashrate
-        y: {
-          display: false, // <-- Hide hashrate scale display
-          ticks: {
-            color: textColorSecondary,
-            callback: (value: number) => HashSuffixPipe.transform(value),
-          },
-        },
-        //temperatur
-        y2: {
-          display: false,
-          ticks: {
-            color: primaryColor,
-            callback: (value: number) => value + '°C',
-          },
-          suggestedMax: 80
-        },
-        //frequency
-        y3: {
-          display: false,
-          ticks: {
-            color: mhzColor,
-            callback: (value: number) => value + 'mHz',
-          },
-          suggestedMax: 1200
-        },
-        //voltage set
-        y4: {
-          display: false,
-          ticks: {
-            color: coreVoltageColor,
-            callback: (value: number) => value + 'mv',
-          },
-          suggestedMax: 1200
-        },
-        //fanspeed
-        y5: {
-          display: false,
-          ticks: {
-            color: coreVoltageColor,
-            callback: (value: number) => value + '%',
-          },
-          suggestedMax: 100
-        },
-        //avg hashrate
-        y6: {
-          ticks: {
-            color: avghashColor,
-            display: false,
-            callback: (value: number) => '',
-          },
-        },
-        //corevoltage
-        y7: {
-          display: false,
-          ticks: {
-            color: coreVoltageCurrentColor,
-            callback: (value: number) => value + 'mv',
-          },
-          suggestedMax: 1200
-        },
-        //ram
-        y8: {
-          display: false,
-          ticks: {
-            color: espRamColor,
-            callback: (value: number) => value / 1024 + '/kb',
-          },
-        },
-        //power
-        y9: {
-          display: false,
-          ticks: {
-            color: coreVoltageCurrentColor,
-            callback: (value: number) => value + 'W',
-          },
-          suggestedMax: 40
-        },
-        //vf ratio
-        y10: {
-          display: false,
-          ticks: {
-            color: diffColor,
-            callback: (value: number) => value.toFixed(2),
-          },
-          suggestedMax: 2.5
-        },
-        //hashrate no error
-        y11: {
-          display: false,
-          ticks: {
-            color: hahsratenoerrorcolor,
-            callback: (value: number) => HashSuffixPipe.transform(value),
-          },
-        },
-        //hashrate error
-        y12: {
-          display: false,
-          ticks: {
-            color: hahsrateerrorcolor,
-            callback: (value: number) => HashSuffixPipe.transform(value)
-          },
-
-        }
-      },
-      yAxes: [{
-        ticks: {
-          beginAtZero: true
-        }
-      }]
-    };
-
-    this.chartData.labels = this.dataLabel;
-    this.chartData.datasets[0].data = this.hashrateData;
-    this.chartData.datasets[1].data = this.temperatureData;
-    this.chartData.datasets[2].data = this.mhzData;
-    this.chartData.datasets[3].data = this.coreVoltageData;
-    this.chartData.datasets[4].data = this.fanspeed;
-    this.chartData.datasets[5].data = this.avghashrateData;
-    this.chartData.datasets[6].data = this.coreVoltageCurrentData;
-    this.chartData.datasets[7].data = this.espRam;
-    this.chartData.datasets[8].data = this.powerData;
-    this.chartData.datasets[9].data = this.diffData;
-    this.chartData.datasets[10].data = this.hashrate_no_error;
-    this.chartData.datasets[11].data = this.hashrate_error;
-
-    // load previous data
+    // Load previous data
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
     this.stats$.subscribe(stats => {
       stats.statistics.forEach(element => {
         this.addDataPoint(element, true, stats);
-        console.log("element:" + (element));
       });
-      this.datasetVisibility = this.chartData.datasets.map(() => true);
-      this.restoreDatasetVisibility();
+
       this.visibleItemCount = this.dataLabel.length;
       this.setTimeLimits();
       this.chart?.refresh();
       this.startGetInfo();
     });
   }
+
+  private getThemeColors(documentStyle: any) {
+    return {
+      textColor: documentStyle.getPropertyValue('--text-color'),
+      textColorSecondary: documentStyle.getPropertyValue('--text-color-secondary'),
+      surfaceBorder: documentStyle.getPropertyValue('--surface-border'),
+      primaryColor: documentStyle.getPropertyValue('--primary-color'),
+      mhzColor: documentStyle.getPropertyValue('--green-800'),
+      coreVoltageColor: documentStyle.getPropertyValue('--orange-800'),
+      fanspeedColor: documentStyle.getPropertyValue('--indigo-600'),
+      avghashColor: documentStyle.getPropertyValue('--pink-300'),
+      coreVoltageCurrentColor: documentStyle.getPropertyValue('--orange-900'),
+      espRamColor: documentStyle.getPropertyValue('--teal-600'),
+      diffColor: '#a259f7',
+      hahsratenoerrorcolor: '#3f51b5',
+      hahsrateerrorcolor: '#36459a'
+    };
+  }
+
+  private initializeChartData(colors: any) {
+    this.chartData = {
+      labels: this.dataLabel,
+      datasets: [
+        { type: 'line', label: 'Hashrate', data: this.hashrateData, backgroundColor: colors.textColorSecondary + '30', borderColor: colors.textColorSecondary, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y', fill: false },
+        { type: 'line', label: 'ASIC Temp', data: this.temperatureData, backgroundColor: colors.primaryColor, borderColor: colors.primaryColor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y2' },
+        { type: 'line', label: 'ASIC Freq', data: this.mhzData, backgroundColor: colors.mhzColor, borderColor: colors.mhzColor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y3' },
+        { type: 'line', label: 'VoltSet', data: this.coreVoltageData, backgroundColor: colors.coreVoltageColor, borderColor: colors.coreVoltageColor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y4' },
+        { type: 'line', label: 'Fan', data: this.fanspeed, backgroundColor: colors.fanspeedColor, borderColor: colors.fanspeedColor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y5' },
+        { type: 'line', label: 'AvgHashrate', data: this.avghashrateData, backgroundColor: colors.avghashColor + '30', borderColor: colors.avghashColor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y6' },
+        { type: 'line', label: 'VoltCurrent', data: this.coreVoltageCurrentData, backgroundColor: colors.coreVoltageColor, borderColor: colors.coreVoltageColor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y7' },
+        { type: 'line', label: 'EspRam', data: this.espRam, backgroundColor: colors.espRamColor, borderColor: colors.espRamColor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y8' },
+        { type: 'line', label: 'Power', data: this.powerData, backgroundColor: colors.coreVoltageColor, borderColor: colors.coreVoltageColor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y9' },
+        { type: 'line', label: 'V/F Ratio', data: this.diffData, backgroundColor: colors.diffColor, borderColor: colors.diffColor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y10' },
+        { type: 'line', label: 'Hashrate no error', data: this.hashrate_no_error, backgroundColor: colors.hahsratenoerrorcolor, borderColor: colors.hahsratenoerrorcolor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y11' },
+        { type: 'line', label: 'Hashrate error', data: this.hashrate_error, backgroundColor: colors.hahsrateerrorcolor, borderColor: colors.hahsrateerrorcolor, tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 0.8, yAxisID: 'y12' },
+      ]
+    };
+    this.datasetVisibility = this.chartData.datasets.map(() => true);
+    this.restoreDatasetVisibility();
+  }
+
+  private initializeChartOptions(colors: any, documentStyle: any) {
+    this.chartOptions = {
+      animation: false,
+      maintainAspectRatio: false,
+      interaction: { mode: 'nearest', axis: 'x', intersect: false },
+      plugins: {
+        legend: { labels: { color: colors.textColor }, onClick: (e: any, legendItem: any, legend: any) => this.onLegendClick(e, legendItem, legend) },
+        tooltip: { callbacks: { label: this.tooltipLabelFormatter } }
+      },
+      layout: { padding: { right: 60, left: 60 } },
+      scales: {
+        x: { type: 'time', time: { unit: 'second' }, ticks: { color: colors.textColorSecondary }, grid: { color: colors.surfaceBorder, drawBorder: false, display: true } },
+        y: { display: false, ticks: { color: colors.textColorSecondary, callback: (value: number) => HashSuffixPipe.transform(value) } },
+        y2: { display: false, ticks: { color: colors.primaryColor, callback: (value: number) => value + '°C' }, suggestedMax: 80 },
+        y3: { display: false, ticks: { color: colors.mhzColor, callback: (value: number) => value + 'mHz' }, suggestedMax: 1200 },
+        y4: { display: false, ticks: { color: colors.coreVoltageColor, callback: (value: number) => value + 'mv' }, suggestedMax: 1200 },
+        y5: { display: false, ticks: { color: colors.fanspeedColor, callback: (value: number) => value + '%' }, suggestedMax: 100 },
+        y6: { ticks: { color: colors.avghashColor, display: false, callback: (value: number) => '' } },
+        y7: { display: false, ticks: { color: colors.coreVoltageCurrentColor, callback: (value: number) => value + 'mv' }, suggestedMax: 1200 },
+        y8: { display: false, ticks: { color: colors.espRamColor, callback: (value: number) => value / 1024 + '/kb' } },
+        y9: { display: false, ticks: { color: colors.coreVoltageCurrentColor, callback: (value: number) => value + 'W' }, suggestedMax: 40 },
+        y10: { display: false, ticks: { color: colors.diffColor, callback: (value: number) => value.toFixed(2) }, suggestedMax: 2.5 },
+        y11: { display: false, ticks: { color: colors.hahsratenoerrorcolor, callback: (value: number) => HashSuffixPipe.transform(value) } },
+        y12: { display: false, ticks: { color: colors.hahsrateerrorcolor, callback: (value: number) => HashSuffixPipe.transform(value) } }
+      },
+    };
+  }
+
+  private onLegendClick(e: any, legendItem: any, legend: any) {
+    const ci = legend.chart;
+    const datasetIndex = legendItem.datasetIndex;
+    // Toggle visibility
+    const meta = ci.getDatasetMeta(datasetIndex);
+    meta.hidden = meta.hidden === null ? !ci.data.datasets[datasetIndex].hidden : null;
+    this.datasetVisibility[datasetIndex] = !meta.hidden;
+    this.saveDatasetVisibility();
+    ci.update();
+    return false;
+  }
+
+  private tooltipLabelFormatter(tooltipItem: any) {
+    let label = tooltipItem.dataset.label || '';
+    if (label) { label += ': '; }
+    switch (tooltipItem.dataset.label) {
+      case 'ASIC Temp': return `${tooltipItem.raw}°C`;
+      case 'ASIC Freq': return `${tooltipItem.raw}mHz`;
+      case 'VoltSet': return `${tooltipItem.raw}mv`;
+      case 'VoltCurrent': return `${tooltipItem.raw}mv`;
+      case 'Fan': return `${tooltipItem.raw}%`;
+      case 'EspRam': return `${tooltipItem.raw}byte`;
+      case 'Power': return `${tooltipItem.raw} W`;
+      case 'V/F Ratio': return tooltipItem.raw.toFixed(4);
+      default: return HashSuffixPipe.transform(tooltipItem.raw);
+    }
+  }
+
 
   /**
    * Adds a new data point from either live info or statistics.
@@ -729,37 +331,37 @@ export class HomeComponent {
     // Calculate V/F ratio for each new point
     const lastIdx = this.coreVoltageData.length - 1;
     if (lastIdx >= 0 && this.mhzData[lastIdx]) {
-      this.diffData[lastIdx] = this.coreVoltageData[lastIdx] / this.mhzData[lastIdx];
+      this.diffData.push(this.coreVoltageData[lastIdx] / this.mhzData[lastIdx]);
     } else {
-      this.diffData[lastIdx] = 0;
+      this.diffData.push(0);
     }
-
-    if (this.itemPosition == 0)
-      this.visibleItemCount++;
-    else
-      this.visibleItemCount--;
-    //this.itemPosition--;
 
     // Shift arrays if needed
     if (this.hashrateData.length >= 720) {
-      this.hashrateData.shift();
-      this.temperatureData.shift();
-      this.mhzData.shift();
-      this.coreVoltageData.shift();
-      this.powerData.shift();
-      this.dataLabel.shift();
-      this.fanspeed.shift();
-      this.avghashrateData.shift();
-      this.coreVoltageCurrentData.shift();
-      this.espRam.shift();
-      this.diffData.shift();
-      this.hashrate_no_error.shift();
-      this.hashrate_error.shift();
-      this.visibleItemCount--;
+      this.shiftArrayData();
     }
+
     this.calculateMinMax();
     this.setTimeLimits();
   }
+
+  private shiftArrayData() {
+    this.hashrateData.shift();
+    this.temperatureData.shift();
+    this.mhzData.shift();
+    this.coreVoltageData.shift();
+    this.powerData.shift();
+    this.dataLabel.shift();
+    this.fanspeed.shift();
+    this.avghashrateData.shift();
+    this.coreVoltageCurrentData.shift();
+    this.espRam.shift();
+    this.diffData.shift();
+    this.hashrate_no_error.shift();
+    this.hashrate_error.shift();
+    this.visibleItemCount--;
+  }
+
 
   private startGetInfo() {
     this.info$ = interval(5000).pipe(
@@ -876,7 +478,7 @@ export class HomeComponent {
     // Wait for chart to be available before applying visibility
     if (!this.chart?.chart) {
       // Try again after a short delay if chart is not ready yet
-      setTimeout(() => this.restoreDatasetVisibility(), 100);
+      setTimeout(() => this.restoreDatasetVisibility(), 200);
       return;
     }
     if (this.datasetVisibility.length) {
@@ -888,6 +490,94 @@ export class HomeComponent {
       chartInstance.update();
     }
   }
+
+  private applyColorsToDatasets(colors: any) {
+    if (this.chartData && this.chartData.datasets) {
+      // Update dataset colors
+      this.chartData.datasets[0].backgroundColor = colors.textColorSecondary + '30';
+      this.chartData.datasets[0].borderColor = colors.textColorSecondary;
+
+      this.chartData.datasets[1].backgroundColor = colors.primaryColor;
+      this.chartData.datasets[1].borderColor = colors.primaryColor;
+
+      this.chartData.datasets[2].backgroundColor = colors.mhzColor;
+      this.chartData.datasets[2].borderColor = colors.mhzColor;
+
+      this.chartData.datasets[3].backgroundColor = colors.coreVoltageColor;
+      this.chartData.datasets[3].borderColor = colors.coreVoltageColor;
+
+      this.chartData.datasets[4].backgroundColor = colors.fanspeedColor;
+      this.chartData.datasets[4].borderColor = colors.fanspeedColor;
+
+      this.chartData.datasets[5].borderColor = colors.avghashColor;
+      this.chartData.datasets[5].backgroundColor = colors.avghashColor + '30';
+
+      this.chartData.datasets[6].borderColor = colors.coreVoltageCurrentColor;
+      this.chartData.datasets[6].backgroundColor = colors.coreVoltageCurrentColor;
+
+      this.chartData.datasets[7].borderColor = colors.espRamColor;
+      this.chartData.datasets[7].backgroundColor = colors.espRamColor;
+
+      this.chartData.datasets[8].borderColor = colors.coreVoltageColor;
+      this.chartData.datasets[8].backgroundColor = colors.coreVoltageColor;
+
+      this.chartData.datasets[9].backgroundColor = colors.diffColor;
+      this.chartData.datasets[9].borderColor = colors.diffColor;
+
+      this.chartData.datasets[10].backgroundColor = colors.textColorSecondary;
+      this.chartData.datasets[10].borderColor = colors.textColorSecondary;
+
+      this.chartData.datasets[11].backgroundColor = colors.textColorSecondary;
+      this.chartData.datasets[11].borderColor = colors.textColorSecondary;
+    }
+  }
+
+  private applyColorsToOptions(colors: any, documentStyle: any) {
+    if (this.chartOptions) {
+      // Update options with new colors
+      this.chartOptions.plugins.legend.labels.color = colors.textColor;
+
+      this.chartOptions.scales.x.ticks.color = colors.textColorSecondary;
+      this.chartOptions.scales.x.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y.ticks.color = colors.textColorSecondary;
+      this.chartOptions.scales.y.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y2.ticks.color = colors.primaryColor;
+      this.chartOptions.scales.y2.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y3.ticks.color = colors.mhzColor;
+      this.chartOptions.scales.y3.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y4.ticks.color = colors.coreVoltageColor;
+      this.chartOptions.scales.y4.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y5.ticks.color = colors.fanspeedColor;
+      this.chartOptions.scales.y5.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y6.ticks.color = colors.avghashColor;
+      this.chartOptions.scales.y6.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y7.ticks.color = colors.coreVoltageCurrentColor;
+      this.chartOptions.scales.y7.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y8.ticks.color = colors.espRamColor;
+      this.chartOptions.scales.y8.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y9.ticks.color = colors.coreVoltageColor;
+      this.chartOptions.scales.y9.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y10.ticks.color = colors.diffColor;
+      this.chartOptions.scales.y10.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y11.ticks.color = colors.hahsratenoerrorcolor;
+      this.chartOptions.scales.y11.grid.color = colors.surfaceBorder;
+
+      this.chartOptions.scales.y12.ticks.color = colors.hahsrateerrorcolor;
+      this.chartOptions.scales.y12.grid.color = colors.surfaceBorder;
+    }
+  }
+
 
   public saveChartDataAsJson() {
     // Prepare the data to save
@@ -944,7 +634,7 @@ Chart.register({
   id: 'customValueLabels',
   afterDatasetsDraw: (chart: any) => {
     const ctx = chart.ctx;
-    
+
 
     chart.data.datasets.forEach((dataset: any, i: number) => {
       const meta = chart.getDatasetMeta(i);
@@ -1002,32 +692,32 @@ Chart.register({
       const labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
 
       const getSuffix = (value: number): string => {
-      if (!value || isNaN(value)) return '';
-      switch (dataset.label) {
-        case 'Hashrate':
-        case 'AvgHashrate':
-        case 'Hashrate no error':
-        case 'Hashrate error':
-          return HashSuffixPipe.transform(value);
-        case 'V/F Ratio':
-          return value.toFixed(4);
-        case 'ASIC Temp':
-          return '°C';
-        case 'ASIC Freq':
-          return 'MHz';
-        case 'VoltSet':
-        case 'VoltCurrent':
-          return 'mV';
-        case 'Fan':
-          return '%';
-        case 'EspRam':
-          return 'B';
-        case 'Power':
-          return 'W';
-        default:
-          return '';
-      }
-    };
+        if (!value || isNaN(value)) return '';
+        switch (dataset.label) {
+          case 'Hashrate':
+          case 'AvgHashrate':
+          case 'Hashrate no error':
+          case 'Hashrate error':
+            return HashSuffixPipe.transform(value);
+          case 'V/F Ratio':
+            return value.toFixed(4);
+          case 'ASIC Temp':
+            return '°C';
+          case 'ASIC Freq':
+            return 'MHz';
+          case 'VoltSet':
+          case 'VoltCurrent':
+            return 'mV';
+          case 'Fan':
+            return '%';
+          case 'EspRam':
+            return 'B';
+          case 'Power':
+            return 'W';
+          default:
+            return '';
+        }
+      };
       labelIndices.forEach(idx => {
         let value = data[idx];
         let tt = "";
@@ -1096,7 +786,7 @@ Chart.register({
 
 Chart.register({
   id: 'legendMargin',
-  beforeInit(chart) {
+  beforeInit(chart: any) {
     if (!chart.legend) return; // Safeguard for undefined legend
     const originalFit = chart.legend.fit;
     chart.legend.fit = function fit() {
