@@ -181,7 +181,7 @@ export class HomeComponent {
     const coreVoltageCurrentColor = documentStyle.getPropertyValue('--orange-900');
     const espRamColor = documentStyle.getPropertyValue('--teal-600');
     const diffColor = '#a259f7'; // purple
-     const hahsratenoerrorcolor = '#3f51b5'
+    const hahsratenoerrorcolor = '#3f51b5'
     const hahsrateerrorcolor = '#36459a'
 
 
@@ -454,8 +454,7 @@ export class HomeComponent {
       ]
     };
 
-    this.datasetVisibility = this.chartData.datasets.map(() => true);
-    this.restoreDatasetVisibility();
+
 
     // Initialize chart options
     this.chartOptions = {
@@ -561,6 +560,7 @@ export class HomeComponent {
             color: primaryColor,
             callback: (value: number) => value + '°C',
           },
+          suggestedMax: 80
         },
         //frequency
         y3: {
@@ -569,6 +569,7 @@ export class HomeComponent {
             color: mhzColor,
             callback: (value: number) => value + 'mHz',
           },
+          suggestedMax: 1200
         },
         //voltage set
         y4: {
@@ -577,6 +578,7 @@ export class HomeComponent {
             color: coreVoltageColor,
             callback: (value: number) => value + 'mv',
           },
+          suggestedMax: 1200
         },
         //fanspeed
         y5: {
@@ -585,6 +587,7 @@ export class HomeComponent {
             color: coreVoltageColor,
             callback: (value: number) => value + '%',
           },
+          suggestedMax: 100
         },
         //avg hashrate
         y6: {
@@ -601,6 +604,7 @@ export class HomeComponent {
             color: coreVoltageCurrentColor,
             callback: (value: number) => value + 'mv',
           },
+          suggestedMax: 1200
         },
         //ram
         y8: {
@@ -617,6 +621,7 @@ export class HomeComponent {
             color: coreVoltageCurrentColor,
             callback: (value: number) => value + 'W',
           },
+          suggestedMax: 40
         },
         //vf ratio
         y10: {
@@ -625,6 +630,7 @@ export class HomeComponent {
             color: diffColor,
             callback: (value: number) => value.toFixed(2),
           },
+          suggestedMax: 2.5
         },
         //hashrate no error
         y11: {
@@ -641,6 +647,7 @@ export class HomeComponent {
             color: hahsrateerrorcolor,
             callback: (value: number) => HashSuffixPipe.transform(value)
           },
+
         }
       },
       yAxes: [{
@@ -671,6 +678,8 @@ export class HomeComponent {
         this.addDataPoint(element, true, stats);
         console.log("element:" + (element));
       });
+      this.datasetVisibility = this.chartData.datasets.map(() => true);
+      this.restoreDatasetVisibility();
       this.visibleItemCount = this.dataLabel.length;
       this.setTimeLimits();
       this.chart?.refresh();
@@ -933,13 +942,66 @@ export class HomeComponent {
 
 Chart.register({
   id: 'customValueLabels',
-  afterDatasetsDraw: (chart) => {
+  afterDatasetsDraw: (chart: any) => {
     const ctx = chart.ctx;
+    
 
-    type Dataset = { label: string; borderColor?: string; data: number[] };
+    chart.data.datasets.forEach((dataset: any, i: number) => {
+      const meta = chart.getDatasetMeta(i);
+      if (!chart.isDatasetVisible(i)) return;
 
-    // Get suffix based on dataset and value
-    const getSuffix = (dataset: Dataset, value: number): string => {
+      const data = dataset.data;
+      const scale = chart.scales.x;
+      const visibleMin = scale.left;
+      const visibleMax = scale.right;
+
+      // Find valid and visible indices
+      const visibleIndices = data
+        .map((v: any, idx: number) => {
+          const point = meta.data[idx];
+          if (
+            v !== undefined &&
+            v !== null &&
+            v !== '' &&
+            v !== 'NaN' &&
+            v !== 'NaNundefined' &&
+            !(typeof v === 'number' && isNaN(v)) &&
+            point &&
+            point.x >= visibleMin &&
+            point.x <= visibleMax
+          ) {
+            return idx;
+          }
+          return null;
+        })
+        .filter((idx: number | null) => idx !== null) as number[];
+
+      if (visibleIndices.length === 0) return;
+
+      const firstIndex = visibleIndices[0];
+      const lastIndex = visibleIndices[visibleIndices.length - 1];
+
+      // Find min and max value indices in the visible range
+      let minIndex = firstIndex;
+      let maxIndex = firstIndex;
+      let minValue = data[firstIndex];
+      let maxValue = data[firstIndex];
+
+      visibleIndices.forEach(idx => {
+        if (data[idx] < minValue) {
+          minValue = data[idx];
+          minIndex = idx;
+        }
+        if (data[idx] > maxValue) {
+          maxValue = data[idx];
+          maxIndex = idx;
+        }
+      });
+
+      // Collect unique indices to label
+      const labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
+
+      const getSuffix = (value: number): string => {
       if (!value || isNaN(value)) return '';
       switch (dataset.label) {
         case 'Hashrate':
@@ -966,76 +1028,10 @@ Chart.register({
           return '';
       }
     };
-
-    chart.data.datasets.forEach((dataset, i) => {
-      const meta = chart.getDatasetMeta(i);
-      if (!chart.isDatasetVisible(i)) return;
-
-      const data = dataset.data;
-      const scale = chart.scales['x'];
-      const visibleMin = scale.left;
-      const visibleMax = scale.right;
-
-      // Find valid and visible indices
-      const visibleIndices = data.map((v, idx) => {
-        if (typeof v === 'number') return idx;
-        return null;
-      }).filter((idx) => idx !== null) as number[];
-
-      if (visibleIndices.length === 0) return;
-
-      const firstIndex = visibleIndices[0];
-      const lastIndex = visibleIndices[visibleIndices.length - 1];
-
-      // Find min and max value indices in the visible range
-      let minIndex = firstIndex;
-      let maxIndex = firstIndex;
-      let minValue: number = data[firstIndex] as number;
-      let maxValue: number = data[firstIndex] as number;
-
-      visibleIndices.forEach((idx) => {
-        const value = data[idx];
-
-        // Check if the value is a number
-        if (typeof value === 'number') {
-          // Update minValue and minIndex if the current value is smaller
-          if (value < minValue || minValue === null) {
-            minValue = value;
-            minIndex = idx;
-          }
-
-          // Update maxValue and maxIndex if the current value is larger
-          if (value > maxValue || maxValue === null) {
-            maxValue = value;
-            maxIndex = idx;
-          }
-        } else {
-          console.warn(`Invalid data point at index ${idx}: ${data[idx]}`);
-        }
-      });
-
-      // Always show label for oldest (firstIndex), newest (lastIndex), plus min/max (no duplicates)
-      let labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
-
-      const paddingX = 4;
-      const paddingY = 2;
-      const verticalShift = 12; // Increased space between labels
-
-      const labelPositions: { x: number; y: number; w: number; h: number }[] = [];
-
-      labelIndices.forEach((idx) => {
+      labelIndices.forEach(idx => {
         let value = data[idx];
-        if (value === null || value === undefined) return; // Skip rendering if value is null or undefined
-        const suffix = getSuffix(dataset as Dataset, value as number);
-        const point = meta.data[idx];
-        if (!point) return;
-
-        ctx.save();
-        ctx.font = '10px "Segoe UI", Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
         let tt = "";
+        const suffix = getSuffix(value as number);
         switch (dataset.label) {
           case 'Hashrate':
           case 'AvgHashrate':
@@ -1048,39 +1044,27 @@ Chart.register({
             tt = value.toString() + suffix;
             break;
         }
-        const text = tt
+        const point = meta.data[idx];
+        if (!point) return;
+
+        // Label styling
+        const paddingX = 4;
+        const paddingY = 2;
+        ctx.save();
+        ctx.font = '10px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const text = String(tt);
         const textWidth = ctx.measureText(text).width;
         const rectWidth = textWidth + paddingX * 2;
         const rectHeight = 14;
 
-        let x = point.x - rectWidth / 2;
-        let y = point.y - rectHeight / 2;
-        if (idx == firstIndex) x -= rectWidth * 0.6;
-        if (idx == lastIndex) x += rectWidth * 0.6;
-
-        // Find a non-overlapping position
-        for (let i = 0; i < labelPositions.length; i++) {
-          const pos = labelPositions[i];
-          while (
-            x < pos.x + pos.w &&
-            x + rectWidth > pos.x &&
-            y < pos.y + pos.h &&
-            y + rectHeight > pos.y
-          ) {
-            // Shift position
-            if (Math.abs(x - pos.x) < Math.abs(y - pos.y)) {
-              x += verticalShift;
-            } else {
-              y += verticalShift;
-            }
-          }
-        }
-
-        // Save this label's position
-        labelPositions.push({ x, y, w: rectWidth, h: rectHeight });
-
+        // Draw background with rounded corners
         ctx.beginPath();
         const radius = 5;
+        const x = point.x - rectWidth / 2;
+        const y = point.y - rectHeight - 6;
         ctx.moveTo(x + radius, y);
         ctx.lineTo(x + rectWidth - radius, y);
         ctx.quadraticCurveTo(x + rectWidth, y, x + rectWidth, y + radius);
@@ -1095,20 +1079,14 @@ Chart.register({
         ctx.fillStyle = "#222c";
         ctx.fill();
 
-        // Set stroke style based on dataset.borderColor
-        let strokeStyle;
-        if (dataset.borderColor !== undefined) {
-          strokeStyle = dataset.borderColor.toString();
-        } else {
-          strokeStyle = '#fff'; // Default stroke style if borderColor is not defined
-        }
-
+        // Draw border
         ctx.lineWidth = 1;
-        ctx.strokeStyle = strokeStyle;
+        ctx.strokeStyle = dataset.borderColor || '#fff';
         ctx.stroke();
 
+        // Draw text
         ctx.fillStyle = "#fff";
-        ctx.fillText(text, x + rectWidth / 2, y + rectHeight / 2 + paddingY / 2);
+        ctx.fillText(text, point.x, y + rectHeight / 2 + paddingY / 2);
 
         ctx.restore();
       });
