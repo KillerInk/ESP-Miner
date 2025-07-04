@@ -151,7 +151,7 @@ export class HomeComponent implements OnInit {
     let maxIndex = this.dataLabel.length + this.itemPosition;
 
     if (maxIndex > this.dataLabel.length)
-      maxIndex = this.dataLabel.length;
+      maxIndex = this.dataLabel.length-5;
 
     const minLabel = this.dataLabel[minIndex];
     const maxLabel = this.dataLabel[maxIndex];
@@ -161,6 +161,7 @@ export class HomeComponent implements OnInit {
 
     (this.chart?.chart as any)?.update();
   }
+
 
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
@@ -344,7 +345,10 @@ export class HomeComponent implements OnInit {
     if (this.hashrateData.length >= 720) {
       this.shiftArrayData();
     }
-
+    if (this.itemPosition == 0)
+      this.visibleItemCount++;
+    else
+      this.visibleItemCount--;
     this.calculateMinMax();
     this.setTimeLimits();
   }
@@ -624,7 +628,7 @@ export class HomeComponent implements OnInit {
     /*if (this.coreVoltageData.length > 0) {
       const minVoltage = Math.min(...this.coreVoltageData);
       const maxVoltage = Math.max(...this.coreVoltageData);
-
+  
       // Set frequency scale's minimum and maximum values
       this.chartOptions.scales.y2.min = minVoltage/2;
       this.chartOptions.scales.y2.max = maxVoltage/2;
