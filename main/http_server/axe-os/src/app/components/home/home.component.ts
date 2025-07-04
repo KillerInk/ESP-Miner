@@ -151,7 +151,7 @@ export class HomeComponent implements OnInit {
     let maxIndex = this.dataLabel.length + this.itemPosition;
 
     if (maxIndex > this.dataLabel.length)
-      maxIndex = this.dataLabel.length-5;
+      maxIndex = this.dataLabel.length - 5;
 
     const minLabel = this.dataLabel[minIndex];
     const maxLabel = this.dataLabel[maxIndex];
@@ -700,7 +700,7 @@ Chart.register({
       const labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
 
       const getSuffix = (value: number): string => {
-        if (!value || isNaN(value)) return '';
+        if (!value || isNaN(value)) value = 0;
         switch (dataset.label) {
           case 'Hashrate':
           case 'AvgHashrate':
@@ -761,8 +761,16 @@ Chart.register({
         // Draw background with rounded corners
         ctx.beginPath();
         const radius = 5;
-        const x = point.x - rectWidth / 2;
-        const y = point.y - rectHeight - 6;
+        const yOffset = 15; 
+        let x, y;
+        if (point.x < visibleMax / 2) {
+          x = point.x - rectWidth  - paddingX; // Move label to the left
+          y = point.y + yOffset - rectHeight / 2; // Add y-offset here
+        } else {
+          x = point.x  + paddingX; // Move label to the right
+          y = point.y - yOffset - rectHeight / 2; // Add y-offset here
+        }
+        
         ctx.moveTo(x + radius, y);
         ctx.lineTo(x + rectWidth - radius, y);
         ctx.quadraticCurveTo(x + rectWidth, y, x + rectWidth, y + radius);
@@ -782,9 +790,14 @@ Chart.register({
         ctx.strokeStyle = dataset.borderColor || '#fff';
         ctx.stroke();
 
+        ctx.textBaseline = 'middle';
+
         // Draw text
         ctx.fillStyle = "#fff";
-        ctx.fillText(text, point.x, y + rectHeight / 2 + paddingY / 2);
+        if (point.x < visibleMax / 2)
+          ctx.fillText(text, point.x - (rectWidth / 2 + paddingX), y + rectHeight / 2 + paddingY / 2);
+        else
+          ctx.fillText(text, point.x + (rectWidth / 2 + paddingX), y + rectHeight / 2 + paddingY / 2);
 
         ctx.restore();
       });
