@@ -368,10 +368,10 @@ uint8_t BM1370_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty
 
 float get_hashrate_cnt() {
     uint8_t buf[9] = {0};
-    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){0x00, BM_UNK_CNT_90}, 2, true);
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){0x00, BM_NONCE_TOTAL_CNT}, 2, true);
     int resp = SERIAL_rx(buf, 11, 10);
     int value = (int)((buf[4] << 8) + buf[5]);
-    ESP_LOGI(TAG, "CNT     %02X: [%02x %02x %02x %02x %02x %02x %02x %02x %02x]", BM_UNK_CNT_90, buf[0], buf[1], buf[2], buf[3], buf[4],buf[5],buf[6],buf[7], buf[8]);
+    ESP_LOGI(TAG, "CNT     %02X: [%02x %02x %02x %02x %02x %02x %02x %02x %02x]", BM_NONCE_TOTAL_CNT, buf[0], buf[1], buf[2], buf[3], buf[4],buf[5],buf[6],buf[7], buf[8]);
     float hashes = 4.096*(float)value;
     ESP_LOGW(TAG,"hashes %f",hashes);
     return hashes;
@@ -389,7 +389,7 @@ float get_hashrate_error_cnt() {
 }
 
 void reset_counters() {
-    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){0x00, BM_UNK_CNT_90,0x00,0x00,0x00,0x00}, 6, true);
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){0x00, BM_NONCE_TOTAL_CNT,0x00,0x00,0x00,0x00}, 6, true);
     _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]){0x00, BM_NONCE_ERROR_CNT,0x00,0x00,0x00,0x00}, 6, true);
 }
 

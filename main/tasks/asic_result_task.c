@@ -61,20 +61,13 @@ void ASIC_result_task(void * pvParameters)
 
             float gh_tot = gh_hash + gh_err;
 
-            float expected_hashrate_mhs = POWER_MANAGEMENT_MODULE.frequency_value * DEVICE_CONFIG.family.asic.small_core_count *
-                                          DEVICE_CONFIG.family.asic.hashrate_test_percentage_target / 1000.0f;
-            ESP_LOGI(TAG, "gh_tot:%f expected:%f", gh_tot, expected_hashrate_mhs);
             long now = esp_timer_get_time();
             if (gh_tot <= 10000 && gh_err < gh_hash) {
                 SYSTEM_MODULE.current_hashrate =
                     0.8 * SYSTEM_MODULE.current_hashrate + 0.2 * ((gh_tot / (now - timegone)) * 1000000.f);
-                // SYSTEM_MODULE.current_hashrate = ((gh_tot / (now - timegone)) * 1000000.f);
+                // Update hashrate_no_error and hashrate_error with the same logic
                 SYSTEM_MODULE.hashrate_no_error = ((gh_hash / (now - timegone)) * 1000000.f);
-                // SYSTEM_MODULE.hashrate_no_error = 0.8 * SYSTEM_MODULE.current_hashrate  + 0.2 * ((gh_hash / (now - timegone)) *
-                // 1000000.f);
                 SYSTEM_MODULE.hashrate_error = ((gh_err / (now - timegone)) * 1000000.f);
-                // SYSTEM_MODULE.hashrate_error = 0.8 * SYSTEM_MODULE.current_hashrate  + 0.2 * ((gh_err / (now - timegone)) *
-                // 1000000.f);
             }
             timegone = now;
             reset_counters();
