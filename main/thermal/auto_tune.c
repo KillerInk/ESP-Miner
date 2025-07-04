@@ -126,26 +126,29 @@ static void enforce_voltage_frequency_ratio() {
 
 void increase_values() {
     if (avg_hashrate_auto > 0) {
-        last_asic_frequency_auto += freq_step;
+        double step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
+        last_asic_frequency_auto += step;
     }
     enforce_voltage_frequency_ratio();
 }
 
 void decrease_values() {
     if (avg_hashrate_auto > 0) {
-        last_asic_frequency_auto -= freq_step;
+        double step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
+        last_asic_frequency_auto -= step;
     }
     enforce_voltage_frequency_ratio();
 }
 
 void switchvalue() {
     if (avg_hashrate_auto > 0) {
+        double current_step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
 
-        if (lastVoltageSet && (last_asic_frequency_auto + freq_step > last_asic_frequency_auto)) {
-            last_asic_frequency_auto += freq_step;
+        if (lastVoltageSet && (last_asic_frequency_auto + current_step > last_asic_frequency_auto)) {
+            last_asic_frequency_auto += current_step;
             last_core_voltage_auto -= volt_step;
         } else if (!lastVoltageSet && (last_core_voltage_auto - volt_step < last_core_voltage_auto)) {
-            last_asic_frequency_auto -= freq_step;
+            last_asic_frequency_auto -= current_step;
             last_core_voltage_auto += volt_step;
         }
     }
@@ -207,16 +210,14 @@ void auto_tune(bool pid_control_fanspeed) {
                 break;
             }
 
-            if (waitCounter-- > 0 && !critical_limithit()) {
+            if (waitCounter-- > 0) {
                 ESP_LOGI(TAG, "state sleep_bevor_warmup %i", waitCounter);
                 break;
             }
 
-            if (waitForStartUp(pid_control_fanspeed) && !critical_limithit()) {
+            if (waitForStartUp(pid_control_fanspeed)) {
                 state = warmup;
             }
-            else
-                state = working;
             break;
 
         case warmup:
@@ -231,6 +232,7 @@ void auto_tune(bool pid_control_fanspeed) {
         case working:
             if (limithit() && !critical_limithit()) {
                 break;  // Added this line to stop adjusting when limit is hit
+
             } else {
                 dowork();  // Resume adjustments once limits are no longer breached
             }
