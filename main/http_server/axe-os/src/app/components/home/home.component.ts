@@ -265,7 +265,11 @@ export class HomeComponent implements OnInit {
     const datasetIndex = legendItem.datasetIndex;
     // Toggle visibility
     const meta = ci.getDatasetMeta(datasetIndex);
-    meta.hidden = meta.hidden === null ? !ci.data.datasets[datasetIndex].hidden : null;
+    if (meta.hidden === null) {
+      meta.hidden = !ci.data.datasets[datasetIndex].hidden;
+    } else {
+      meta.hidden = !meta.hidden;
+    }
     this.datasetVisibility[datasetIndex] = !meta.hidden;
     this.saveDatasetVisibility();
     ci.update();
