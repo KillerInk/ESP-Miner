@@ -18,7 +18,7 @@ static int timecounter = 4;
 
 void ASIC_result_task(void * pvParameters)
 {
-
+    timegone = esp_timer_get_time();
     while (1) {
         // task_result *asic_result = (*GLOBAL_STATE.ASIC_functions.receive_result_fn)();
         task_result * asic_result = ASIC_process_work();
@@ -55,23 +55,26 @@ void ASIC_result_task(void * pvParameters)
             }
             SYSTEM_notify_found_nonce(nonce_diff, job_id);
         }
+
+        float gh_hash = get_hashrate_cnt();
+        float gh_err = get_hashrate_error_cnt();
+       
+        float gh_tot = gh_hash + gh_err;
+
+        long now = esp_timer_get_time();
+        if (gh_tot < 50000 && gh_err < gh_hash) {
+
+            SYSTEM_MODULE.current_hashrate = 0.8 * SYSTEM_MODULE.current_hashrate + 0.2 * ((gh_tot / (now - timegone)) * 1000000.f);
+            // Update hashrate_no_error and hashrate_error with the same logic
+            SYSTEM_MODULE.hashrate_no_error = ((gh_hash / (now - timegone)) * 1000000.f);
+            SYSTEM_MODULE.hashrate_error = ((gh_err / (now - timegone)) * 1000000.f);
+        }
+        else
+            timecounter = 1;
         if (timecounter-- == 0) {
-            float gh_hash = get_hashrate_cnt();
-            float gh_err = get_hashrate_error_cnt();
-
-            float gh_tot = gh_hash + gh_err;
-
-            long now = esp_timer_get_time();
-            if (gh_tot <= 10000 && gh_err < gh_hash) {
-                SYSTEM_MODULE.current_hashrate =
-                    0.8 * SYSTEM_MODULE.current_hashrate + 0.2 * ((gh_tot / (now - timegone)) * 1000000.f);
-                // Update hashrate_no_error and hashrate_error with the same logic
-                SYSTEM_MODULE.hashrate_no_error = ((gh_hash / (now - timegone)) * 1000000.f);
-                SYSTEM_MODULE.hashrate_error = ((gh_err / (now - timegone)) * 1000000.f);
-            }
             timegone = now;
             reset_counters();
-            timecounter = 4;
+            timecounter = 20;
         }
     }
 }
