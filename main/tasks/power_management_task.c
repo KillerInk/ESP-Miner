@@ -69,7 +69,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     double last_core_voltage = 0.0;
     double last_asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     POWER_MANAGEMENT_MODULE.frequency_value = last_asic_frequency;
-    bool auto_tune_hashrate = true;
+    
     auto_tune_init();
 
     while (1) {
@@ -93,7 +93,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         // overheat mode if the voltage regulator or ASIC is too hot
         if ((POWER_MANAGEMENT_MODULE.vr_temp > TPS546_THROTTLE_TEMP || POWER_MANAGEMENT_MODULE.chip_temp_avg > THROTTLE_TEMP) &&
             (POWER_MANAGEMENT_MODULE.frequency_value > 50 || POWER_MANAGEMENT_MODULE.voltage > 1000)) {
-            auto_tune_hashrate = false;
+            auto_tune_set_auto_tune_hashrate(false);
             ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", POWER_MANAGEMENT_MODULE.vr_temp, POWER_MANAGEMENT_MODULE.chip_temp_avg);
             POWER_MANAGEMENT_MODULE.fan_perc = 100;
             Thermal_set_fan_percent(DEVICE_CONFIG, 1);
@@ -168,7 +168,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         double core_voltage;
         double asic_frequency;
 
-        if (!auto_tune_hashrate || !pid_control_fanspeed) {
+        if (!auto_tune_get_auto_tune_hashrate() || !pid_control_fanspeed) {
             core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
             asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
         } else {
