@@ -1,8 +1,9 @@
 import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
-import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
+import { interval, map, Observable, shareReplay, startWith, switchMap, tap, first } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
+import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
@@ -43,7 +44,7 @@ export class HomeComponent implements OnInit {
   public activePoolPort!: number;
   public activePoolUser!: string;
   public activePoolLabel!: 'Primary' | 'Fallback';
-
+  public responseTime!: number;
   @ViewChild('chart')
   private chart?: UIChart;
 
@@ -63,7 +64,7 @@ export class HomeComponent implements OnInit {
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
     private shareRejectReasonsService: ShareRejectionExplanationService,
-    private titleService: Title
+    private loadingService: LoadingService,
   ) {
     this.initializeChart();
 
@@ -75,6 +76,7 @@ export class HomeComponent implements OnInit {
 
   ngOnInit() {
     this.pageDefaultTitle = this.titleService.getTitle();
+    this.loadingService.loading$.next(true);
   }
 
   private get zoomPanFactor(): number {
@@ -392,6 +394,7 @@ export class HomeComponent implements OnInit {
         this.activePoolURL = isFallback ? info.fallbackStratumURL : info.stratumURL;
         this.activePoolUser = isFallback ? info.fallbackStratumUser : info.stratumUser;
         this.activePoolPort = isFallback ? info.fallbackStratumPort : info.stratumPort;
+        this.responseTime = info.responseTime;
       }),
       map(info => {
         info.power = parseFloat(info.power.toFixed(1))
@@ -406,7 +409,14 @@ export class HomeComponent implements OnInit {
       shareReplay({ refCount: true, bufferSize: 1 }),
 
     );
-    // live data
+
+    this.info$.pipe(
+      first()
+    ).subscribe({
+      next: () => {
+        this.loadingService.loading$.next(false)
+      }
+    });
 
     this.quickLink$ = this.info$.pipe(
       map(info => {

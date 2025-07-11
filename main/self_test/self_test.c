@@ -32,11 +32,9 @@
 #include "asic.h"
 #include "device_config.h"
 #include "asic_reset.h"
+#include "global_state.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
-
-#define TESTS_FAILED 0
-#define TESTS_PASSED 1
 
 /////Test Constants/////
 //Test Fan Speed
@@ -49,27 +47,33 @@
 //Test Power Consumption
 #define POWER_CONSUMPTION_MARGIN 3              //+/- watts
 
+//Test Difficulty
+#define DIFFICULTY 8
+
 static const char * TAG = "self_test";
 
-SemaphoreHandle_t BootSemaphore;
+static SemaphoreHandle_t longPressSemaphore;
+static bool isFactoryTest = false;
 
 //local function prototypes
 static void tests_done(bool test_result);
 
-bool should_test() {
-    bool is_max = DEVICE_CONFIG.family.asic.model == BM1397;
-    uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
-    uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
-    if (should_self_test == 1 && !is_max && best_diff < 1) {
+static bool should_test() {
+    uint64_t is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0) < 1;
+    uint16_t is_self_test_flag_set = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
+    if (is_factory_flash && is_self_test_flag_set) {
+        isFactoryTest = true;
         return true;
     }
-    return false;
+
+    // Optionally start self-test when boot button is pressed
+    return gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
 }
 
 static void reset_self_test() {
     ESP_LOGI(TAG, "Long press detected...");
     // Give the semaphore back
-    xSemaphoreGive(BootSemaphore);
+    xSemaphoreGive(longPressSemaphore);
 }
 
 static void display_msg(char * msg) 
@@ -251,70 +255,77 @@ esp_err_t test_psram(){
  * This function is intended to be run as a task and will execute a series of 
  * diagnostic tests to ensure the system is functioning correctly.
  *
+ * @return true if the self-test was run, false if it was skipped.
  */
-void self_test()
+bool self_test()
 {
 
-    ESP_LOGI(TAG, "Running Self Tests");
+    // Should we run the self-test?
+    if (!should_test()) return true;
 
-    SELF_TEST_MODULE.active = true;
+    if (isFactoryTest) {
+        ESP_LOGI(TAG, "Running factory self-test");
+    } else {
+        ESP_LOGI(TAG, "Running manual self-test");
+    }
+
+    SELF_TEST_MODULE.is_active = true;
 
     // Create a binary semaphore
-    BootSemaphore = xSemaphoreCreateBinary();
+    longPressSemaphore = xSemaphoreCreateBinary();
 
     gpio_install_isr_service(0);
 
-    if (BootSemaphore == NULL) {
+    if (longPressSemaphore == NULL) {
         ESP_LOGE(TAG, "Failed to create semaphore");
-        return;
+        return false;
     }
 
     //Run PSRAM test
     if(test_psram() != ESP_OK) {
         ESP_LOGE(TAG, "NO PSRAM on device!");
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     //Run display tests
     if (test_display() != ESP_OK) {
         ESP_LOGE(TAG, "Display test failed!");
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     //Run input tests
     if (test_input() != ESP_OK) {
         ESP_LOGE(TAG, "Input test failed!");
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     //Run screen tests
     if (test_screen() != ESP_OK) {
         ESP_LOGE(TAG, "Screen test failed!");
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     //Init peripherals EMC2101 and INA260 (if present)
     if (test_init_peripherals() != ESP_OK) {
         ESP_LOGE(TAG, "Peripherals init failed!");
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     //Voltage Regulator Testing
     if (test_voltage_regulator() != ESP_OK) {
         ESP_LOGE(TAG, "Voltage Regulator test failed!");
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     if (asic_reset() != ESP_OK) {
         ESP_LOGE(TAG, "ASIC reset failed!");
-        tests_done(TESTS_FAILED);
-        return;
+        tests_done(false);
     }
 
     //test for number of ASICs
     if (SERIAL_init() != ESP_OK) {
         ESP_LOGE(TAG, "SERIAL init failed!");
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
@@ -322,14 +333,16 @@ void self_test()
     uint8_t chips_detected = ASIC_init();
     uint8_t chips_expected = DEVICE_CONFIG.family.asic_count;
 
+    DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
+
     ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, chips_expected);
 
     if (chips_detected != chips_expected) {
-        ESP_LOGE(TAG, "SELF TEST FAIL, %d of %d CHIPS DETECTED", chips_detected, chips_expected);
+        ESP_LOGE(TAG, "SELF-TEST FAIL, %d of %d CHIPS DETECTED", chips_detected, chips_expected);
         char error_buf[20];
         snprintf(error_buf, 20, "ASIC:FAIL %d CHIPS", chips_detected);
         display_msg(error_buf);
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     //test for voltage regulator faults
@@ -338,7 +351,7 @@ void self_test()
         char error_buf[20];
         snprintf(error_buf, 20, "VCORE:PWR FAULT");
         display_msg(error_buf);
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     //setup and test hashrate
@@ -347,7 +360,7 @@ void self_test()
 
     if (SERIAL_set_baud(baud) != ESP_OK) {
         ESP_LOGE(TAG, "SERIAL set baud failed!");
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
@@ -397,13 +410,8 @@ void self_test()
 
     bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
 
-    uint8_t difficulty_mask = 8;
     reset_counters();
-
-
-    //(*GLOBAL_STATE.ASIC_functions.set_difficulty_mask_fn)(difficulty_mask);
     ASIC_set_job_difficulty_mask(difficulty_mask);
-
     ESP_LOGI(TAG, "Sending work");
 
     //(*GLOBAL_STATE.ASIC_functions.send_work_fn)(&job);
@@ -422,7 +430,7 @@ void self_test()
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
-            sum += difficulty_mask;
+            sum += DIFFICULTY;
             
             hash_rate = (sum * 4294967296) / (duration * 1000000000);
             ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
@@ -446,14 +454,14 @@ void self_test()
 
     if (hash_rate < expected_hashrate_mhs) {
         display_msg("HASHRATE:FAIL");
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     free(ASIC_TASK_MODULE.active_jobs);
     free(GLOBAL_STATE.valid_jobs);
 
     if (test_core_voltage() != ESP_OK) {
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
     // TODO: Maybe make a test equivalent for test values
@@ -461,46 +469,61 @@ void self_test()
         if (test_INA260_power_consumption(DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
             ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float)DEVICE_CONFIG.power_consumption_target);
             display_msg("POWER:FAIL");
-            tests_done(TESTS_FAILED);
+            tests_done(false);
         }
     }
     if (DEVICE_CONFIG.TPS546) {
         if (test_TPS546_power_consumption(DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
             ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)DEVICE_CONFIG.power_consumption_target);
             display_msg("POWER:FAIL");
-            tests_done(TESTS_FAILED);
+            tests_done(false);
         }
     }
 
     if (test_fan_sense() != ESP_OK) {     
         ESP_LOGE(TAG, "Fan test failed!"); 
-        tests_done(TESTS_FAILED);
+        tests_done(false);
     }
 
-    tests_done(TESTS_PASSED);
+    tests_done(true);
 
-    return;  
+    return true;
 }
 
 static void tests_done(bool test_result) 
 {
-    SELF_TEST_MODULE.result = test_result;
-    SELF_TEST_MODULE.finished = true;
     VCORE_set_voltage(0.0f);
 
-    if (test_result == TESTS_FAILED) {
-        ESP_LOGI(TAG, "SELF TESTS FAIL -- Press RESET to continue");  
-        while (1) {
-            // Wait here forever until reset_self_test() gives the BootSemaphore
-            if (xSemaphoreTake(BootSemaphore, portMAX_DELAY) == pdTRUE) {
-                nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
-                //wait 100ms for nvs write to finish?
-                vTaskDelay(100 / portTICK_PERIOD_MS);
-                esp_restart();
-            }
+    if (test_result) {
+        if (isFactoryTest) {
+            ESP_LOGI(TAG, "Self-test flag cleared");
+            nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
         }
+        ESP_LOGI(TAG, "SELF-TEST PASS! -- Press RESET button to restart.");
+        SELF_TEST_MODULE.result = "SELF-TEST PASS!";
+        SELF_TEST_MODULE.finished = "Press RESET button to restart.";
     } else {
-        nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
-        ESP_LOGI(TAG, "Self Tests Passed!!!");
+        // isTestFailed
+        SELF_TEST_MODULE.result = "SELF-TEST FAIL!";
+        if (isFactoryTest) {
+            ESP_LOGI(TAG, "SELF-TEST FAIL! -- Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.");
+            SELF_TEST_MODULE.finished = "Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.";
+            SELF_TEST_MODULE.is_finished = true;
+            while (1) {
+                // Wait here forever until reset_self_test() gives the longPressSemaphore
+                if (xSemaphoreTake(longPressSemaphore, portMAX_DELAY) == pdTRUE) {
+                    ESP_LOGI(TAG, "Self-test flag cleared");
+                    nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
+                    // flush all pending NVS writes
+                    nvs_config_commit();
+                    esp_restart();
+                }
+            }
+        } else {
+            ESP_LOGI(TAG, "SELF-TEST FAIL -- Press RESET button to restart.");
+            SELF_TEST_MODULE.finished = "Press RESET button to restart.";
+        }
+        
     }
+    SELF_TEST_MODULE.is_finished = true;
 }

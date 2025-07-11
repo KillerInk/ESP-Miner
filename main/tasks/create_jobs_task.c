@@ -20,7 +20,7 @@ static void generate_work(mining_notify * notification, uint32_t extranonce_2, u
 void create_jobs_task(void * pvParameters)
 {
 
-    uint32_t difficulty = GLOBAL_STATE.stratum_difficulty;
+    uint32_t difficulty = GLOBAL_STATE.pool_difficulty;
     while (1) {
         mining_notify * mining_notification = (mining_notify *) queue_dequeue(&GLOBAL_STATE.stratum_queue);
         if (mining_notification == NULL) {
@@ -32,9 +32,8 @@ void create_jobs_task(void * pvParameters)
         ESP_LOGI(TAG, "New Work Dequeued %s", mining_notification->job_id);
 
         if (GLOBAL_STATE.new_set_mining_difficulty_msg) {
-            ESP_LOGI(TAG, "New pool difficulty %lu", GLOBAL_STATE.stratum_difficulty);
-            difficulty = GLOBAL_STATE.stratum_difficulty;
-            GLOBAL_STATE.new_set_mining_difficulty_msg = false;
+            ESP_LOGI(TAG, "New pool difficulty %lu", GLOBAL_STATE.pool_difficulty);
+            difficulty = GLOBAL_STATE.pool_difficulty;
         }
 
         uint32_t extranonce_2 = 0;

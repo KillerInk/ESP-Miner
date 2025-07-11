@@ -3,15 +3,12 @@
 #include "esp_psram.h"
 #include "nvs_flash.h"
 
-#include "main.h"
-
 #include "asic_result_task.h"
 #include "asic_task.h"
 #include "create_jobs_task.h"
 #include "statistics_task.h"
 #include "system.h"
 #include "http_server.h"
-#include "nvs_config.h"
 #include "serial.h"
 #include "stratum_task.h"
 #include "i2c_bitaxe.h"
@@ -19,8 +16,8 @@
 #include "nvs_device.h"
 #include "self_test.h"
 #include "asic.h"
-#include "driver/gpio.h"
 #include "device_config.h"
+#include "connect.h"
 #include "asic_reset.h"
 
 GlobalState GLOBAL_STATE = {
@@ -73,14 +70,8 @@ void app_main(void)
         return;
     }
 
-    // Optionally hold the boot button
-    bool pressed = gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
-    //should we run the self test?
-    if (should_test() || pressed) {
-        self_test();
-        return;
-    }
-
+    if (self_test()) return;
+    
     SYSTEM_init_system();
     statistics_init();
 
@@ -88,10 +79,6 @@ void app_main(void)
     wifi_init();
 
     SYSTEM_init_peripherals();
-
-    // This needs to be done before the power management task starts
-    POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)POWER_MANAGEMENT_MODULE.frequency_value);
 
     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, NULL,10, NULL);
 
@@ -101,12 +88,6 @@ void app_main(void)
     while (!SYSTEM_MODULE.is_connected) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
-
-    ESP_LOGI(TAG, "Connected to SSID: %s", SYSTEM_MODULE.ssid);
-
-    GLOBAL_STATE.new_stratum_version_rolling_msg = false;
-
-    wifi_softap_off();
 
     queue_init(&GLOBAL_STATE.stratum_queue);
     queue_init(&GLOBAL_STATE.ASIC_jobs_queue);

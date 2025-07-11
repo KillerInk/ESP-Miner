@@ -59,6 +59,8 @@ static int s_retry_num = 0;
 static int clients_connected_to_ap = 0;
 
 static const char *get_wifi_reason_string(int reason);
+static void wifi_softap_on(void);
+static void wifi_softap_off(void);
 
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
@@ -215,6 +217,10 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         s_retry_num = 0;
 
         SYSTEM_MODULE.is_connected = true;
+
+        ESP_LOGI(TAG, "Connected to SSID: %s", SYSTEM_MODULE.ssid);
+
+        wifi_softap_off();
     }
 }
 
@@ -228,8 +234,9 @@ esp_netif_t * wifi_init_softap(char * ap_ssid)
     snprintf(ap_ssid, 32, "Bitaxe_%02X%02X", mac[4], mac[5]);
 
     wifi_config_t wifi_ap_config;
-    memset(&wifi_ap_config, 0, sizeof(wifi_ap_config)); // Clear the structure
-    strncpy((char *) wifi_ap_config.ap.ssid, ap_ssid, sizeof(wifi_ap_config.ap.ssid));
+    memset(&wifi_ap_config, 0, sizeof(wifi_ap_config));
+    strncpy((char *) wifi_ap_config.ap.ssid, ap_ssid, sizeof(wifi_ap_config.ap.ssid) - 1);
+    wifi_ap_config.ap.ssid[sizeof(wifi_ap_config.ap.ssid) - 1] = '\0';
     wifi_ap_config.ap.ssid_len = strlen(ap_ssid);
     wifi_ap_config.ap.channel = 1;
     wifi_ap_config.ap.max_connection = 10;
@@ -253,12 +260,12 @@ void toggle_wifi_softap(void)
     }
 }
 
-void wifi_softap_off(void)
+static void wifi_softap_off(void)
 {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 }
 
-void wifi_softap_on(void)
+static void wifi_softap_on(void)
 {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
 }

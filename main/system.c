@@ -73,6 +73,14 @@ void SYSTEM_init_system()
     SYSTEM_MODULE.pool_pass = nvs_config_get_string(NVS_CONFIG_STRATUM_PASS, CONFIG_STRATUM_PW);
     SYSTEM_MODULE.fallback_pool_pass = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, CONFIG_FALLBACK_STRATUM_PW);
 
+    // set the pool difficulty
+    SYSTEM_MODULE.pool_difficulty = nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY, CONFIG_STRATUM_DIFFICULTY);
+    SYSTEM_MODULE.fallback_pool_difficulty = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, CONFIG_FALLBACK_STRATUM_DIFFICULTY);
+
+    // set the pool extranonce subscribe
+    SYSTEM_MODULE.pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, STRATUM_EXTRANONCE_SUBSCRIBE);
+    SYSTEM_MODULE.fallback_pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
+
     // set fallback to false.
     SYSTEM_MODULE.is_using_fallback = false;
 
@@ -123,7 +131,7 @@ static int compare_rejected_reason_stats(const void *a, const void *b) {
     return (eb->count > ea->count) - (ea->count > eb->count);
 }
 
-void SYSTEM_notify_rejected_share( char * error_msg)
+void SYSTEM_notify_rejected_share(char * error_msg)
 {
 
     SYSTEM_MODULE.shares_rejected++;
@@ -169,12 +177,12 @@ void SYSTEM_notify_new_ntime( uint32_t ntime)
     settimeofday(&tv, NULL);
 }
 
-void SYSTEM_notify_found_nonce( double found_diff, uint8_t job_id)
+void SYSTEM_notify_found_nonce(double found_diff, uint8_t job_id)
 {
     // Calculate the time difference in seconds with sub-second precision
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
 
-    /*SYSTEM_MODULE.historical_hashrate[SYSTEM_MODULE.historical_hashrate_rolling_index] = DEVICE_CONFIG.family.asic.difficulty;
+    SYSTEM_MODULE.historical_hashrate[SYSTEM_MODULE.historical_hashrate_rolling_index] = DEVICE_CONFIG.family.asic.difficulty;
     SYSTEM_MODULE.historical_hashrate_time_stamps[SYSTEM_MODULE.historical_hashrate_rolling_index] = esp_timer_get_time();
 
     SYSTEM_MODULE.historical_hashrate_rolling_index = (SYSTEM_MODULE.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;

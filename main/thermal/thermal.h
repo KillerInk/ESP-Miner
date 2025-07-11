@@ -8,9 +8,9 @@
 #include "EMC2103.h"
 #include "global_state.h"
 
-esp_err_t Thermal_init(DeviceConfig device_config);
-esp_err_t Thermal_set_fan_percent(DeviceConfig device_config, float percent);
-uint16_t Thermal_get_fan_speed(DeviceConfig device_config);
+esp_err_t Thermal_init();
+esp_err_t Thermal_set_fan_percent(float percent);
+uint16_t Thermal_get_fan_speed();
 
 float Thermal_get_chip_temp();
 

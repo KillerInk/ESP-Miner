@@ -104,5 +104,5 @@ uint16_t ADC_get_vcore(void)
         return 0;
     }
 
-    return (uint16_t)voltage;
+    return voltage;
 }

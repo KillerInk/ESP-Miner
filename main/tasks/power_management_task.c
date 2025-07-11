@@ -42,6 +42,7 @@ bool pid_startup_phase = true;
 int pid_startup_counter = 0;
 double avg_fanspeed = 15;
 
+
 // Hold and Ramp startup D-term
 #define PID_STARTUP_HOLD_DURATION 3  // Number of cycles to HOLD pid_d_startup
 #define PID_STARTUP_RAMP_DURATION 17 // Number of cycles to RAMP DOWN D (Total startup duration PID_STARTUP_HOLD_DURATION + PID_STARTUP_RAMP_DURATION)
@@ -62,9 +63,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     pid_set_output_limits(&pid, 10, 100); // Output limits 25% to 100%
     pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
 
-
     POWER_MANAGEMENT_MODULE.frequency_multiplier = 1;
-
     vTaskDelay(500 / portTICK_PERIOD_MS);
     double last_core_voltage = 0.0;
     double last_asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
@@ -72,8 +71,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     
     auto_tune_init();
 
-    while (1) {
+    POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    ESP_LOGI(TAG, "ASIC Frequency: %.2fMHz", (float)POWER_MANAGEMENT_MODULE.frequency_value);
 
+    while (1) {
         // Refresh PID setpoint from NVS in case it was changed via API
         pid_setPoint = (double) nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
         
