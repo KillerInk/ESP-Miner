@@ -19,7 +19,8 @@ auto_tune_settings AUTO_TUNE = {.power_limit = 20,
                                 .max_frequency_asic = 1000,
                                 .max_asic_temperatur = 65,
                                 .frequency = 525,
-                                .voltage = 1150};
+                                .voltage = 1150,
+                                .auto_tune_hashrate = true};
 
 double last_core_voltage_auto;
 double last_asic_frequency_auto;
@@ -56,6 +57,7 @@ void auto_tune_init()
     AUTO_TUNE.max_voltage_asic = nvs_config_get_u16(NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, AUTO_TUNE.max_voltage_asic);
     AUTO_TUNE.max_frequency_asic = nvs_config_get_u16(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, AUTO_TUNE.max_frequency_asic);
     AUTO_TUNE.max_asic_temperatur = nvs_config_get_u16(NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, AUTO_TUNE.max_asic_temperatur);
+    AUTO_TUNE.auto_tune_hashrate = nvs_config_get_u16(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, AUTO_TUNE.auto_tune_hashrate);
 
     last_core_voltage_auto = AUTO_TUNE.voltage;
     last_asic_frequency_auto = AUTO_TUNE.frequency;
@@ -73,8 +75,8 @@ bool waitForStartUp(bool pid_control_fanspeed)
 
 bool can_increase_values()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc < AUTO_TUNE.fan_limit - 1 &&
-           POWER_MANAGEMENT_MODULE.power < AUTO_TUNE.power_limit - 0.1 &&
+    return POWER_MANAGEMENT_MODULE.fan_perc < AUTO_TUNE.fan_limit &&
+           POWER_MANAGEMENT_MODULE.power < AUTO_TUNE.power_limit &&
            POWER_MANAGEMENT_MODULE.chip_temp_avg < AUTO_TUNE.max_asic_temperatur;
 }
 
@@ -126,7 +128,8 @@ static void enforce_voltage_frequency_ratio() {
 
 void increase_values() {
     if (avg_hashrate_auto > 0) {
-        double step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
+        // Calculate step based on current and average hashrate
+        double step = freq_step * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
         last_asic_frequency_auto += step;
     }
     enforce_voltage_frequency_ratio();
@@ -134,7 +137,8 @@ void increase_values() {
 
 void decrease_values() {
     if (avg_hashrate_auto > 0) {
-        double step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
+        // Calculate step based on current and average hashrate
+        double step = freq_step * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
         last_asic_frequency_auto -= step;
     }
     enforce_voltage_frequency_ratio();
@@ -142,7 +146,8 @@ void decrease_values() {
 
 void switchvalue() {
     if (avg_hashrate_auto > 0) {
-        double current_step = AUTO_TUNE.autotune_step_frequency * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
+        // Calculate current step based on current and average hashrate
+        double current_step = freq_step * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
 
         if (lastVoltageSet && (last_asic_frequency_auto + current_step > last_asic_frequency_auto)) {
             last_asic_frequency_auto += current_step;
@@ -162,8 +167,6 @@ void respectLimits() {
     last_core_voltage_auto = clamp(last_core_voltage_auto, MIN_VOLTAGE, AUTO_TUNE.max_voltage_asic);
 
     if (last_asic_frequency_auto == MIN_FREQ || last_core_voltage_auto == MIN_VOLTAGE) {
-        last_asic_frequency_auto = INIT_FREQ;
-        last_core_voltage_auto = INIT_VOLTAGE;
         lastVoltageSet = true;  // Assuming default voltage set to be initial value
     }
 }
@@ -248,4 +251,14 @@ double auto_tune_get_frequency()
 double auto_tune_get_voltage()
 {
     return AUTO_TUNE.voltage;
+}
+
+bool auto_tune_get_auto_tune_hashrate()
+{
+    return AUTO_TUNE.auto_tune_hashrate;
+}
+
+void auto_tune_set_auto_tune_hashrate(bool enable)
+{
+    AUTO_TUNE.auto_tune_hashrate = enable;
 }

@@ -98,6 +98,7 @@ export class SettingsComponent implements OnInit {
   }
   ngOnInit() {
     this.autotuneForm = this.fb.group({
+    auto_tune_hashrate:[true,[Validators.required, Validators.required]],
     power_limit: [20, [Validators.required, Validators.min(1)]],
     fan_limit: [75, [Validators.required, Validators.min(1)]],
     max_voltage_asic: [1400, [Validators.required, Validators.min(1)]],
@@ -110,6 +111,7 @@ export class SettingsComponent implements OnInit {
     next: autotune => {
       this.autotuneInfo = autotune;
       this.autotuneForm.patchValue({
+        auto_tune_hashrate: autotune.auto_tune_hashrate,
         power_limit: autotune.power_limit ?? 20,
         fan_limit: autotune.fan_limit ?? 75,
         max_voltage_asic: autotune.max_voltage_asic ?? 1400,

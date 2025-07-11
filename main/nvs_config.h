@@ -44,6 +44,7 @@
 #define NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC "max_voltage_asic"
 #define NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC "max_frequency_asic"
 #define NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR "max_asic_temperatur"
+#define NVS_CONFIG_KEY_AUTO_TUNE_ENABLE "auto_tune_hashrate"
 
 // Theme configuration
 #define NVS_CONFIG_THEME_SCHEME "themescheme"

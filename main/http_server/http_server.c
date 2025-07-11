@@ -659,29 +659,46 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     return ESP_OK;
 }
 
-int create_json_statistics_all(cJSON * root)
+int create_json_statistics_all(cJSON *root)
 {
     int prebuffer = 0;
-
-    if (root) {
-        // create array for all statistics
-        const char * label[15] = {"hashRate",          "temp",     "vrTemp", "power",    "voltage",  "current",
-                                  "coreVoltageActual", "fanspeed", "fanrpm", "wifiRSSI", "freeHeap", "timestamp","avghashRate", "hashRate_no_error", "hashRate_error"};
-
-        cJSON * statsLabelArray = cJSON_CreateStringArray(label, 15);
+    if (root)
+    {
+        // Create array for all statistics
+        const char *label[15] = {"hashRate", "temp", "vrTemp", "power", "voltage", "current",
+                                 "coreVoltageActual", "fanspeed", "fanrpm", "wifiRSSI", "freeHeap", "timestamp",
+                                 "avghashRate", "hashRate_no_error", "hashRate_error"};
+        cJSON *statsLabelArray = cJSON_CreateStringArray(label, 15);
+        if (statsLabelArray == NULL)
+        {
+            // Handle error: unable to create string array
+            return -1;
+        }
         cJSON_AddItemToObject(root, "labels", statsLabelArray);
         prebuffer++;
 
-        cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
+        cJSON *statsArray = cJSON_AddArrayToObject(root, "statistics");
+        if (statsArray == NULL)
+        {
+            // Handle error: unable to add array to object
+            return -1;
+        }
 
-        if (NULL != STATISTICS_MODULE.statisticsList) {
+        if (NULL != STATISTICS_MODULE.statisticsList)
+        {
             StatisticsNodePtr node = *STATISTICS_MODULE.statisticsList; // double pointer
             struct StatisticsData statsData;
 
-            while (NULL != node) {
+            while (NULL != node)
+            {
                 node = statisticData(node, &statsData);
+                cJSON *valueArray = cJSON_CreateArray();
+                if (valueArray == NULL)
+                {
+                    // Handle error: unable to create array
+                    return -1;
+                }
 
-                cJSON * valueArray = cJSON_CreateArray();
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature));
@@ -698,12 +715,16 @@ int create_json_statistics_all(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate_no_error));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate_error));
 
-                cJSON_AddItemToArray(statsArray, valueArray);
+                if (cJSON_AddItemToArray(statsArray, valueArray) == NULL)
+                {
+                    // Handle error: unable to add item to array
+                    return -1;
+                }
+
                 prebuffer++;
             }
         }
     }
-
     return prebuffer;
 }
 
@@ -1079,6 +1100,7 @@ static esp_err_t GET_autotune_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, AUTO_TUNE.max_voltage_asic);
     cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, AUTO_TUNE.max_frequency_asic);
     cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, AUTO_TUNE.max_asic_temperatur);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, AUTO_TUNE.auto_tune_hashrate);
 
     const char *response = cJSON_Print(root);
     httpd_resp_sendstr(req, response);
@@ -1156,6 +1178,11 @@ static esp_err_t POST_autotune_update(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.max_asic_temperatur = item->valuedouble;
         nvs_config_set_u16(NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, (uint16_t)AUTO_TUNE.max_asic_temperatur);
+    }
+
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_AUTO_TUNE_ENABLE)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.auto_tune_hashrate = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, (uint16_t)AUTO_TUNE.auto_tune_hashrate);
     }
 
     cJSON_Delete(root);
