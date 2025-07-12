@@ -63,7 +63,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     pid_set_output_limits(&pid, 10, 100); // Output limits 25% to 100%
     pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
 
-    POWER_MANAGEMENT_MODULE.frequency_multiplier = 1;
     vTaskDelay(500 / portTICK_PERIOD_MS);
     double last_core_voltage = 0.0;
     double last_asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
@@ -97,7 +96,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             auto_tune_set_auto_tune_hashrate(false);
             ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", POWER_MANAGEMENT_MODULE.vr_temp, POWER_MANAGEMENT_MODULE.chip_temp_avg);
             POWER_MANAGEMENT_MODULE.fan_perc = 100;
-            Thermal_set_fan_percent(DEVICE_CONFIG, 1);
+            Thermal_set_fan_percent(1);
 
             // Turn off core voltage
             VCORE_set_voltage(0.0f);
@@ -147,7 +146,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 // ESP_LOGD(TAG, "DEBUG: PID raw output: %.2f%%, Input: %.1f, SetPoint: %.1f", pid_output, pid_input, pid_setPoint);
                 avg_fanspeed = 0.93 * avg_fanspeed + 0.07 * pid_output;
                 POWER_MANAGEMENT_MODULE.fan_perc = (uint16_t) avg_fanspeed;
-                Thermal_set_fan_percent(DEVICE_CONFIG, avg_fanspeed / 100.0);
+                Thermal_set_fan_percent(avg_fanspeed / 100.0);
                 //ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
                 //         pid_input, pid_setPoint, avg_fanspeed, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
             } else {
@@ -155,7 +154,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%",
                              POWER_MANAGEMENT_MODULE.chip_temp_avg);
                     POWER_MANAGEMENT_MODULE.fan_perc = 70;
-                    Thermal_set_fan_percent(DEVICE_CONFIG, 0.7);
+                    Thermal_set_fan_percent(0.7);
                 } else {
                     ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f°C", POWER_MANAGEMENT_MODULE.chip_temp_avg);
                 }
@@ -163,7 +162,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         } else { // Manual fan speed
             float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
             POWER_MANAGEMENT_MODULE.fan_perc = fs;
-            Thermal_set_fan_percent(DEVICE_CONFIG, (float) fs / 100.0);
+            Thermal_set_fan_percent((float) fs / 100.0);
         }
 
         double core_voltage;

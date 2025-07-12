@@ -75,7 +75,7 @@ export class HomeComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.pageDefaultTitle = this.titleService.getTitle();
+    //this.pageDefaultTitle = this.titleService.getTitle();
     this.loadingService.loading$.next(true);
   }
 
@@ -426,18 +426,7 @@ export class HomeComponent implements OnInit {
       })
     );
 
-    this.info$.subscribe(info => {
-      this.titleService.setTitle(
-        [
-          this.pageDefaultTitle,
-          info.hostname,
-          (info.hashRate ? HashSuffixPipe.transform(info.hashRate * 1000000000) : false),
-          (info.temp ? `${info.temp}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
-          (!info.power_fault ? `${info.power} W` : false),
-          (info.bestDiff ? info.bestDiff : false),
-        ].filter(Boolean).join(' • ')
-      );
-    });
+    
 
   }
 

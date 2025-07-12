@@ -182,7 +182,7 @@ void SYSTEM_notify_found_nonce(double found_diff, uint8_t job_id)
     // Calculate the time difference in seconds with sub-second precision
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
 
-    SYSTEM_MODULE.historical_hashrate[SYSTEM_MODULE.historical_hashrate_rolling_index] = DEVICE_CONFIG.family.asic.difficulty;
+    /*SYSTEM_MODULE.historical_hashrate[SYSTEM_MODULE.historical_hashrate_rolling_index] = DEVICE_CONFIG.family.asic.difficulty;
     SYSTEM_MODULE.historical_hashrate_time_stamps[SYSTEM_MODULE.historical_hashrate_rolling_index] = esp_timer_get_time();
 
     SYSTEM_MODULE.historical_hashrate_rolling_index = (SYSTEM_MODULE.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
