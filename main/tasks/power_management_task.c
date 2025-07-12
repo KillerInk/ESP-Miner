@@ -165,8 +165,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             Thermal_set_fan_percent((float) fs / 100.0);
         }
 
-        double core_voltage;
-        double asic_frequency;
+        float core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
+        float asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
         if (!auto_tune_get_auto_tune_hashrate() || !pid_control_fanspeed) {
             core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);

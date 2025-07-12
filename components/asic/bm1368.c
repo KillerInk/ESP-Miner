@@ -1,7 +1,7 @@
 #include "bm1368.h"
 
 #include "crc.h"
-#include "global_state.h"
+#include "asic_task.h"
 #include "serial.h"
 #include "utils.h"
 
@@ -119,7 +119,7 @@ void BM1368_set_version_mask(uint32_t version_mask)
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, version_cmd, 6, BM1368_SERIALTX_DEBUG);
 }
 
-void BM1368_send_hash_frequency(double target_freq) {
+void BM1368_send_hash_frequency(float target_freq) {
     float max_diff = 0.001;
     uint8_t freqbuf[6] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41};
     uint8_t postdiv_min = 255;
@@ -169,11 +169,11 @@ void BM1368_send_hash_frequency(double target_freq) {
     current_frequency = target_freq;
 }
 
-bool BM1368_set_frequency(double target_freq) {
+bool BM1368_set_frequency(float target_freq) {
     return do_frequency_transition(target_freq, BM1368_send_hash_frequency, 1368);
 }
 
-static void do_frequency_ramp_up(double target_frequency) {
+static void do_frequency_ramp_up(float target_frequency) {
     ESP_LOGI(TAG, "Ramping up frequency from %.2f MHz to %.2f MHz", current_frequency, target_frequency);
     do_frequency_transition(target_frequency, BM1368_send_hash_frequency, 1368);
 }
@@ -279,9 +279,9 @@ void BM1368_send_work(bm_job * next_bm_job)
 
     ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
 
-    pthread_mutex_lock(&GLOBAL_STATE.valid_jobs_lock);
-    GLOBAL_STATE.valid_jobs[job.job_id] = 1;
-    pthread_mutex_unlock(&GLOBAL_STATE.valid_jobs_lock);
+    pthread_mutex_lock(&ASIC_TASK_MODULE.valid_jobs_lock);
+    ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
+    pthread_mutex_unlock(&ASIC_TASK_MODULE.valid_jobs_lock);
 
     #if BM1368_DEBUG_JOBS
     ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
@@ -290,7 +290,7 @@ void BM1368_send_work(bm_job * next_bm_job)
     _send_BM1368((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1368_job), BM1368_DEBUG_WORK);
 }
 
-task_result * BM1368_process_work(void * pvParameters)
+task_result * BM1368_process_work()
 {
     bm1368_asic_result_t asic_result = {0};
 
@@ -305,7 +305,7 @@ task_result * BM1368_process_work(void * pvParameters)
     ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
 
 
-    if (GLOBAL_STATE.valid_jobs[job_id] == 0) {
+    if (ASIC_TASK_MODULE.valid_jobs[job_id] == 0) {
         ESP_LOGW(TAG, "Invalid job found, 0x%02X", job_id);
         return NULL;
     }

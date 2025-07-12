@@ -704,9 +704,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "avghashRate", SYSTEM_MODULE.avg_hashrate);
 
     if (SYSTEM_MODULE.power_fault > 0) {
-    cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0));
-    if (SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string());
+        cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0));
     }
 
     free(ssid);
@@ -829,7 +828,7 @@ int create_json_statistics_dashboard(cJSON * root)
     return prebuffer;
 }
 
-static esp_err_t GET_system_statistics(httpd_req_t * req)
+esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
@@ -858,7 +857,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     return ESP_OK;
 }
 
-static esp_err_t GET_system_statistics_dashboard(httpd_req_t * req)
+esp_err_t GET_system_statistics_dashboard(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
@@ -1145,7 +1144,7 @@ void websocket_log_handler()
     }
 }
 
-esp_err_t start_rest_server()
+esp_err_t GET_autotune_info(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
@@ -1175,7 +1174,7 @@ esp_err_t start_rest_server()
     return ESP_OK;
 }
 
-static esp_err_t POST_autotune_update(httpd_req_t * req)
+esp_err_t POST_autotune_update(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
@@ -1356,6 +1355,7 @@ esp_err_t start_rest_server()
         .method = HTTP_GET,
         .handler = GET_autotune_info,
         .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &autotune_get_uri);
 
     httpd_uri_t autotune_post_uri = {
@@ -1374,10 +1374,6 @@ esp_err_t start_rest_server()
         httpd_register_uri_handler(server, &recovery_implicit_get_uri);
 
     } else {
-        httpd_uri_t api_common_uri = {
-            .uri = "/api/*",
-            .uri = "/*", .method = HTTP_GET, .handler = rest_common_get_handler, .user_ctx = rest_context};
-        httpd_register_uri_handler(server, &api_common_uri);
         /* URI handler for getting web server files */
         httpd_uri_t common_get_uri = {
             .uri = "/*", .method = HTTP_GET, .handler = rest_common_get_handler, .user_ctx = rest_context};

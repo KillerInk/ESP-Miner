@@ -14,7 +14,7 @@
 #include "utils.h"
 #include "crc.h"
 #include "mining.h"
-#include "global_state.h"
+#include "asic_task.h"
 
 #define BM1397_CHIP_ID 0x1397
 #define BM1397_CHIP_ID_RESPONSE_LENGTH 9
@@ -132,17 +132,17 @@ void BM1397_set_version_mask(uint32_t version_mask) {
 }
 
 // borrowed from cgminer driver-gekko.c calc_gsf_freq()
-void BM1397_send_hash_frequency(double frequency)
+void BM1397_send_hash_frequency(float frequency)
 {
     unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; // prefreq - pll0_divider
 
     // default 200Mhz if it fails
     unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x25}; // freqbuf - pll0_parameter
 
-    double deffreq = 200.0;
+    float deffreq = 200.0;
 
-    double fa, fb, fc1, fc2, newf;
-    double f1, basef, famax = 0x104, famin = 0x10;
+    float fa, fb, fc1, fc2, newf;
+    float f1, basef, famax = 0x104, famin = 0x10;
     int i;
 
     // bound the frequency setting
@@ -324,9 +324,9 @@ void BM1397_send_work(bm_job *next_bm_job)
 
     ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
 
-    pthread_mutex_lock(&GLOBAL_STATE.valid_jobs_lock);
-    GLOBAL_STATE.valid_jobs[job.job_id] = 1;
-    pthread_mutex_unlock(&GLOBAL_STATE.valid_jobs_lock);
+    pthread_mutex_lock(&ASIC_TASK_MODULE.valid_jobs_lock);
+    ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
+    pthread_mutex_unlock(&ASIC_TASK_MODULE.valid_jobs_lock);
 
     #if BM1397_DEBUG_JOBS
     ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
@@ -335,7 +335,7 @@ void BM1397_send_work(bm_job *next_bm_job)
     _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job_packet), BM1397_DEBUG_WORK);
 }
 
-task_result *BM1397_process_work(void *pvParameters)
+task_result *BM1397_process_work()
 {
     bm1397_asic_result_t asic_result = {0};
 
@@ -350,7 +350,7 @@ task_result *BM1397_process_work(void *pvParameters)
     uint8_t rx_midstate_index = asic_result.job_id & 0x03;
 
     
-    if (GLOBAL_STATE.valid_jobs[rx_job_id] == 0)
+    if (ASIC_TASK_MODULE.valid_jobs[rx_job_id] == 0)
     {
         ESP_LOGW(TAG, "Invalid job nonce found, id=%d", rx_job_id);
         return NULL;
