@@ -1374,6 +1374,13 @@ esp_err_t start_rest_server()
         httpd_register_uri_handler(server, &recovery_implicit_get_uri);
 
     } else {
+        httpd_uri_t api_common_uri = {
+            .uri = "/api/*",
+            .method = HTTP_ANY,
+            .handler = rest_api_common_handler,
+            .user_ctx = rest_context
+        };
+        httpd_register_uri_handler(server, &api_common_uri);
         /* URI handler for getting web server files */
         httpd_uri_t common_get_uri = {
             .uri = "/*", .method = HTTP_GET, .handler = rest_common_get_handler, .user_ctx = rest_context};

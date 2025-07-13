@@ -65,7 +65,6 @@ void app_main(void)
     }
 
     if (!self_test()) return;
-        return;
 
     SYSTEM_init_system();
     statistics_init();
