@@ -15,6 +15,8 @@
 #include "vcore.h"
 #include <string.h>
 #include <auto_tune.h>
+#include "power_management_task.h"
+#include "system_module.h"
 
 
 #define MAX_TEMP 90.0

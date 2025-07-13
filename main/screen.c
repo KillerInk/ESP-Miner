@@ -6,10 +6,12 @@
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
 #include "esp_timer.h"
+#include "power_management_task.h"
 #include "global_state.h"
 #include "lvgl.h"
 #include "nvs_config.h"
 #include <string.h>
+#include "system_module.h"
 
 typedef enum
 {
@@ -526,7 +528,6 @@ esp_err_t screen_start()
     screen_lines = lv_display_get_vertical_resolution(NULL) / 8;
     
     if (SYSTEM_MODULE.is_screen_active) {
-        SystemModule * module = &SYSTEM_MODULE;
 
         screens[SCR_SELF_TEST] = create_scr_self_test();
         screens[SCR_OVERHEAT] = create_scr_overheat();

@@ -11,6 +11,8 @@
 #include "asic.h"
 #include "bm1370.h"
 #include "esp_timer.h"
+#include "asic_task.h"
+#include "system_module.h"
 
 static const char *TAG = "asic_result";
 
