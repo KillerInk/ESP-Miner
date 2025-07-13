@@ -18,9 +18,11 @@ import { saveAs } from 'file-saver';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent implements OnInit {
+export class HomeComponent {
+
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
+
   public chartOptions: any;
   public dataLabel: number[] = [];
   public hashrateData: number[] = [];
@@ -35,11 +37,14 @@ export class HomeComponent implements OnInit {
   public espRam: number[] = [];
   public hashrate_no_error: number[] = [];
   public hashrate_error: number[] = [];
+
   public maxPower: number = 0;
   public nominalVoltage: number = 0;
   public maxTemp: number = 75;
   public maxFrequency: number = 800;
+
   public quickLink$!: Observable<string | undefined>;
+
   public activePoolURL!: string;
   public activePoolPort!: number;
   public activePoolUser!: string;
@@ -63,8 +68,9 @@ export class HomeComponent implements OnInit {
     private systemService: SystemService,
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
-    private shareRejectReasonsService: ShareRejectionExplanationService,
+    private titleService: Title,
     private loadingService: LoadingService,
+    private shareRejectReasonsService: ShareRejectionExplanationService
   ) {
     this.initializeChart();
 
@@ -75,7 +81,7 @@ export class HomeComponent implements OnInit {
   }
 
   ngOnInit() {
-    //this.pageDefaultTitle = this.titleService.getTitle();
+    this.pageDefaultTitle = this.titleService.getTitle();
     this.loadingService.loading$.next(true);
   }
 
@@ -160,10 +166,8 @@ export class HomeComponent implements OnInit {
 
     this.chartOptions.scales.x.min = minLabel;
     this.chartOptions.scales.x.max = maxLabel;
-
     (this.chart?.chart as any)?.update();
   }
-
 
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
@@ -428,6 +432,18 @@ export class HomeComponent implements OnInit {
 
     
 
+    this.info$.subscribe(info => {
+      this.titleService.setTitle(
+        [
+          this.pageDefaultTitle,
+          info.hostname,
+          (info.hashRate ? HashSuffixPipe.transform(info.hashRate * 1000000000) : false),
+          (info.temp ? `${info.temp}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
+          (!info.power_fault ? `${info.power} W` : false),
+          (info.bestDiff ? info.bestDiff : false),
+        ].filter(Boolean).join(' • ')
+      );
+    });
   }
 
   getRejectionExplanation(reason: string): string | null {
