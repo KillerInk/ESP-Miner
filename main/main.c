@@ -70,7 +70,7 @@ void app_main(void)
         return;
     }
 
-    if (self_test()) return;
+    if (!self_test()) return;
     
     SYSTEM_init_system();
     statistics_init();
