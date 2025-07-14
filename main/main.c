@@ -1,8 +1,5 @@
-#include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
-#include "nvs_flash.h"
-
 #include "adc.h"
 #include "asic.h"
 #include "asic_reset.h"
@@ -19,11 +16,15 @@
 #include "statistics_task.h"
 #include "stratum_task.h"
 #include "system.h"
+#include "power_management_module.h"
 #include "power_management_task.h"
 #include "system_module.h"
+#include "self_test_module.h"
+#include "mining_module.h"
+#include "device_config.h"
+#include "display.h"
+#include "work_queue.h"
 
-GlobalState GLOBAL_STATE = {
-    .extranonce_str = NULL, .extranonce_2_len = 0, .abandon_work = 0, .version_mask = 0, .ASIC_initalized = false};
 SystemModule SYSTEM_MODULE;
 PowerManagementModule POWER_MANAGEMENT_MODULE;
 DeviceConfig DEVICE_CONFIG;
@@ -31,6 +32,7 @@ DisplayConfig DISPLAY_CONFIG;
 AsicTaskModule ASIC_TASK_MODULE;
 SelfTestModule SELF_TEST_MODULE;
 StatisticsModule STATISTICS_MODULE;
+mining_queues MINING_MODULE;
 
 static const char * TAG = "bitaxe";
 
@@ -40,9 +42,9 @@ void app_main(void)
 
     if (!esp_psram_is_initialized()) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32 device!");
-        GLOBAL_STATE.psram_is_available = false;
+        SYSTEM_MODULE.psram_is_available = false;
     } else {
-        GLOBAL_STATE.psram_is_available = true;
+        SYSTEM_MODULE.psram_is_available = true;
     }
 
     // Init I2C
@@ -84,8 +86,8 @@ void app_main(void)
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
-    queue_init(&GLOBAL_STATE.stratum_queue);
-    queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
+    queue_init(&MINING_MODULE.stratum_queue);
+    queue_init(&MINING_MODULE.ASIC_jobs_queue);
 
     if (asic_reset() != ESP_OK) {
         SYSTEM_MODULE.asic_status = "ASIC reset failed";
@@ -107,7 +109,7 @@ void app_main(void)
     SERIAL_set_baud(ASIC_set_max_baud());
     SERIAL_clear_buffer();
 
-    GLOBAL_STATE.ASIC_initalized = true;
+    SYSTEM_MODULE.ASIC_initalized = true;
     xTaskCreate(stratum_task, "stratum admin", 8192, NULL, 5, NULL);
     xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, NULL, 10, NULL);

@@ -32,7 +32,7 @@
 #include "axe-os/api/system/asic_settings.h"
 #include "cJSON.h"
 #include "connect.h"
-#include "global_state.h"
+
 #include "http_server.h"
 #include "nvs_config.h"
 #include "power.h"
@@ -41,8 +41,9 @@
 #include "vcore.h"
 #include "auto_tune.h"
 #include "system.h"
-#include "power_management_task.h"
+#include "power_management_module.h"
 #include "system_module.h"
+#include "device_config.h"
 
 #define JSON_ALL_STATS_ELEMENT_SIZE 120
 #define JSON_DASHBOARD_STATS_ELEMENT_SIZE 60
@@ -638,11 +639,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "expectedHashrate", expected_hashrate);
     cJSON_AddStringToObject(root, "bestDiff", SYSTEM_MODULE.best_diff_string);
     cJSON_AddStringToObject(root, "bestSessionDiff", SYSTEM_MODULE.best_session_diff_string);
-    cJSON_AddNumberToObject(root, "poolDifficulty", GLOBAL_STATE.pool_difficulty);
+    cJSON_AddNumberToObject(root, "poolDifficulty", SYSTEM_MODULE.pool_difficulty);
 
     cJSON_AddNumberToObject(root, "isUsingFallbackStratum", SYSTEM_MODULE.is_using_fallback);
 
-    cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE.psram_is_available);
+    cJSON_AddNumberToObject(root, "isPSRAMAvailable", SYSTEM_MODULE.psram_is_available);
 
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
     cJSON_AddNumberToObject(root, "coreVoltage", POWER_MANAGEMENT_MODULE.core_voltage);

@@ -5,12 +5,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "statistics_task.h"
-#include "global_state.h"
+
 #include "nvs_config.h"
 #include "power.h"
 #include "connect.h"
 #include "vcore.h"
-#include "power_management_task.h"
+#include "power_management_module.h"
 #include "system_module.h"
 
 #define DEFAULT_POLL_RATE 5000

@@ -2,17 +2,17 @@
 
 #include "system.h"
 #include "work_queue.h"
-#include "serial.h"
 #include <string.h>
 #include "esp_log.h"
-#include "nvs_config.h"
 #include "utils.h"
 #include "stratum_task.h"
 #include "asic.h"
-#include "bm1370.h"
 #include "esp_timer.h"
 #include "asic_task.h"
 #include "system_module.h"
+#include "asic_task.h"
+#include "mining_module.h"
+#include "bm1370.h"
 
 static const char *TAG = "asic_result";
 
@@ -51,7 +51,7 @@ void ASIC_result_task(void *pvParameters)
             ESP_LOGI(TAG, "ID: %s, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid,
                      asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
             char * user = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_user : SYSTEM_MODULE.pool_user;
-            int ret = STRATUM_V1_submit_share(GLOBAL_STATE.sock, GLOBAL_STATE.send_uid++, user, active_job->jobid,
+            int ret = STRATUM_V1_submit_share(MINING_MODULE.sock, MINING_MODULE.send_uid++, user, active_job->jobid,
                                               active_job->extranonce2, active_job->ntime, asic_result->nonce,
                                               asic_result->rolled_version ^ active_job->version);
 

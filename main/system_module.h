@@ -1,6 +1,21 @@
 #ifndef SYSTEM_MODULE_H_
 #define SYSTEM_MODULE_H_
 
+#include <stdbool.h>
+#include <stdint.h>
+
+#define STRATUM_USER CONFIG_STRATUM_USER
+#define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
+
+#define HISTORY_LENGTH 100
+#define DIFF_STRING_SIZE 10
+
+typedef struct
+{
+    char message[64];
+    uint32_t count;
+} RejectedReasonStat;
+
 typedef struct
 {
     double duration_start;
@@ -51,8 +66,11 @@ typedef struct
     char firmware_update_filename[20];
     char firmware_update_status[20];
     char * asic_status;
+    bool ASIC_initalized;
+    bool psram_is_available;
 } SystemModule;
 
 extern SystemModule SYSTEM_MODULE;
+
 
 #endif
