@@ -1,52 +1,50 @@
 #include <lwip/tcpip.h>
 
+#include "asic.h"
+#include "asic_task.h"
+#include "asic_task_module.h"
+#include "bm1370.h"
+#include "esp_log.h"
+#include "esp_timer.h"
+#include "mining_module.h"
+#include "pool_module.h"
+#include "stratum_task.h"
 #include "system.h"
+#include "system_module.h"
+#include "utils.h"
 #include "work_queue.h"
 #include <string.h>
-#include "esp_log.h"
-#include "utils.h"
-#include "stratum_task.h"
-#include "asic.h"
-#include "esp_timer.h"
-#include "system_module.h"
-#include "asic_task_module.h"
-#include "pool_module.h"
-#include "asic_task.h"
-#include "mining_module.h"
-#include "bm1370.h"
 
-static const char *TAG = "asic_result";
+static const char * TAG = "asic_result";
 
 static long timegone = 1;
 static int timecounter = 4;
 
-void ASIC_result_task(void *pvParameters)
+void ASIC_result_task(void * pvParameters)
 {
     timegone = esp_timer_get_time();
-    while (1)
-    {
-        //task_result *asic_result = (*GLOBAL_STATE.ASIC_functions.receive_result_fn)(GLOBAL_STATE);
-        task_result *asic_result = ASIC_process_work();
+    while (1) {
+        // task_result *asic_result = (*GLOBAL_STATE.ASIC_functions.receive_result_fn)(GLOBAL_STATE);
+        task_result * asic_result = ASIC_process_work();
 
-        if (asic_result == NULL)
-        {
+        if (asic_result == NULL) {
             continue;
         }
 
         uint8_t job_id = asic_result->job_id;
 
-        if (ASIC_TASK_MODULE.valid_jobs[job_id] == 0)
-        {
+        if (ASIC_TASK_MODULE.valid_jobs[job_id] == 0) {
             ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
             continue;
         }
 
-        bm_job *active_job = ASIC_TASK_MODULE.active_jobs[job_id];
+        bm_job * active_job = ASIC_TASK_MODULE.active_jobs[job_id];
         // check the nonce difficulty
         double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
 
-        //log the ASIC response
-        ESP_LOGI(TAG, "ID: %s, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid, asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
+        // log the ASIC response
+        ESP_LOGI(TAG, "ID: %s, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid,
+                 asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
 
         if (nonce_diff >= active_job->pool_diff) {
             ESP_LOGI(TAG, "ID: %s, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid,
@@ -64,21 +62,28 @@ void ASIC_result_task(void *pvParameters)
             SYSTEM_notify_found_nonce(nonce_diff, job_id);
         }
 
-        float gh_hash = get_hashrate_cnt();
-        float gh_err = get_hashrate_error_cnt();
-       
-        float gh_tot = gh_hash + gh_err;
-
         long now = esp_timer_get_time();
-        if (gh_tot < 50000 && gh_err < gh_hash) {
+        float gh_hash = get_hashrate_cnt();
+        if (gh_hash > 0)
+            gh_hash = (gh_hash /(now - timegone)) * 1000000.f;
 
-            SYSTEM_MODULE.current_hashrate = 0.8 * SYSTEM_MODULE.current_hashrate + 0.2 * ((gh_tot / (now - timegone)) * 1000000.f);
+        float gh_err = get_hashrate_error_cnt();
+        if (gh_err > 0)
+            gh_err = (gh_err / (now - timegone)) * 1000000.f;
+        
+        float current_hashrate_sum = gh_hash + gh_err;
+        if(SYSTEM_MODULE.current_hashrate  == 0)
+            SYSTEM_MODULE.current_hashrate = current_hashrate_sum;
+        if (current_hashrate_sum < SYSTEM_MODULE.current_hashrate * 1.5f  ) {
+            SYSTEM_MODULE.current_hashrate =
+                0.8f * SYSTEM_MODULE.current_hashrate + 0.2f * current_hashrate_sum;
             // Update hashrate_no_error and hashrate_error with the same logic
-            SYSTEM_MODULE.hashrate_no_error = ((gh_hash / (now - timegone)) * 1000000.f);
-            SYSTEM_MODULE.hashrate_error = ((gh_err / (now - timegone)) * 1000000.f);
+            SYSTEM_MODULE.hashrate_no_error = gh_hash;
+            SYSTEM_MODULE.hashrate_error = gh_err;
+        } else {
+            timecounter = 1; // Reset the counter if conditions are not met
         }
-        else
-            timecounter = 1;
+
         if (timecounter-- == 0) {
             timegone = now;
             reset_counters();
