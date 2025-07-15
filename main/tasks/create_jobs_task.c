@@ -8,10 +8,10 @@
 #include "string.h"
 #include "work_queue.h"
 #include "freertos/FreeRTOS.h"
-#include "asic_task.h"
-#include "system_module.h"
+#include "asic_task_module.h"
 #include "asic.h"
 #include "mining_module.h"
+#include "pool_module.h"
 
 static const char * TAG = "create_jobs_task";
 
@@ -23,7 +23,7 @@ static void generate_work(mining_notify * notification, uint32_t extranonce_2, u
 void create_jobs_task(void * pvParameters)
 {
 
-    uint32_t difficulty = SYSTEM_MODULE.pool_difficulty;
+    uint32_t difficulty = POOL_MODULE.pool_difficulty;
     while (1) {
         mining_notify * mining_notification = (mining_notify *) queue_dequeue(&MINING_MODULE.stratum_queue);
         if (mining_notification == NULL) {
@@ -35,8 +35,8 @@ void create_jobs_task(void * pvParameters)
         ESP_LOGI(TAG, "New Work Dequeued %s", mining_notification->job_id);
 
         if (MINING_MODULE.new_set_mining_difficulty_msg) {
-            ESP_LOGI(TAG, "New pool difficulty %i", SYSTEM_MODULE.pool_difficulty);
-            difficulty = SYSTEM_MODULE.pool_difficulty;
+            ESP_LOGI(TAG, "New pool difficulty %i", POOL_MODULE.pool_difficulty);
+            difficulty = POOL_MODULE.pool_difficulty;
         }
 
         uint32_t extranonce_2 = 0;

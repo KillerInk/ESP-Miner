@@ -8,8 +8,9 @@
 #include "stratum_task.h"
 #include "asic.h"
 #include "esp_timer.h"
-#include "asic_task.h"
 #include "system_module.h"
+#include "asic_task_module.h"
+#include "pool_module.h"
 #include "asic_task.h"
 #include "mining_module.h"
 #include "bm1370.h"
@@ -50,7 +51,7 @@ void ASIC_result_task(void *pvParameters)
         if (nonce_diff >= active_job->pool_diff) {
             ESP_LOGI(TAG, "ID: %s, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid,
                      asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
-            char * user = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_user : SYSTEM_MODULE.pool_user;
+            char * user = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
             int ret = STRATUM_V1_submit_share(MINING_MODULE.sock, MINING_MODULE.send_uid++, user, active_job->jobid,
                                               active_job->extranonce2, active_job->ntime, asic_result->nonce,
                                               asic_result->rolled_version ^ active_job->version);
