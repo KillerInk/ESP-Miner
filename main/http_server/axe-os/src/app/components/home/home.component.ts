@@ -658,6 +658,9 @@ Chart.register({
   afterDatasetsDraw: (chart: any) => {
     const ctx = chart.ctx;
 
+    // Track y positions for left/right stacking across all datasets
+    let globalLeftStackY: number[] = [];
+    let globalRightStackY: number[] = [];
 
     chart.data.datasets.forEach((dataset: any, i: number) => {
       const meta = chart.getDatasetMeta(i);
@@ -691,15 +694,11 @@ Chart.register({
 
       if (visibleIndices.length === 0) return;
 
-      const firstIndex = visibleIndices[0];
-      const lastIndex = visibleIndices[visibleIndices.length - 1];
-
-      // Find min and max value indices in the visible range
-      let minIndex = firstIndex;
-      let maxIndex = firstIndex;
-      let minValue = data[firstIndex];
-      let maxValue = data[firstIndex];
-
+      // Always show highest and lowest value labels in visible range
+      let minIndex = visibleIndices[0];
+      let maxIndex = visibleIndices[0];
+      let minValue = data[minIndex];
+      let maxValue = data[maxIndex];
       visibleIndices.forEach(idx => {
         if (data[idx] < minValue) {
           minValue = data[idx];
@@ -711,9 +710,14 @@ Chart.register({
         }
       });
 
+      // Most left and right visible indices
+      const firstIndex = visibleIndices[0];
+      const lastIndex = visibleIndices[visibleIndices.length - 1];
+
       // Collect unique indices to label
       const labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
 
+      // Helper for suffix
       const getSuffix = (value: number): string => {
         if (!value || isNaN(value)) value = 0;
         switch (dataset.label) {
@@ -741,6 +745,7 @@ Chart.register({
             return '';
         }
       };
+
       labelIndices.forEach(idx => {
         let value = data[idx];
         let tt = "";
@@ -772,20 +777,43 @@ Chart.register({
         const textWidth = ctx.measureText(text).width;
         const rectWidth = textWidth + paddingX * 2;
         const rectHeight = 14;
+        const radius = 5;
+        const yOffset = 5;
+
+        let x: number, y: number;
+
+        // Left-most label stacking (global)
+        if (idx === firstIndex) {
+          x = point.x - rectWidth - paddingX;
+          y = point.y + yOffset - rectHeight / 2;
+          // Stack up/down if overlapping with previous left labels (global)
+          let stackOffset = 0;
+          globalLeftStackY.forEach(prevY => {
+            if (Math.abs(y - prevY) < rectHeight + paddingY) stackOffset += rectHeight + paddingY;
+          });
+          y += stackOffset;
+          globalLeftStackY.push(y);
+        }
+        // Right-most label stacking (global)
+        else if (idx === lastIndex) {
+          x = point.x + paddingX;
+          y = point.y - yOffset - rectHeight / 2;
+          let stackOffset = 0;
+          globalRightStackY.forEach(prevY => {
+            if (Math.abs(y - prevY) < rectHeight + paddingY) stackOffset -= rectHeight + paddingY;
+          });
+          y += stackOffset;
+          globalRightStackY.push(y);
+        }
+        // Min/Max labels (not left/right)
+        else {
+          // Place above the point for min, below for max
+          x = point.x;
+          y = idx === minIndex ? point.y - rectHeight - paddingY : point.y + rectHeight + paddingY;
+        }
 
         // Draw background with rounded corners
         ctx.beginPath();
-        const radius = 5;
-        const yOffset = 15; 
-        let x, y;
-        if (point.x < visibleMax / 2) {
-          x = point.x - rectWidth  - paddingX; // Move label to the left
-          y = point.y + yOffset - rectHeight / 2; // Add y-offset here
-        } else {
-          x = point.x  + paddingX; // Move label to the right
-          y = point.y - yOffset - rectHeight / 2; // Add y-offset here
-        }
-        
         ctx.moveTo(x + radius, y);
         ctx.lineTo(x + rectWidth - radius, y);
         ctx.quadraticCurveTo(x + rectWidth, y, x + rectWidth, y + radius);
@@ -806,13 +834,8 @@ Chart.register({
         ctx.stroke();
 
         ctx.textBaseline = 'middle';
-
-        // Draw text
         ctx.fillStyle = "#fff";
-        if (point.x < visibleMax / 2)
-          ctx.fillText(text, point.x - (rectWidth / 2 + paddingX), y + rectHeight / 2 + paddingY / 2);
-        else
-          ctx.fillText(text, point.x + (rectWidth / 2 + paddingX), y + rectHeight / 2 + paddingY / 2);
+        ctx.fillText(text, x + rectWidth / 2, y + rectHeight / 2 + paddingY);
 
         ctx.restore();
       });
