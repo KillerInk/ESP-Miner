@@ -824,7 +824,9 @@ int create_json_statistics_dashboard(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.avghashrate));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap));
-
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate_no_error));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate_error));
+                
                 cJSON_AddItemToArray(statsArray, valueArray);
                 prebuffer++;
             }

@@ -91,7 +91,7 @@ bool limithit()
 bool critical_limithit()
 {
     return POWER_MANAGEMENT_MODULE.chip_temp_avg > AUTO_TUNE.max_asic_temperatur ||
-           POWER_MANAGEMENT_MODULE.power >= AUTO_TUNE.power_limit + 0.5 ||
+           POWER_MANAGEMENT_MODULE.power >= AUTO_TUNE.power_limit + 0.2 ||
            POWER_MANAGEMENT_MODULE.fan_perc >= AUTO_TUNE.fan_limit + 5;
 }
 
@@ -175,7 +175,7 @@ void respectLimits() {
 
 void dowork() {
     avg_hashrate_auto = (avg_hashrate_auto == 0) ? SYSTEM_MODULE.current_hashrate :
-                                                               0.999 * avg_hashrate_auto + 0.001 * SYSTEM_MODULE.current_hashrate;
+                                                               0.99 * avg_hashrate_auto + 0.01 * SYSTEM_MODULE.current_hashrate;
 
     double hashrate_delta = current_hashrate_auto - last_hashrate_auto;
     double base = (last_hashrate_auto == 0) ? 1 : last_hashrate_auto;

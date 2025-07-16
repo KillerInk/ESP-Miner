@@ -657,10 +657,59 @@ Chart.register({
   id: 'customValueLabels',
   afterDatasetsDraw: (chart: any) => {
     const ctx = chart.ctx;
+    const rectHeight = 14;
+    const paddingY = 2;
+    const paddingX = 4;
+    const radius = 5;
+    const yOffset = 5;
 
-    // Track y positions for left/right stacking across all datasets
-    let globalLeftStackY: number[] = [];
-    let globalRightStackY: number[] = [];
+    // Helper for suffix
+    const getSuffix = (dataset: any, value: number): string => {
+      if (!value || isNaN(value)) value = 0;
+      switch (dataset.label) {
+        case 'Hashrate':
+        case 'AvgHashrate':
+        case 'Hashrate no error':
+        case 'Hashrate error':
+          return HashSuffixPipe.transform(value);
+        case 'V/F Ratio':
+          return value.toFixed(4);
+        case 'ASIC Temp':
+          return '°C';
+        case 'ASIC Freq':
+          return 'MHz';
+        case 'VoltSet':
+        case 'VoltCurrent':
+          return 'mV';
+        case 'Fan':
+          return '%';
+        case 'EspRam':
+          return 'B';
+        case 'Power':
+          return 'W';
+        default:
+          return '';
+      }
+    };
+
+    type LabelPoint = {
+      datasetIdx: number;
+      dataIdx: number;
+      x: number;
+      y: number;
+      value: number;
+      dataset: any;
+      meta: any;
+      text: string;
+      textWidth: number;
+      rectWidth: number;
+      type: 'left' | 'right' | 'min' | 'max';
+    };
+
+    const leftPoints: LabelPoint[] = [];
+    const rightPoints: LabelPoint[] = [];
+    const minPoints: LabelPoint[] = [];
+    const maxPoints: LabelPoint[] = [];
 
     chart.data.datasets.forEach((dataset: any, i: number) => {
       const meta = chart.getDatasetMeta(i);
@@ -671,7 +720,7 @@ Chart.register({
       const visibleMin = scale.left;
       const visibleMax = scale.right;
 
-      // Find valid and visible indices
+      // Find visible indices
       const visibleIndices = data
         .map((v: any, idx: number) => {
           const point = meta.data[idx];
@@ -694,151 +743,211 @@ Chart.register({
 
       if (visibleIndices.length === 0) return;
 
-      // Always show highest and lowest value labels in visible range
-      let minIndex = visibleIndices[0];
-      let maxIndex = visibleIndices[0];
-      let minValue = data[minIndex];
-      let maxValue = data[maxIndex];
-      visibleIndices.forEach(idx => {
-        if (data[idx] < minValue) {
-          minValue = data[idx];
-          minIndex = idx;
-        }
-        if (data[idx] > maxValue) {
-          maxValue = data[idx];
-          maxIndex = idx;
-        }
-      });
-
       // Most left and right visible indices
       const firstIndex = visibleIndices[0];
       const lastIndex = visibleIndices[visibleIndices.length - 1];
 
-      // Collect unique indices to label
-      const labelIndices = Array.from(new Set([firstIndex, lastIndex, minIndex, maxIndex]));
+      // Min/max in visible range
+      let minIdx = visibleIndices[0];
+      let maxIdx = visibleIndices[0];
+      let minVal = data[minIdx];
+      let maxVal = data[maxIdx];
+      visibleIndices.forEach(idx => {
+        if (data[idx] < minVal) {
+          minVal = data[idx];
+          minIdx = idx;
+        }
+        if (data[idx] > maxVal) {
+          maxVal = data[idx];
+          maxIdx = idx;
+        }
+      });
 
-      // Helper for suffix
-      const getSuffix = (value: number): string => {
-        if (!value || isNaN(value)) value = 0;
+      // Prepare label text
+      const getLabelText = (idx: number) => {
+        let value = data[idx];
+        const suffix = getSuffix(dataset, value as number);
         switch (dataset.label) {
           case 'Hashrate':
           case 'AvgHashrate':
+          case 'V/F Ratio':
           case 'Hashrate no error':
           case 'Hashrate error':
-            return HashSuffixPipe.transform(value);
-          case 'V/F Ratio':
-            return value.toFixed(4);
-          case 'ASIC Temp':
-            return '°C';
-          case 'ASIC Freq':
-            return 'MHz';
-          case 'VoltSet':
-          case 'VoltCurrent':
-            return 'mV';
-          case 'Fan':
-            return '%';
-          case 'EspRam':
-            return 'B';
-          case 'Power':
-            return 'W';
+            return suffix;
           default:
-            return '';
+            return value.toString() + suffix;
         }
       };
 
-      labelIndices.forEach(idx => {
-        let value = data[idx];
-        let tt = "";
-        const suffix = getSuffix(value as number);
-        switch (dataset.label) {
-          case 'Hashrate':
-          case 'AvgHashrate':
-          case 'V/F Ratio':
-          case 'Hashrate no error':
-          case 'Hashrate error':
-            tt = suffix;
-            break;
-          default:
-            tt = value.toString() + suffix;
-            break;
-        }
+      // Left-most
+      {
+        const idx = firstIndex;
         const point = meta.data[idx];
-        if (!point) return;
-
-        // Label styling
-        const paddingX = 4;
-        const paddingY = 2;
-        ctx.save();
-        ctx.font = '10px "Segoe UI", Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        const text = String(tt);
-        const textWidth = ctx.measureText(text).width;
-        const rectWidth = textWidth + paddingX * 2;
-        const rectHeight = 14;
-        const radius = 5;
-        const yOffset = 5;
-
-        let x: number, y: number;
-
-        // Left-most label stacking (global)
-        if (idx === firstIndex) {
-          x = point.x - rectWidth - paddingX;
-          y = point.y + yOffset - rectHeight / 2;
-          // Stack up/down if overlapping with previous left labels (global)
-          let stackOffset = 0;
-          globalLeftStackY.forEach(prevY => {
-            if (Math.abs(y - prevY) < rectHeight + paddingY) stackOffset += rectHeight + paddingY;
+        if (point) {
+          const text = getLabelText(idx);
+          ctx.save();
+          ctx.font = '10px "Segoe UI", Arial, sans-serif';
+          const textWidth = ctx.measureText(text).width;
+          ctx.restore();
+          leftPoints.push({
+            datasetIdx: i,
+            dataIdx: idx,
+            x: point.x,
+            y: point.y + yOffset - rectHeight / 2,
+            value: data[idx],
+            dataset,
+            meta,
+            text,
+            textWidth,
+            rectWidth: textWidth + paddingX * 2,
+            type: 'left'
           });
-          y += stackOffset;
-          globalLeftStackY.push(y);
         }
-        // Right-most label stacking (global)
-        else if (idx === lastIndex) {
-          x = point.x + paddingX;
-          y = point.y - yOffset - rectHeight / 2;
-          let stackOffset = 0;
-          globalRightStackY.forEach(prevY => {
-            if (Math.abs(y - prevY) < rectHeight + paddingY) stackOffset -= rectHeight + paddingY;
+      }
+      // Right-most
+      {
+        const idx = lastIndex;
+        const point = meta.data[idx];
+        if (point) {
+          const text = getLabelText(idx);
+          ctx.save();
+          ctx.font = '10px "Segoe UI", Arial, sans-serif';
+          const textWidth = ctx.measureText(text).width;
+          ctx.restore();
+          rightPoints.push({
+            datasetIdx: i,
+            dataIdx: idx,
+            x: point.x,
+            y: point.y - yOffset - rectHeight / 2,
+            value: data[idx],
+            dataset,
+            meta,
+            text,
+            textWidth,
+            rectWidth: textWidth + paddingX * 2,
+            type: 'right'
           });
-          y += stackOffset;
-          globalRightStackY.push(y);
         }
-        // Min/Max labels (not left/right)
-        else {
-          // Place above the point for min, below for max
-          x = point.x;
-          y = idx === minIndex ? point.y - rectHeight - paddingY : point.y + rectHeight + paddingY;
+      }
+      // Min (skip if min is left or right)
+      if (minIdx !== firstIndex && minIdx !== lastIndex) {
+        const point = meta.data[minIdx];
+        if (point) {
+          const text = getLabelText(minIdx);
+          ctx.save();
+          ctx.font = '10px "Segoe UI", Arial, sans-serif';
+          const textWidth = ctx.measureText(text).width;
+          ctx.restore();
+          minPoints.push({
+            datasetIdx: i,
+            dataIdx: minIdx,
+            x: point.x,
+            y: point.y - rectHeight - 2 * yOffset,
+            value: data[minIdx],
+            dataset,
+            meta,
+            text: text,
+            textWidth,
+            rectWidth: textWidth + paddingX * 2,
+            type: 'min'
+          });
         }
+      }
+      // Max (skip if max is left or right)
+      if (maxIdx !== firstIndex && maxIdx !== lastIndex) {
+        const point = meta.data[maxIdx];
+        if (point) {
+          const text = getLabelText(maxIdx);
+          ctx.save();
+          ctx.font = '10px "Segoe UI", Arial, sans-serif';
+          const textWidth = ctx.measureText(text).width;
+          ctx.restore();
+          maxPoints.push({
+            datasetIdx: i,
+            dataIdx: maxIdx,
+            x: point.x,
+            y: point.y + rectHeight + 2 * yOffset,
+            value: data[maxIdx],
+            dataset,
+            meta,
+            text: text,
+            textWidth,
+            rectWidth: textWidth + paddingX * 2,
+            type: 'max'
+          });
+        }
+      }
+    });
 
-        // Draw background with rounded corners
-        ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + rectWidth - radius, y);
-        ctx.quadraticCurveTo(x + rectWidth, y, x + rectWidth, y + radius);
-        ctx.lineTo(x + rectWidth, y + rectHeight - radius);
-        ctx.quadraticCurveTo(x + rectWidth, y + rectHeight, x + rectWidth - radius, y + rectHeight);
-        ctx.lineTo(x + radius, y + rectHeight);
-        ctx.quadraticCurveTo(x, y + rectHeight, x, y + rectHeight - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
+    // Helper to resolve overlaps for a set of points
+    function resolveOverlaps(points: LabelPoint[]) {
+      points.sort((a, b) => a.y - b.y);
+      for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1];
+        const curr = points[i];
+        if (Math.abs(curr.y - prev.y) < rectHeight + paddingY) {
+          curr.y = prev.y + rectHeight + paddingY;
+        }
+      }
+    }
 
-        ctx.fillStyle = "#222c";
-        ctx.fill();
+    resolveOverlaps(leftPoints);
+    resolveOverlaps(rightPoints);
+    resolveOverlaps(minPoints);
+    resolveOverlaps(maxPoints);
 
-        // Draw border
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = dataset.borderColor || '#fff';
-        ctx.stroke();
+    // Draw helper
+    function drawLabel(pt: LabelPoint, x: number, y: number) {
+      ctx.save();
+      ctx.font = '10px "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
 
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = "#fff";
-        ctx.fillText(text, x + rectWidth / 2, y + rectHeight / 2 + paddingY);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + pt.rectWidth - radius, y);
+      ctx.quadraticCurveTo(x + pt.rectWidth, y, x + pt.rectWidth, y + radius);
+      ctx.lineTo(x + pt.rectWidth, y + rectHeight - radius);
+      ctx.quadraticCurveTo(x + pt.rectWidth, y + rectHeight, x + pt.rectWidth - radius, y + rectHeight);
+      ctx.lineTo(x + radius, y + rectHeight);
+      ctx.quadraticCurveTo(x, y + rectHeight, x, y + rectHeight - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
 
-        ctx.restore();
-      });
+      ctx.fillStyle = "#222c";
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = pt.dataset.borderColor || '#fff';
+      ctx.stroke();
+
+      ctx.fillStyle = "#fff";
+      ctx.fillText(pt.text, x + pt.rectWidth / 2, y + rectHeight / 2 + paddingY);
+      ctx.restore();
+    }
+
+    // Draw all left-most labels
+    leftPoints.forEach(pt => {
+      const x = pt.x - pt.rectWidth - paddingX;
+      drawLabel(pt, x, pt.y);
+    });
+
+    // Draw all right-most labels
+    rightPoints.forEach(pt => {
+      const x = pt.x + paddingX;
+      drawLabel(pt, x, pt.y);
+    });
+
+    // Draw all min labels
+    minPoints.forEach(pt => {
+      const x = pt.x - pt.rectWidth / 2;
+      drawLabel(pt, x, pt.y);
+    });
+
+    // Draw all max labels
+    maxPoints.forEach(pt => {
+      const x = pt.x - pt.rectWidth / 2;
+      drawLabel(pt, x, pt.y);
     });
   }
 });

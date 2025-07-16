@@ -48,13 +48,16 @@
 #define FAST_UART_CONFIGURATION 0x28
 #define TICKET_MASK 0x14
 #define MISC_CONTROL 0x18
-
+//error hashcount
 #define BM_NONCE_ERROR_CNT 0x4C
+//seem also to report errors.
 #define BM_UNK_CNT_88 0x88
 #define BM_UNK_CNT_89 0x89
 #define BM_UNK_CNT_8A 0x8A
 #define BM_UNK_CNT_8B 0x8B
+//seems to be buggy falls to 0 after some time
 #define BM_NONCE_TOTAL_CNT 0x8C
+//non error hashcount
 #define BM_UNK_CNT_90 0x90
 #define BM_GOLDEN_NONCE_CNT 0x94
 
@@ -371,10 +374,10 @@ uint8_t BM1370_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty
 float get_hashrate_cnt()
 {
     uint8_t buf[9] = {0};
-    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]) {0x00, BM_NONCE_TOTAL_CNT}, 2, true);
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]) {0x00, BM_UNK_CNT_90}, 2, true);
     int resp = SERIAL_rx(buf, 11, 10);
     int value = (int) ((buf[4] << 8) + buf[5]);
-    ESP_LOGI(TAG, "CNT     %02X: [%02x %02x %02x %02x %02x %02x %02x %02x %02x]", BM_NONCE_TOTAL_CNT, buf[0], buf[1], buf[2],
+    ESP_LOGI(TAG, "CNT     %02X: [%02x %02x %02x %02x %02x %02x %02x %02x %02x]", BM_UNK_CNT_90, buf[0], buf[1], buf[2],
              buf[3], buf[4], buf[5], buf[6], buf[7], buf[8]);
     float hashes = 4.096 * (float) value;
     ESP_LOGW(TAG, "hashes %f", hashes);
@@ -396,7 +399,7 @@ float get_hashrate_error_cnt()
 
 void reset_counters()
 {
-    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]) {0x00, BM_NONCE_TOTAL_CNT, 0x00, 0x00, 0x00, 0x00}, 6, true);
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]) {0x00, BM_UNK_CNT_90, 0x00, 0x00, 0x00, 0x00}, 6, true);
     _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]) {0x00, BM_NONCE_ERROR_CNT, 0x00, 0x00, 0x00, 0x00}, 6, true);
 }
 
@@ -428,33 +431,6 @@ int BM1370_set_max_baud(void)
     return 1000000;
 }
 
-void BM1370_set_job_difficulty_mask(int difficulty)
-{
-    // Default mask of 256 diff
-    unsigned char job_difficulty_mask[9] = {0x00, TICKET_MASK, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
-
-    // The mask must be a power of 2 so there are no holes
-    // Correct:  {0b00000000, 0b00000000, 0b11111111, 0b11111111}
-    // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
-    // (difficulty - 1) if it is a pow 2 then step down to second largest for more hashrate sampling
-    difficulty = _largest_power_of_two(difficulty) - 1;
-
-    // convert difficulty into char array
-    // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
-    // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
-    for (int i = 0; i < 4; i++) {
-        char value = (difficulty >> (8 * i)) & 0xFF;
-        // The char is read in backwards to the register so we need to reverse them
-        // So a mask of 512 looks like 0b00000000 00000000 00000001 1111111
-        // and not 0b00000000 00000000 10000000 1111111
-
-        job_difficulty_mask[5 - i] = _reverse_bits(value);
-    }
-
-    ESP_LOGI(TAG, "Setting ASIC difficulty mask to %d", difficulty);
-
-    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, BM1370_SERIALTX_DEBUG);
-}
 
 static uint8_t id = 0;
 
