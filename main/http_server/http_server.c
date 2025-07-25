@@ -1264,13 +1264,21 @@ esp_err_t POST_autotune_update(httpd_req_t * req)
         nvs_config_set_u16(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, (uint16_t)AUTO_TUNE.auto_tune_hashrate);
     }
 
-    if ((item = cJSON_GetObjectItem(root, "overshot_power_limit")) && cJSON_IsNumber(item)) {
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.overshot_power_limit = item->valuedouble;
         nvs_config_set_u16(NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT, (uint16_t)AUTO_TUNE.overshot_power_limit);
     }
-    if ((item = cJSON_GetObjectItem(root, "overshot_fanspeed")) && cJSON_IsNumber(item)) {
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.overshot_fanspeed = (uint16_t)item->valuedouble;
         nvs_config_set_u16(NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT, (uint16_t)AUTO_TUNE.overshot_fanspeed);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_VF_RATIO_MAX)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.vf_ratio_max = (uint16_t)item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_VF_RATIO_MAX, (uint16_t)AUTO_TUNE.vf_ratio_max);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_VF_RATIO_MIN)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.vf_ratio_min = (uint16_t)item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_VF_RATIO_MIN, (uint16_t)AUTO_TUNE.vf_ratio_min);
     }
 
     cJSON_Delete(root);
