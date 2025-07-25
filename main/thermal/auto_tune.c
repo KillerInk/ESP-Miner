@@ -22,7 +22,10 @@ auto_tune_settings AUTO_TUNE = {.power_limit = 20,
                                 .max_asic_temperatur = 65,
                                 .frequency = 525,
                                 .voltage = 1150,
-                                .auto_tune_hashrate = true};
+                                .auto_tune_hashrate = true,
+                                .overshot_power_limit = 0.2, //watt
+                                .overshot_fanspeed = 5, //%
+};
 
 double last_core_voltage_auto;
 double last_asic_frequency_auto;
@@ -60,6 +63,9 @@ void auto_tune_init()
     AUTO_TUNE.max_frequency_asic = nvs_config_get_u16(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, AUTO_TUNE.max_frequency_asic);
     AUTO_TUNE.max_asic_temperatur = nvs_config_get_u16(NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, AUTO_TUNE.max_asic_temperatur);
     AUTO_TUNE.auto_tune_hashrate = nvs_config_get_u16(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, AUTO_TUNE.auto_tune_hashrate);
+    AUTO_TUNE.overshot_power_limit = nvs_config_get_u16(NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT, AUTO_TUNE.overshot_power_limit);
+    AUTO_TUNE.overshot_fanspeed = nvs_config_get_u16(NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT, AUTO_TUNE.overshot_fanspeed);
+
 
     last_core_voltage_auto = AUTO_TUNE.voltage;
     last_asic_frequency_auto = AUTO_TUNE.frequency;
@@ -91,8 +97,8 @@ bool limithit()
 bool critical_limithit()
 {
     return POWER_MANAGEMENT_MODULE.chip_temp_avg > AUTO_TUNE.max_asic_temperatur ||
-           POWER_MANAGEMENT_MODULE.power >= AUTO_TUNE.power_limit + 0.2 ||
-           POWER_MANAGEMENT_MODULE.fan_perc >= AUTO_TUNE.fan_limit + 5;
+           POWER_MANAGEMENT_MODULE.power >= AUTO_TUNE.power_limit + AUTO_TUNE.overshot_power_limit ||
+           POWER_MANAGEMENT_MODULE.fan_perc >= AUTO_TUNE.fan_limit + AUTO_TUNE.overshot_fanspeed;
 }
 
 bool hashrate_decreased()
