@@ -141,7 +141,7 @@ static void enforce_voltage_frequency_ratio() {
 void increase_values() {
     if (avg_hashrate_auto > 0) {
         // Calculate step based on current and average hashrate
-        double step = freq_step * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
+        double step = freq_step * (current_hashrate_auto / avg_hashrate_auto);
         last_asic_frequency_auto += step;
     }
     enforce_voltage_frequency_ratio();
@@ -150,7 +150,7 @@ void increase_values() {
 void decrease_values() {
     if (avg_hashrate_auto > 0) {
         // Calculate step based on current and average hashrate
-        double step = freq_step * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
+        double step = freq_step * (current_hashrate_auto / avg_hashrate_auto);
         last_asic_frequency_auto -= step;
     }
     enforce_voltage_frequency_ratio();
@@ -159,7 +159,7 @@ void decrease_values() {
 void switchvalue() {
     if (avg_hashrate_auto > 0) {
         // Calculate current step based on current and average hashrate
-        double current_step = freq_step * (SYSTEM_MODULE.current_hashrate / avg_hashrate_auto);
+        double current_step = freq_step * (current_hashrate_auto / avg_hashrate_auto);
 
         if (lastVoltageSet && (last_asic_frequency_auto + current_step > last_asic_frequency_auto)) {
             last_asic_frequency_auto += current_step;
@@ -184,9 +184,7 @@ void respectLimits() {
 }
 
 void dowork() {
-    avg_hashrate_auto = (avg_hashrate_auto == 0) ? SYSTEM_MODULE.current_hashrate :
-                                                               0.99 * avg_hashrate_auto + 0.01 * SYSTEM_MODULE.current_hashrate;
-
+    
     double hashrate_delta = current_hashrate_auto - last_hashrate_auto;
     double base = (last_hashrate_auto == 0) ? 1 : last_hashrate_auto;
     double step_scale = clamp(1.0 + hashrate_delta / base, 0.0, 2.0);
@@ -209,7 +207,7 @@ void dowork() {
 
     ESP_LOGI(TAG, "Hashrate %f Voltage %f Frequency %f", avg_hashrate_auto, last_core_voltage_auto, last_asic_frequency_auto);
 
-    last_hashrate_auto = current_hashrate_auto;
+    
     respectLimits();
     SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
     AUTO_TUNE.voltage = last_core_voltage_auto;
@@ -218,6 +216,8 @@ void dowork() {
 
 void auto_tune(bool pid_control_fanspeed) {
     current_hashrate_auto = SYSTEM_MODULE.current_hashrate;
+    avg_hashrate_auto = (avg_hashrate_auto == 0) ? current_hashrate_auto :
+                                                               0.999 * avg_hashrate_auto + 0.001 * current_hashrate_auto;
 
     switch (state) {
         case sleep_before_warmup:
@@ -253,6 +253,7 @@ void auto_tune(bool pid_control_fanspeed) {
             }
             break;
     }
+    last_hashrate_auto = current_hashrate_auto;
 }
 
 double auto_tune_get_frequency()
