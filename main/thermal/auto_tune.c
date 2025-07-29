@@ -15,8 +15,8 @@ auto_tune_settings AUTO_TUNE = {
     .power_limit = 20,
     .fan_limit = 75,
     .step_volt = 0.1,
-    .step_freq_rampup = 0.5,
-    .step_freq = 0.2,
+    .step_freq_rampup = 0.8,
+    .step_freq = 0.4,
     .autotune_step_frequency = 0,
     .max_voltage_asic = 1400,
     .max_frequency_asic = 1000,
@@ -26,7 +26,7 @@ auto_tune_settings AUTO_TUNE = {
     .auto_tune_hashrate = false,
     .overshot_power_limit = 0.2, // watt
     .overshot_fanspeed = 5,      //%
-    .vf_ratio_max = 2.2,
+    .vf_ratio_max = 2,
     .vf_ratio_min = 1.76,
 };
 
@@ -161,19 +161,6 @@ void decrease_values()
     enforce_voltage_frequency_ratio();
 }
 
-void switchvalue()
-{
-    if (lastVoltageSet) {
-        last_asic_frequency_auto += freq_step;
-        last_core_voltage_auto -= volt_step;
-    } else {
-        last_asic_frequency_auto -= freq_step;
-        last_core_voltage_auto += volt_step;
-    }
-
-    enforce_voltage_frequency_ratio();
-}
-
 void respectLimits()
 {
     last_asic_frequency_auto = clamp(last_asic_frequency_auto, MIN_FREQ, AUTO_TUNE.max_frequency_asic);
@@ -192,13 +179,9 @@ void dowork()
 
     if (hashrate_decreased())
         lastVoltageSet = !lastVoltageSet;
-    if (limithit()) {
-        if (!critical_limithit()) {
-            switchvalue();
-        } else {
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
-            last_core_voltage_auto -= AUTO_TUNE.step_volt;
-        }
+    if (critical_limithit()) {
+        last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
+        last_core_voltage_auto -= AUTO_TUNE.step_volt;
     } else if (can_increase_values()) {
         increase_values();
     } else {
