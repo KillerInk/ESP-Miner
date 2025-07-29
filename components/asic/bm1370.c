@@ -159,39 +159,32 @@ void BM1370_send_hash_frequency(float target_freq)
 
     uint8_t best_fb_divider = 0, best_post_divider1 = 0, best_post_divider2 = 0, best_ref_divider = 0;
     float min_difference = 10.0f;
-    const double max_diff = 1.0;
-    uint8_t smallest_refdiv = UINT8_MAX; // Initialize to the maximum possible value of uint8_t
+    const float max_diff = 1.0f;
 
-    bool find_best_match(bool relaxed_mode, float * min_difference, float * newf, uint8_t * best_fb_divider,
-                         uint8_t * best_post_divider1, uint8_t * best_post_divider2, uint8_t * best_ref_divider, double target_freq)
+    bool find_best_match(bool relaxed_mode, float *min_difference, float *newf, uint8_t *best_fb_divider,
+                         uint8_t *best_post_divider1, uint8_t *best_post_divider2, uint8_t *best_ref_divider, float target_freq)
     {
         float threshold = relaxed_mode ? *min_difference : max_diff;
 
         for (uint8_t refdiv = 1; refdiv <= 2; ++refdiv) {
             for (uint8_t postdiv1 = 1; postdiv1 <= 7; ++postdiv1) {
                 for (uint8_t postdiv2 = 1; postdiv2 <= postdiv1; ++postdiv2) {
-                    double fb_divider_f = postdiv1 * postdiv2 * target_freq * refdiv / 25.0;
+                    float fb_divider_f = postdiv1 * postdiv2 * target_freq * refdiv / 25.0f;
                     int fb_divider = round(fb_divider_f);
 
                     if (fb_divider < 0xA0 || fb_divider > 0xEF)
                         continue;
 
-                    double actual_freq = 25.0 * fb_divider / (refdiv * postdiv1 * postdiv2);
-                    double diff = fabs(target_freq - actual_freq);
+                    float actual_freq = 25.0f * fb_divider / (refdiv * postdiv1 * postdiv2);
+                    float diff = fabsf(target_freq - actual_freq);
 
                     if (diff < *min_difference && diff < threshold) {
                         *best_fb_divider = fb_divider;
                         *best_post_divider1 = postdiv1;
                         *best_post_divider2 = postdiv2;
                         *best_ref_divider = refdiv;
-                        smallest_refdiv = refdiv; // Update the smallest refdiv found
                         *min_difference = diff;
                         *newf = actual_freq;
-
-                        // ESP_LOGI(TAG,
-                        //     "Found better match: fb_divider=%d, postdiv1=%d, postdiv2=%d, refdiv=%d, smallest_refdiv=%d,
-                        //     diff=%.6f", *best_fb_divider, *best_post_divider1, *best_post_divider2, *best_ref_divider,
-                        //     smallest_refdiv, *min_difference);
 
                         return true;
                     }
@@ -210,19 +203,15 @@ void BM1370_send_hash_frequency(float target_freq)
 
         if (!find_best_match(true, &min_difference, &newf, &best_fb_divider, &best_post_divider1, &best_post_divider2,
                              &best_ref_divider, target_freq)) {
-            // ESP_LOGE(TAG, "Failed to find any PLL settings for target frequency %.2f", target_freq);
             return;
         }
-
-        // ESP_LOGW(TAG, "Using next best PLL settings for frequency %.2f (actual %.2f, diff %.2f)", target_freq, newf,
-        //          min_difference);
     }
 
     freqbuf[3] = best_fb_divider;
     freqbuf[4] = best_ref_divider;
     freqbuf[5] = (((best_post_divider1 - 1) & 0xF) << 4) | ((best_post_divider2 - 1) & 0xF);
 
-    if ((best_fb_divider * 25.0 / (float) best_ref_divider) >= 2400.0f) {
+    if ((best_fb_divider * 25.0f / (float) best_ref_divider) >= 2400.0f) {
         freqbuf[2] = 0x50;
     }
 

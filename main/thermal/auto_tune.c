@@ -1,32 +1,33 @@
 #include "auto_tune.h"
 #include "PID.h"
 #include "esp_log.h"
+#include "mining_module.h"
 #include "nvs_config.h"
 #include "power_management_module.h"
 #include "power_management_task.h"
-#include "mining_module.h"
 #include "system_module.h"
-#include <math.h>
 #include <float.h>
+#include <math.h>
 
 static const char * TAG = "auto_tune";
 
-auto_tune_settings AUTO_TUNE = {.power_limit = 20,
-                                .fan_limit = 75,
-                                .step_volt = 0.5,
-                                .step_freq_rampup = 0.5,
-                                .step_freq = 0.5,
-                                .autotune_step_frequency = 0,
-                                .max_voltage_asic = 1400,
-                                .max_frequency_asic = 1000,
-                                .max_asic_temperatur = 65,
-                                .frequency = 525,
-                                .voltage = 1150,
-                                .auto_tune_hashrate = false,
-                                .overshot_power_limit = 0.2, //watt
-                                .overshot_fanspeed = 5, //%
-                                .vf_ratio_max = 2.2,
-                                .vf_ratio_min = 1.76, 
+auto_tune_settings AUTO_TUNE = {
+    .power_limit = 20,
+    .fan_limit = 75,
+    .step_volt = 0.1,
+    .step_freq_rampup = 0.5,
+    .step_freq = 0.2,
+    .autotune_step_frequency = 0,
+    .max_voltage_asic = 1400,
+    .max_frequency_asic = 1000,
+    .max_asic_temperatur = 65,
+    .frequency = 525,
+    .voltage = 1150,
+    .auto_tune_hashrate = false,
+    .overshot_power_limit = 0.2, // watt
+    .overshot_fanspeed = 5,      //%
+    .vf_ratio_max = 2.2,
+    .vf_ratio_min = 1.76,
 };
 
 double last_core_voltage_auto;
@@ -70,7 +71,6 @@ void auto_tune_init()
     AUTO_TUNE.vf_ratio_max = nvs_config_get_double(NVS_CONFIG_KEY_VF_RATIO_MAX, AUTO_TUNE.vf_ratio_max);
     AUTO_TUNE.vf_ratio_min = nvs_config_get_double(NVS_CONFIG_KEY_VF_RATIO_MIN, AUTO_TUNE.vf_ratio_min);
 
-
     last_core_voltage_auto = AUTO_TUNE.voltage;
     last_asic_frequency_auto = AUTO_TUNE.frequency;
     POWER_MANAGEMENT_MODULE.core_voltage = last_core_voltage_auto;
@@ -87,15 +87,14 @@ bool waitForStartUp(bool pid_control_fanspeed)
 
 bool can_increase_values()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc < AUTO_TUNE.fan_limit &&
-           POWER_MANAGEMENT_MODULE.power < AUTO_TUNE.power_limit &&
+    return POWER_MANAGEMENT_MODULE.fan_perc < AUTO_TUNE.fan_limit && POWER_MANAGEMENT_MODULE.power < AUTO_TUNE.power_limit &&
            POWER_MANAGEMENT_MODULE.chip_temp_avg < AUTO_TUNE.max_asic_temperatur;
 }
 
 bool limithit()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc >= AUTO_TUNE.fan_limit || POWER_MANAGEMENT_MODULE.power >= AUTO_TUNE.power_limit ||
-           POWER_MANAGEMENT_MODULE.chip_temp_avg >= AUTO_TUNE.max_asic_temperatur;
+    return POWER_MANAGEMENT_MODULE.fan_perc > AUTO_TUNE.fan_limit || POWER_MANAGEMENT_MODULE.power > AUTO_TUNE.power_limit ||
+           POWER_MANAGEMENT_MODULE.chip_temp_avg > AUTO_TUNE.max_asic_temperatur;
 }
 
 bool critical_limithit()
@@ -110,11 +109,13 @@ bool hashrate_decreased()
     return last_hashrate_auto > current_hashrate_auto;
 }
 
-static inline double clamp(double val, double min, double max) {
+static inline double clamp(double val, double min, double max)
+{
     return (val < min) ? min : ((val > max) ? max : val);
 }
 
-static void enforce_voltage_frequency_ratio() {
+static void enforce_voltage_frequency_ratio()
+{
     double min_voltage = last_asic_frequency_auto * AUTO_TUNE.vf_ratio_min;
     double max_voltage = last_asic_frequency_auto * AUTO_TUNE.vf_ratio_max;
 
@@ -138,66 +139,65 @@ static void enforce_voltage_frequency_ratio() {
     }
 }
 
-void increase_values() {
-    if (avg_hashrate_auto > 0) {
-        // Calculate step based on current and average hashrate
-        double step = freq_step * (current_hashrate_auto / avg_hashrate_auto);
-        last_asic_frequency_auto += step;
-    }
-    enforce_voltage_frequency_ratio();
-}
-
-void decrease_values() {
-    if (avg_hashrate_auto > 0) {
-        // Calculate step based on current and average hashrate
-        double step = freq_step * (current_hashrate_auto / avg_hashrate_auto);
-        last_asic_frequency_auto -= step;
-    }
-    enforce_voltage_frequency_ratio();
-}
-
-void switchvalue() {
-    if (avg_hashrate_auto > 0) {
-        // Calculate current step based on current and average hashrate
-        double current_step = freq_step * (current_hashrate_auto / avg_hashrate_auto);
-
-        if (lastVoltageSet && (last_asic_frequency_auto + current_step > last_asic_frequency_auto)) {
-            last_asic_frequency_auto += current_step;
-            last_core_voltage_auto -= volt_step;
-        } else if (!lastVoltageSet && (last_core_voltage_auto - volt_step < last_core_voltage_auto)) {
-            last_asic_frequency_auto -= current_step;
-            last_core_voltage_auto += volt_step;
-        }
+void increase_values()
+{
+    if (!lastVoltageSet) {
+        last_asic_frequency_auto += freq_step;
+    } else {
+        last_core_voltage_auto += volt_step;
     }
 
     enforce_voltage_frequency_ratio();
-    lastVoltageSet = !lastVoltageSet;
 }
 
-void respectLimits() {
+void decrease_values()
+{
+    if (!lastVoltageSet) {
+        last_asic_frequency_auto -= freq_step;
+    } else {
+        last_core_voltage_auto -= volt_step;
+    }
+
+    enforce_voltage_frequency_ratio();
+}
+
+void switchvalue()
+{
+    if (lastVoltageSet) {
+        last_asic_frequency_auto += freq_step;
+        last_core_voltage_auto -= volt_step;
+    } else {
+        last_asic_frequency_auto -= freq_step;
+        last_core_voltage_auto += volt_step;
+    }
+
+    enforce_voltage_frequency_ratio();
+}
+
+void respectLimits()
+{
     last_asic_frequency_auto = clamp(last_asic_frequency_auto, MIN_FREQ, AUTO_TUNE.max_frequency_asic);
     last_core_voltage_auto = clamp(last_core_voltage_auto, MIN_VOLTAGE, AUTO_TUNE.max_voltage_asic);
 
     if (last_asic_frequency_auto == MIN_FREQ || last_core_voltage_auto == MIN_VOLTAGE) {
-        lastVoltageSet = true;  // Assuming default voltage set to be initial value
+        lastVoltageSet = true; // Assuming default voltage set to be initial value
     }
 }
 
-void dowork() {
-    
-    double hashrate_delta = current_hashrate_auto - last_hashrate_auto;
-    double base = (last_hashrate_auto == 0) ? 1 : last_hashrate_auto;
-    double step_scale = clamp(1.0 + hashrate_delta / base, 0.0, 2.0);
+void dowork()
+{
 
-    freq_step = AUTO_TUNE.autotune_step_frequency * step_scale;
-    volt_step = AUTO_TUNE.step_volt * step_scale;
+    freq_step = AUTO_TUNE.autotune_step_frequency;
+    volt_step = AUTO_TUNE.step_volt;
 
+    if (hashrate_decreased())
+        lastVoltageSet = !lastVoltageSet;
     if (limithit()) {
         if (!critical_limithit()) {
             switchvalue();
         } else {
-            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency * 2;
-            last_core_voltage_auto -= AUTO_TUNE.step_volt * 2;
+            last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
+            last_core_voltage_auto -= AUTO_TUNE.step_volt;
         }
     } else if (can_increase_values()) {
         increase_values();
@@ -207,51 +207,51 @@ void dowork() {
 
     ESP_LOGI(TAG, "Hashrate %f Voltage %f Frequency %f", avg_hashrate_auto, last_core_voltage_auto, last_asic_frequency_auto);
 
-    
     respectLimits();
     SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
     AUTO_TUNE.voltage = last_core_voltage_auto;
     AUTO_TUNE.frequency = last_asic_frequency_auto;
 }
 
-void auto_tune(bool pid_control_fanspeed) {
+void auto_tune(bool pid_control_fanspeed)
+{
     current_hashrate_auto = SYSTEM_MODULE.current_hashrate;
-    avg_hashrate_auto = (avg_hashrate_auto == 0) ? current_hashrate_auto :
-                                                               0.999 * avg_hashrate_auto + 0.001 * current_hashrate_auto;
-
+    avg_hashrate_auto =
+        (avg_hashrate_auto == 0) ? current_hashrate_auto : 0.999 * avg_hashrate_auto + 0.001 * current_hashrate_auto;
+    SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
     switch (state) {
-        case sleep_before_warmup:
-            if (POWER_MANAGEMENT_MODULE.chip_temp_avg == -1) {
-                break;
-            }
-
-            if (waitCounter-- > 0) {
-                ESP_LOGI(TAG, "state sleep_bevor_warmup %i", waitCounter);
-                break;
-            }
-
-            if (waitForStartUp(pid_control_fanspeed)) {
-                state = warmup;
-            }
+    case sleep_before_warmup:
+        if (POWER_MANAGEMENT_MODULE.chip_temp_avg == -1) {
             break;
+        }
 
-        case warmup:
-            AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq_rampup;
-            dowork();
-            if (limithit()) {
-                AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq;
-                state = working;
-            }
+        if (waitCounter-- > 0) {
+            ESP_LOGI(TAG, "state sleep_bevor_warmup %i", waitCounter);
             break;
+        }
 
-        case working:
-            if (limithit() && !critical_limithit()) {
-                break;  // Added this line to stop adjusting when limit is hit
+        if (waitForStartUp(pid_control_fanspeed)) {
+            state = warmup;
+        }
+        break;
 
-            } else {
-                dowork();  // Resume adjustments once limits are no longer breached
-            }
-            break;
+    case warmup:
+        AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq_rampup;
+        dowork();
+        if (limithit()) {
+            AUTO_TUNE.autotune_step_frequency = AUTO_TUNE.step_freq;
+            state = working;
+        }
+        break;
+
+    case working:
+        if (limithit() && !critical_limithit()) {
+            break; // Added this line to stop adjusting when limit is hit
+
+        } else {
+            dowork(); // Resume adjustments once limits are no longer breached
+        }
+        break;
     }
     last_hashrate_auto = current_hashrate_auto;
 }
