@@ -150,17 +150,6 @@ void increase_values()
     enforce_voltage_frequency_ratio();
 }
 
-void decrease_values()
-{
-    if (!lastVoltageSet) {
-        last_asic_frequency_auto -= freq_step;
-    } else {
-        last_core_voltage_auto -= volt_step;
-    }
-
-    enforce_voltage_frequency_ratio();
-}
-
 void respectLimits()
 {
     last_asic_frequency_auto = clamp(last_asic_frequency_auto, MIN_FREQ, AUTO_TUNE.max_frequency_asic);
@@ -181,11 +170,9 @@ void dowork()
         lastVoltageSet = !lastVoltageSet;
     if (critical_limithit()) {
         last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
-        last_core_voltage_auto -= AUTO_TUNE.step_volt;
+        last_core_voltage_auto -= AUTO_TUNE.step_volt * 2;
     } else if (can_increase_values()) {
         increase_values();
-    } else {
-        decrease_values();
     }
 
     ESP_LOGI(TAG, "Hashrate %f Voltage %f Frequency %f", avg_hashrate_auto, last_core_voltage_auto, last_asic_frequency_auto);
