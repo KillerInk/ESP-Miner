@@ -21,6 +21,7 @@ auto_tune_settings AUTO_TUNE = {
     .max_voltage_asic = 1400,
     .max_frequency_asic = 1000,
     .max_asic_temperatur = 65,
+    .max_vr_temperatur = 85,
     .frequency = 525,
     .voltage = 1150,
     .auto_tune_hashrate = false,
@@ -30,11 +31,15 @@ auto_tune_settings AUTO_TUNE = {
     .vf_ratio_min = 1.76,
 };
 
+#define HASHRATE_HISTORY_SIZE 30
 double last_core_voltage_auto;
 double last_asic_frequency_auto;
 double last_hashrate_auto;
 double current_hashrate_auto;
 double avg_hashrate_auto;
+double hashrate_history[HASHRATE_HISTORY_SIZE];
+int history_index = 0;
+bool history_initialized = false;
 
 bool lastVoltageSet = false;
 const int waitTime = 30;
@@ -56,6 +61,21 @@ enum TuneState
 
 enum TuneState state;
 
+void update_hashrate_history(double new_value)
+{
+    // Initialize history if not already done
+    if (!history_initialized) {
+        for (int i = 0; i < HASHRATE_HISTORY_SIZE; i++) {
+            hashrate_history[i] = new_value;
+        }
+        history_initialized = true;
+    }
+
+    // Add new value to circular buffer
+    hashrate_history[history_index] = new_value;
+    history_index = (history_index + 1) % HASHRATE_HISTORY_SIZE;
+}
+
 void auto_tune_init()
 {
     AUTO_TUNE.frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, AUTO_TUNE.frequency);
@@ -70,12 +90,16 @@ void auto_tune_init()
     AUTO_TUNE.overshot_fanspeed = nvs_config_get_u16(NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT, AUTO_TUNE.overshot_fanspeed);
     AUTO_TUNE.vf_ratio_max = nvs_config_get_double(NVS_CONFIG_KEY_VF_RATIO_MAX, AUTO_TUNE.vf_ratio_max);
     AUTO_TUNE.vf_ratio_min = nvs_config_get_double(NVS_CONFIG_KEY_VF_RATIO_MIN, AUTO_TUNE.vf_ratio_min);
-
+    AUTO_TUNE.max_vr_temperatur = nvs_config_get_u16(NVS_CONFIG_KEY_MAX_VR_TEMPERATUR, AUTO_TUNE.max_vr_temperatur);
     last_core_voltage_auto = AUTO_TUNE.voltage;
     last_asic_frequency_auto = AUTO_TUNE.frequency;
     POWER_MANAGEMENT_MODULE.core_voltage = last_core_voltage_auto;
     last_hashrate_auto = SYSTEM_MODULE.current_hashrate;
     current_hashrate_auto = last_hashrate_auto;
+
+    // Initialize hashrate history
+    update_hashrate_history(last_hashrate_auto);
+
     state = sleep_before_warmup;
     waitCounter = 45 * 1000 / POLL_RATE;
 }
@@ -87,26 +111,56 @@ bool waitForStartUp(bool pid_control_fanspeed)
 
 bool can_increase_values()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc < AUTO_TUNE.fan_limit && POWER_MANAGEMENT_MODULE.power < AUTO_TUNE.power_limit &&
-           POWER_MANAGEMENT_MODULE.chip_temp_avg < AUTO_TUNE.max_asic_temperatur;
+    return POWER_MANAGEMENT_MODULE.fan_perc < AUTO_TUNE.fan_limit &&
+           POWER_MANAGEMENT_MODULE.power < AUTO_TUNE.power_limit &&
+           POWER_MANAGEMENT_MODULE.chip_temp_avg < AUTO_TUNE.max_asic_temperatur &&
+           POWER_MANAGEMENT_MODULE.vr_temp < AUTO_TUNE.max_vr_temperatur;
 }
 
 bool limithit()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc > AUTO_TUNE.fan_limit || POWER_MANAGEMENT_MODULE.power > AUTO_TUNE.power_limit ||
+    return POWER_MANAGEMENT_MODULE.fan_perc > AUTO_TUNE.fan_limit ||
+           POWER_MANAGEMENT_MODULE.power > AUTO_TUNE.power_limit ||
            POWER_MANAGEMENT_MODULE.chip_temp_avg > AUTO_TUNE.max_asic_temperatur;
+           
 }
 
 bool critical_limithit()
 {
     return POWER_MANAGEMENT_MODULE.chip_temp_avg > AUTO_TUNE.max_asic_temperatur ||
            POWER_MANAGEMENT_MODULE.power >= AUTO_TUNE.power_limit + AUTO_TUNE.overshot_power_limit ||
-           POWER_MANAGEMENT_MODULE.fan_perc >= AUTO_TUNE.fan_limit + AUTO_TUNE.overshot_fanspeed;
+           POWER_MANAGEMENT_MODULE.fan_perc >= AUTO_TUNE.fan_limit + AUTO_TUNE.overshot_fanspeed ||
+           POWER_MANAGEMENT_MODULE.vr_temp > AUTO_TUNE.max_vr_temperatur;
 }
 
 bool hashrate_decreased()
 {
     return last_hashrate_auto > current_hashrate_auto;
+}
+
+
+
+bool hashrate_increased_since_last_set()
+{
+    if (!history_initialized) {
+        return false; // Not enough data yet
+    }
+
+    int last_set_index = history_index;
+
+    // Check if hashrate increased since that point
+    double last_value = hashrate_history[last_set_index];
+    bool increased = false;
+
+    for (int i = 1; i < HASHRATE_HISTORY_SIZE; i++) {
+        int idx = (last_set_index + i) % HASHRATE_HISTORY_SIZE;
+        if (hashrate_history[idx] > last_value) {
+            increased = true;
+            break;
+        }
+    }
+
+    return increased;
 }
 
 static inline double clamp(double val, double min, double max)
@@ -146,10 +200,8 @@ void increase_values()
     } else {
         last_core_voltage_auto += volt_step;
     }
-
-    
 }
-
+    
 void respectLimits()
 {
     last_asic_frequency_auto = clamp(last_asic_frequency_auto, MIN_FREQ, AUTO_TUNE.max_frequency_asic);
@@ -162,11 +214,16 @@ void respectLimits()
 
 void dowork()
 {
-
     freq_step = AUTO_TUNE.autotune_step_frequency;
     volt_step = AUTO_TUNE.step_volt;
 
-    if (hashrate_decreased())
+    
+
+    // Check if hashrate increased since last voltage/frequency set
+    bool hashrate_increased = hashrate_increased_since_last_set();
+
+    // If hashrate didn't increase, switch the setting
+    if (!hashrate_increased) 
         lastVoltageSet = !lastVoltageSet;
     if (critical_limithit()) {
         last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
@@ -189,6 +246,8 @@ void auto_tune(bool pid_control_fanspeed)
     avg_hashrate_auto =
         (avg_hashrate_auto == 0) ? current_hashrate_auto : 0.999 * avg_hashrate_auto + 0.001 * current_hashrate_auto;
     SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
+    // Update hashrate history with current value
+    update_hashrate_history(current_hashrate_auto);
     switch (state) {
     case sleep_before_warmup:
         if (POWER_MANAGEMENT_MODULE.chip_temp_avg == -1) {
