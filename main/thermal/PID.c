@@ -22,7 +22,7 @@ void pid_init(PIDController *pid, double *input, double *output, double *setpoin
     pid->inAuto = false;
 
     pid_set_output_limits(pid, 0, 255);
-    pid->sampleTime = 100;
+    pid->sampleTime = 500; // Updated sample time
 
     pid_set_controller_direction(pid, ControllerDirection);
     pid_set_tunings_adv(pid, Kp, Ki, Kd, POn);
@@ -83,7 +83,6 @@ bool pid_compute(PIDController *pid) {
 
 void pid_set_tunings_adv(PIDController *pid, double Kp, double Ki, double Kd, PIDProportionalMode POn) {
     if (Kp < 0 || Ki < 0 || Kd < 0) return;
-
     pid->pOn = POn;
     pid->pOnE = (POn == PID_P_ON_E);
 
