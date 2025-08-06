@@ -729,8 +729,6 @@ Chart.register({
             v !== undefined &&
             v !== null &&
             v !== '' &&
-            v !== 'NaN' &&
-            v !== 'NaNundefined' &&
             !(typeof v === 'number' && isNaN(v)) &&
             point &&
             point.x >= visibleMin &&
@@ -765,7 +763,7 @@ Chart.register({
       });
 
       // Prepare label text
-      const getLabelText = (idx: number) => {
+      const getLabelText = (idx: number): string => {
         let value = data[idx];
         const suffix = getSuffix(dataset, value as number);
         switch (dataset.label) {
@@ -780,57 +778,41 @@ Chart.register({
         }
       };
 
-      // Left-most
-      {
-        const idx = firstIndex;
+      const getLabelPoint = (idx: number, type: 'left' | 'right') => {
         const point = meta.data[idx];
-        if (point) {
-          const text = getLabelText(idx);
-          ctx.save();
-          ctx.font = '10px "Segoe UI", Arial, sans-serif';
-          const textWidth = ctx.measureText(text).width;
-          ctx.restore();
-          leftPoints.push({
-            datasetIdx: i,
-            dataIdx: idx,
-            x: point.x,
-            y: point.y + yOffset - rectHeight / 2,
-            value: data[idx],
-            dataset,
-            meta,
-            text,
-            textWidth,
-            rectWidth: textWidth + paddingX * 2,
-            type: 'left'
-          });
-        }
+        if (!point) return null;
+
+        const text = getLabelText(idx);
+        ctx.save();
+        ctx.font = '10px "Segoe UI", Arial, sans-serif';
+        const textWidth = ctx.measureText(text).width;
+        ctx.restore();
+
+        return {
+          datasetIdx: i,
+          dataIdx: idx,
+          x: point.x,
+          y: (type === 'left' ? point.y + yOffset - rectHeight / 2 : point.y - yOffset - rectHeight / 2),
+          value: data[idx],
+          dataset,
+          meta,
+          text,
+          textWidth,
+          rectWidth: textWidth + paddingX * 2,
+          type
+        };
+      };
+
+      const addLabelPoint = (idx: number, points: LabelPoint[], type: 'left' | 'right') => {
+        const point = getLabelPoint(idx, type);
+        if (point) points.push(point);
       }
-      // Right-most
-      {
-        const idx = lastIndex;
-        const point = meta.data[idx];
-        if (point) {
-          const text = getLabelText(idx);
-          ctx.save();
-          ctx.font = '10px "Segoe UI", Arial, sans-serif';
-          const textWidth = ctx.measureText(text).width;
-          ctx.restore();
-          rightPoints.push({
-            datasetIdx: i,
-            dataIdx: idx,
-            x: point.x,
-            y: point.y - yOffset - rectHeight / 2,
-            value: data[idx],
-            dataset,
-            meta,
-            text,
-            textWidth,
-            rectWidth: textWidth + paddingX * 2,
-            type: 'right'
-          });
-        }
-      }
-      // Min (skip if min is left or right)
+
+      // Left-most and Right-most labels
+      addLabelPoint(firstIndex, leftPoints, 'left');
+      addLabelPoint(lastIndex, rightPoints, 'right');
+
+      // Min and Max labels
       if (minIdx !== firstIndex && minIdx !== lastIndex) {
         const point = meta.data[minIdx];
         if (point) {
@@ -839,6 +821,7 @@ Chart.register({
           ctx.font = '10px "Segoe UI", Arial, sans-serif';
           const textWidth = ctx.measureText(text).width;
           ctx.restore();
+
           minPoints.push({
             datasetIdx: i,
             dataIdx: minIdx,
@@ -847,14 +830,14 @@ Chart.register({
             value: data[minIdx],
             dataset,
             meta,
-            text: text,
+            text,
             textWidth,
             rectWidth: textWidth + paddingX * 2,
             type: 'min'
           });
         }
       }
-      // Max (skip if max is left or right)
+
       if (maxIdx !== firstIndex && maxIdx !== lastIndex) {
         const point = meta.data[maxIdx];
         if (point) {
@@ -863,6 +846,7 @@ Chart.register({
           ctx.font = '10px "Segoe UI", Arial, sans-serif';
           const textWidth = ctx.measureText(text).width;
           ctx.restore();
+
           maxPoints.push({
             datasetIdx: i,
             dataIdx: maxIdx,
@@ -871,7 +855,7 @@ Chart.register({
             value: data[maxIdx],
             dataset,
             meta,
-            text: text,
+            text,
             textWidth,
             rectWidth: textWidth + paddingX * 2,
             type: 'max'
@@ -927,29 +911,27 @@ Chart.register({
       ctx.restore();
     }
 
-    // Draw all left-most labels
-    leftPoints.forEach(pt => {
-      const x = pt.x - pt.rectWidth - paddingX;
-      drawLabel(pt, x, pt.y);
-    });
+    // Draw all labels
+    const drawLabels = (points: LabelPoint[], offsetX: number) => {
+      points.forEach(pt => {
+        const x = pt.type === 'left' ? pt.x - pt.rectWidth - paddingX : pt.x + paddingX;
+        drawLabel(pt, x, pt.y);
+      });
+    }
 
-    // Draw all right-most labels
-    rightPoints.forEach(pt => {
-      const x = pt.x + paddingX;
-      drawLabel(pt, x, pt.y);
-    });
+    drawLabels(leftPoints, -1); // Left labels
+    drawLabels(rightPoints, 1); // Right labels
 
-    // Draw all min labels
-    minPoints.forEach(pt => {
-      const x = pt.x - pt.rectWidth / 2;
-      drawLabel(pt, x, pt.y);
-    });
+    // Draw all min and max labels centered
+    const drawCenteredLabels = (points: LabelPoint[]) => {
+      points.forEach(pt => {
+        const x = pt.x - pt.rectWidth / 2;
+        drawLabel(pt, x, pt.y);
+      });
+    }
 
-    // Draw all max labels
-    maxPoints.forEach(pt => {
-      const x = pt.x - pt.rectWidth / 2;
-      drawLabel(pt, x, pt.y);
-    });
+    drawCenteredLabels(minPoints); // Min labels
+    drawCenteredLabels(maxPoints); // Max labels
   }
 });
 
