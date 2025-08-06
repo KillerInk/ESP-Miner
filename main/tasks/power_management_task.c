@@ -1,26 +1,24 @@
+#include <string.h>
 #include "INA260.h"
-#include "PID.h"
-#include "TPS546.h"
-#include "asic.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
 #include "math.h"
 #include "mining.h"
 #include "nvs_config.h"
-#include "power.h"
 #include "serial.h"
-#include "thermal.h"
+#include "TPS546.h"
 #include "vcore.h"
-#include <string.h>
-#include "power_management_task.h"
-#include "device_config.h"
+#include "thermal.h"
+#include "PID.h"
+#include "power.h"
+#include "asic.h"
 #include "power_management_module.h"
 #include "auto_tune.h"
-#include "wifi_module.h"
 #include "state_module.h"
-
+#include "wifi_module.h"
+#include "device_config.h"
+#include "power_management_task.h"
 
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
@@ -48,7 +46,6 @@ bool pid_startup_phase = true;
 int pid_startup_counter = 0;
 double avg_fanspeed = 15;
 
-
 // Hold and Ramp startup D-term
 #define PID_STARTUP_HOLD_DURATION 3  // Number of cycles to HOLD pid_d_startup
 #define PID_STARTUP_RAMP_DURATION 17 // Number of cycles to RAMP DOWN D (Total startup duration PID_STARTUP_HOLD_DURATION + PID_STARTUP_RAMP_DURATION)
@@ -60,7 +57,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
 
-
     pid_setPoint = (double) nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
     min_fan_pct = (double)nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED, min_fan_pct);
 
@@ -71,40 +67,54 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
-    double last_core_voltage = 0.0;
+    uint16_t last_core_voltage = 0.0;
     double last_asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     POWER_MANAGEMENT_MODULE.frequency_value = last_asic_frequency;
     
     auto_tune_init();
-
-    POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     ESP_LOGI(TAG, "ASIC Frequency: %.2fMHz", (float)POWER_MANAGEMENT_MODULE.frequency_value);
-
+    
     while (1) {
 
         // Refresh PID setpoint from NVS in case it was changed via API
-        pid_setPoint = (double) nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
-        
+        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
+
         POWER_MANAGEMENT_MODULE.voltage = Power_get_input_voltage();
         POWER_MANAGEMENT_MODULE.power = Power_get_power();
 
-        POWER_MANAGEMENT_MODULE.fan_rpm = Thermal_get_fan_speed(DEVICE_CONFIG);
+        POWER_MANAGEMENT_MODULE.fan_rpm = Thermal_get_fan_speed();
         POWER_MANAGEMENT_MODULE.chip_temp_avg = Thermal_get_chip_temp();
-
+        
         POWER_MANAGEMENT_MODULE.vr_temp = Power_get_vreg_temp();
+        // Only get second temperature for dual-sensor devices (GAMMA_TURBO)
+        if (Thermal_has_dual_sensors()) {
+            thermal_temps_t temps = Thermal_get_chip_temps();
+            POWER_MANAGEMENT_MODULE.chip_temp_avg = temps.temp1;
+            POWER_MANAGEMENT_MODULE.chip_temp2_avg = temps.temp2;
+        } else {
+            POWER_MANAGEMENT_MODULE.chip_temp2_avg = 0.0f;
+        }
+
 
         // ASIC Thermal Diode will give bad readings if the ASIC is turned off
         // if(POWER_MANAGEMENT_MODULE.voltage < tps546_config.TPS546_INIT_VOUT_MIN){
         //     goto looper;
         // }
 
-        // overheat mode if the voltage regulator or ASIC is too hot
-        if ((POWER_MANAGEMENT_MODULE.vr_temp > TPS546_THROTTLE_TEMP || POWER_MANAGEMENT_MODULE.chip_temp_avg > THROTTLE_TEMP) &&
-            (POWER_MANAGEMENT_MODULE.frequency_value > 50 || POWER_MANAGEMENT_MODULE.voltage > 1000)) {
-            auto_tune_set_auto_tune_hashrate(false);
-            ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", POWER_MANAGEMENT_MODULE.vr_temp, POWER_MANAGEMENT_MODULE.chip_temp_avg);
-            POWER_MANAGEMENT_MODULE.fan_perc = 100;
-            Thermal_set_fan_percent(1);
+        //overheat mode if the voltage regulator or ASIC is too hot
+        bool asic_overheat = POWER_MANAGEMENT_MODULE.chip_temp_avg > THROTTLE_TEMP;
+        
+        // For EMC2103 devices, check second chip temperature
+        if (DEVICE_CONFIG.EMC2103) {
+            asic_overheat = asic_overheat || (POWER_MANAGEMENT_MODULE.chip_temp2_avg > THROTTLE_TEMP);
+        }
+        
+        if ((POWER_MANAGEMENT_MODULE.vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (POWER_MANAGEMENT_MODULE.frequency_value > 50 || POWER_MANAGEMENT_MODULE.voltage > 1000)) {
+            if (DEVICE_CONFIG.EMC2103) {
+                ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC1: %fC ASIC2: %fC", POWER_MANAGEMENT_MODULE.vr_temp, POWER_MANAGEMENT_MODULE.chip_temp_avg, POWER_MANAGEMENT_MODULE.chip_temp2_avg);
+            } else {
+                ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC: %fC", POWER_MANAGEMENT_MODULE.vr_temp, POWER_MANAGEMENT_MODULE.chip_temp_avg);
+            }
 
             // Turn off core voltage
             VCORE_set_voltage(0.0f);
@@ -155,12 +165,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 avg_fanspeed = 0.93 * avg_fanspeed + 0.07 * pid_output;
                 POWER_MANAGEMENT_MODULE.fan_perc = (uint16_t) avg_fanspeed;
                 Thermal_set_fan_percent(avg_fanspeed / 100.0);
-                //ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
-                //         pid_input, pid_setPoint, avg_fanspeed, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
+                ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
+                         pid_input, pid_setPoint, pid_output, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
             } else {
                 if (WIFI_MODULE.ap_enabled) {
-                    ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%",
-                             POWER_MANAGEMENT_MODULE.chip_temp_avg);
+                    ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%", POWER_MANAGEMENT_MODULE.chip_temp_avg);
                     POWER_MANAGEMENT_MODULE.fan_perc = 70;
                     Thermal_set_fan_percent(0.7);
                 } else {
@@ -176,10 +185,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         float core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
         float asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
-        if (!auto_tune_get_auto_tune_hashrate() || !pid_control_fanspeed) {
-            core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-            asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-        } else {
+        if(auto_tune_get_auto_tune_hashrate()) {
             auto_tune(pid_control_fanspeed);
             core_voltage = auto_tune_get_voltage();
             asic_frequency = auto_tune_get_frequency();
@@ -194,19 +200,19 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         if (asic_frequency != last_asic_frequency) {
             ESP_LOGI(TAG, "New ASIC frequency requested: %fMHz (current: %fMHz)", asic_frequency, last_asic_frequency);
-
-            bool success = ASIC_set_frequency((float) asic_frequency);
-
+            
+            bool success = ASIC_set_frequency((float)asic_frequency);
+            
             if (success) {
-                POWER_MANAGEMENT_MODULE.frequency_value = (float) asic_frequency;
+                POWER_MANAGEMENT_MODULE.frequency_value = (float)asic_frequency;
             }
-
+            
             last_asic_frequency = asic_frequency;
         }
 
         // Check for changing of overheat mode
         uint16_t new_overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-
+        
         if (new_overheat_mode != STATE_MODULE.overheat_mode) {
             STATE_MODULE.overheat_mode = new_overheat_mode;
             ESP_LOGI(TAG, "Overheat mode updated to: %d", STATE_MODULE.overheat_mode);

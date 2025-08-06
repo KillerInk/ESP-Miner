@@ -242,7 +242,7 @@ void dowork()
 
 void auto_tune(bool pid_control_fanspeed)
 {
-    current_hashrate_auto = SYSTEM_MODULE.current_hashrate;
+    current_hashrate_auto = SYSTEM_MODULE.hashrate_no_error;
     avg_hashrate_auto =
         (avg_hashrate_auto == 0) ? current_hashrate_auto : 0.999 * avg_hashrate_auto + 0.001 * current_hashrate_auto;
     SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;

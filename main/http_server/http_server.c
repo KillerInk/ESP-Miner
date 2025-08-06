@@ -42,6 +42,7 @@
 #include "auto_tune.h"
 #include "system.h"
 #include "power_management_module.h"
+#include "websocket.h"
 #include "system_module.h"
 #include "device_config.h"
 #include "wifi_module.h"
@@ -56,14 +57,16 @@ static const char * CORS_TAG = "CORS";
 
 static char axeOSVersion[32];
 
+static httpd_handle_t server = NULL;
+
 /* Handler for WiFi scan endpoint */
-static esp_err_t GET_wifi_scan(httpd_req_t * req)
+static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/json");
-
+    
     // Give some time for the connected flag to take effect
     vTaskDelay(100 / portTICK_PERIOD_MS);
-
+    
     wifi_ap_record_simple_t ap_records[20];
     uint16_t ap_count = 0;
 
@@ -73,12 +76,12 @@ static esp_err_t GET_wifi_scan(httpd_req_t * req)
         return ESP_OK;
     }
 
-    cJSON * root = cJSON_CreateObject();
-    cJSON * networks = cJSON_CreateArray();
+    cJSON *root = cJSON_CreateObject();
+    cJSON *networks = cJSON_CreateArray();
 
     for (int i = 0; i < ap_count; i++) {
-        cJSON * network = cJSON_CreateObject();
-        cJSON_AddStringToObject(network, "ssid", (char *) ap_records[i].ssid);
+        cJSON *network = cJSON_CreateObject();
+        cJSON_AddStringToObject(network, "ssid", (char *)ap_records[i].ssid);
         cJSON_AddNumberToObject(network, "rssi", ap_records[i].rssi);
         cJSON_AddNumberToObject(network, "authmode", ap_records[i].authmode);
         cJSON_AddItemToArray(networks, network);
@@ -86,17 +89,13 @@ static esp_err_t GET_wifi_scan(httpd_req_t * req)
 
     cJSON_AddItemToObject(root, "networks", networks);
 
-    const char * response = cJSON_Print(root);
+    const char *response = cJSON_Print(root);
     httpd_resp_sendstr(req, response);
 
-    free((void *) response);
+    free((void *)response);
     cJSON_Delete(root);
     return ESP_OK;
 }
-static httpd_handle_t server = NULL;
-QueueHandle_t log_queue = NULL;
-
-static int fd = -1;
 
 #define REST_CHECK(a, str, goto_tag, ...)                                                                                          \
     do {                                                                                                                           \
@@ -118,8 +117,7 @@ typedef struct rest_server_context
 
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
-static esp_err_t ip_in_private_range(uint32_t address)
-{
+static esp_err_t ip_in_private_range(uint32_t address) {
     uint32_t ip_address = ntohl(address);
 
     // 10.0.0.0 - 10.255.255.255 (Class A)
@@ -140,20 +138,20 @@ static esp_err_t ip_in_private_range(uint32_t address)
     return ESP_FAIL;
 }
 
-static uint32_t extract_origin_ip_addr(char * origin)
+static uint32_t extract_origin_ip_addr(char *origin)
 {
     char ip_str[16];
     uint32_t origin_ip_addr = 0;
 
     // Find the start of the IP address in the Origin header
-    const char * prefix = "http://";
-    char * ip_start = strstr(origin, prefix);
+    const char *prefix = "http://";
+    char *ip_start = strstr(origin, prefix);
     if (ip_start) {
         ip_start += strlen(prefix); // Move past "http://"
 
         // Extract the IP address portion (up to the next '/')
-        char * ip_end = strchr(ip_start, '/');
-        size_t ip_len = ip_end ? (size_t) (ip_end - ip_start) : strlen(ip_start);
+        char *ip_end = strchr(ip_start, '/');
+        size_t ip_len = ip_end ? (size_t)(ip_end - ip_start) : strlen(ip_start);
         if (ip_len < sizeof(ip_str)) {
             strncpy(ip_str, ip_start, ip_len);
             ip_str[ip_len] = '\0'; // Null-terminate the string
@@ -182,10 +180,10 @@ esp_err_t is_network_allowed(httpd_req_t * req)
 
     int sockfd = httpd_req_to_sockfd(req);
     char ipstr[INET6_ADDRSTRLEN];
-    struct sockaddr_in6 addr; // esp_http_server uses IPv6 addressing
+    struct sockaddr_in6 addr;   // esp_http_server uses IPv6 addressing
     socklen_t addr_size = sizeof(addr);
 
-    if (getpeername(sockfd, (struct sockaddr *) &addr, &addr_size) < 0) {
+    if (getpeername(sockfd, (struct sockaddr *)&addr, &addr_size) < 0) {
         ESP_LOGE(CORS_TAG, "Error getting client IP");
         return ESP_FAIL;
     }
@@ -299,7 +297,6 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
 
 esp_err_t set_cors_headers(httpd_req_t * req)
 {
-
     esp_err_t err;
 
     err = httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -330,7 +327,7 @@ static esp_err_t rest_recovery_handler(httpd_req_t * req)
     extern const unsigned char recovery_page_start[] asm("_binary_recovery_page_html_start");
     extern const unsigned char recovery_page_end[] asm("_binary_recovery_page_html_end");
     const size_t recovery_page_size = (recovery_page_end - recovery_page_start);
-    httpd_resp_send_chunk(req, (const char *) recovery_page_start, recovery_page_size);
+    httpd_resp_send_chunk(req, (const char*)recovery_page_start, recovery_page_size);
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
@@ -442,7 +439,6 @@ static esp_err_t handle_options_request(httpd_req_t * req)
 
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
-
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
@@ -585,7 +581,7 @@ static esp_err_t POST_restart(httpd_req_t * req)
     ESP_LOGI(TAG, "Restarting System because of API Request");
 
     // Send HTTP response before restarting
-    const char * resp_str = "System will restart shortly.";
+    const char* resp_str = "System will restart shortly.";
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
 
     // Delay to ensure the response is sent
@@ -636,6 +632,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "voltage", POWER_MANAGEMENT_MODULE.voltage);
     cJSON_AddNumberToObject(root, "current", Power_get_current());
     cJSON_AddNumberToObject(root, "temp", POWER_MANAGEMENT_MODULE.chip_temp_avg);
+    cJSON_AddNumberToObject(root, "temp2", POWER_MANAGEMENT_MODULE.chip_temp2_avg);
     cJSON_AddNumberToObject(root, "vrTemp", POWER_MANAGEMENT_MODULE.vr_temp);
     cJSON_AddNumberToObject(root, "maxPower", DEVICE_CONFIG.family.max_power);
     cJSON_AddNumberToObject(root, "nominalVoltage", DEVICE_CONFIG.family.nominal_voltage);
@@ -664,7 +661,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "sharesAccepted", SYSTEM_MODULE.shares_accepted);
     cJSON_AddNumberToObject(root, "sharesRejected", SYSTEM_MODULE.shares_rejected);
 
-    cJSON * error_array = cJSON_CreateArray();
+    cJSON *error_array = cJSON_CreateArray();
     cJSON_AddItemToObject(root, "sharesRejectedReasons", error_array);
 
     for (int i = 0; i < SYSTEM_MODULE.rejected_reason_stats_count; i++) {
@@ -725,15 +722,15 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(stratumUser);
     free(fallbackStratumUser);
     free(display);
-    
+
     const char * sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free((char *) sys_info);
+    free((char *)sys_info);
     cJSON_Delete(root);
     return ESP_OK;
 }
 
-int create_json_statistics_all(cJSON *root)
+int create_json_statistics_all(cJSON * root)
 {
     int prebuffer = 0;
     if (root)
@@ -763,8 +760,7 @@ int create_json_statistics_all(cJSON *root)
             StatisticsNodePtr node = *STATISTICS_MODULE.statisticsList; // double pointer
             struct StatisticsData statsData;
 
-            while (NULL != node)
-            {
+            while (NULL != node) {
                 node = statisticData(node, &statsData);
                 cJSON *valueArray = cJSON_CreateArray();
                 if (valueArray == NULL)
@@ -799,6 +795,7 @@ int create_json_statistics_all(cJSON *root)
             }
         }
     }
+
     return prebuffer;
 }
 
@@ -817,7 +814,7 @@ int create_json_statistics_dashboard(cJSON * root)
             while (NULL != node) {
                 node = statisticData(node, &statsData);
 
-                cJSON * valueArray = cJSON_CreateArray();
+                cJSON *valueArray = cJSON_CreateArray();
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
@@ -862,7 +859,7 @@ esp_err_t GET_system_statistics(httpd_req_t * req)
 
     const char * response = cJSON_PrintBuffered(root, (JSON_ALL_STATS_ELEMENT_SIZE * prebuffer), 0); // unformatted
     httpd_resp_sendstr(req, response);
-    free((void *) response);
+    free((void *)response);
 
     cJSON_Delete(root);
 
@@ -891,7 +888,7 @@ esp_err_t GET_system_statistics_dashboard(httpd_req_t * req)
 
     const char * response = cJSON_PrintBuffered(root, (JSON_DASHBOARD_STATS_ELEMENT_SIZE * prebuffer), 0); // unformatted
     httpd_resp_sendstr(req, response);
-    free((void *) response);
+    free((void *)response);
 
     cJSON_Delete(root);
 
@@ -906,7 +903,8 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
 
     wifi_mode_t mode;
     esp_wifi_get_mode(&mode);
-    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
+    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
+    {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
         return ESP_OK;
     }
@@ -978,7 +976,8 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
     wifi_mode_t mode;
     esp_wifi_get_mode(&mode);
-    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
+    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
+    {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
         return ESP_OK;
     }
@@ -1040,86 +1039,6 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     return ESP_OK;
 }
 
-int log_to_queue(const char * format, va_list args)
-{
-    va_list args_copy;
-    va_copy(args_copy, args);
-
-    // Calculate the required buffer size
-    int needed_size = vsnprintf(NULL, 0, format, args_copy) + 1;
-    va_end(args_copy);
-
-    // Allocate the buffer dynamically
-    char * log_buffer = (char *) calloc(needed_size + 2, sizeof(char)); // +2 for potential \n and \0
-    if (log_buffer == NULL) {
-        return 0;
-    }
-
-    // Format the string into the allocated buffer
-    va_copy(args_copy, args);
-    vsnprintf(log_buffer, needed_size, format, args_copy);
-    va_end(args_copy);
-
-    // Ensure the log message ends with a newline
-    size_t len = strlen(log_buffer);
-    if (len > 0 && log_buffer[len - 1] != '\n') {
-        log_buffer[len] = '\n';
-        log_buffer[len + 1] = '\0';
-        len++;
-    }
-
-    // Print to standard output
-    printf("%s", log_buffer);
-
-    if (xQueueSendToBack(log_queue, (void *) &log_buffer, (TickType_t) 0) != pdPASS) {
-        if (log_buffer != NULL) {
-            free((void *) log_buffer);
-        }
-    }
-
-    return 0;
-}
-
-void send_log_to_websocket(char * message)
-{
-    // Prepare the WebSocket frame
-    httpd_ws_frame_t ws_pkt;
-    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-    ws_pkt.payload = (uint8_t *) message;
-    ws_pkt.len = strlen(message);
-    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-
-    // Ensure server and fd are valid
-    if (server != NULL && fd >= 0) {
-        // Send the WebSocket frame asynchronously
-        if (httpd_ws_send_frame_async(server, fd, &ws_pkt) != ESP_OK) {
-            esp_log_set_vprintf(vprintf);
-        }
-    }
-
-    // Free the allocated buffer
-    free((void *) message);
-}
-
-/*
- * This handler echos back the received ws data
- * and triggers an async send if certain message received
- */
-esp_err_t echo_handler(httpd_req_t * req)
-{
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-    }
-
-    if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "Handshake done, the new connection was opened");
-        fd = httpd_req_to_sockfd(req);
-        esp_log_set_vprintf(log_to_queue);
-        return ESP_OK;
-    }
-    return ESP_OK;
-}
-
 // HTTP Error (404) Handler - Redirects all requests to the root page
 esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
 {
@@ -1132,28 +1051,6 @@ esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
 
     ESP_LOGI(TAG, "Redirecting to root");
     return ESP_OK;
-}
-
-void websocket_log_handler()
-{
-    while (true) {
-        char * message;
-        if (xQueueReceive(log_queue, &message, (TickType_t) portMAX_DELAY) != pdPASS) {
-            if (message != NULL) {
-                free((void *) message);
-            }
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-            continue;
-        }
-
-        if (fd == -1) {
-            free((void *) message);
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-            continue;
-        }
-
-        send_log_to_websocket(message);
-    }
 }
 
 esp_err_t GET_autotune_info(httpd_req_t * req)
@@ -1291,61 +1188,94 @@ esp_err_t start_rest_server()
     REST_CHECK(rest_context, "No memory for rest context", err);
     strlcpy(rest_context->base_path, base_path, sizeof(rest_context->base_path));
 
-    log_queue = xQueueCreate(MESSAGE_QUEUE_SIZE, sizeof(char *));
-
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 16384;
-    config.max_open_sockets = 10;
+    config.max_open_sockets = 20;
     config.max_uri_handlers = 20;
+    config.close_fn = websocket_close_fn;
+    config.lru_purge_enable = true;
 
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
 
     httpd_uri_t recovery_explicit_get_uri = {
-        .uri = "/recovery", .method = HTTP_GET, .handler = rest_recovery_handler, .user_ctx = rest_context};
+        .uri = "/recovery", 
+        .method = HTTP_GET, 
+        .handler = rest_recovery_handler, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &recovery_explicit_get_uri);
-
+    
     // Register theme API endpoints
     ESP_ERROR_CHECK(register_theme_api_endpoints(server, rest_context));
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
-        .uri = "/api/system/info", .method = HTTP_GET, .handler = GET_system_info, .user_ctx = rest_context};
+        .uri = "/api/system/info", 
+        .method = HTTP_GET, 
+        .handler = GET_system_info, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &system_info_get_uri);
 
     /* URI handler for fetching system asic values */
     httpd_uri_t system_asic_get_uri = {
-        .uri = "/api/system/asic", .method = HTTP_GET, .handler = GET_system_asic, .user_ctx = rest_context};
+        .uri = "/api/system/asic", 
+        .method = HTTP_GET, 
+        .handler = GET_system_asic, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &system_asic_get_uri);
 
     /* URI handler for fetching system statistic values */
     httpd_uri_t system_statistics_get_uri = {
-        .uri = "/api/system/statistics", .method = HTTP_GET, .handler = GET_system_statistics, .user_ctx = rest_context};
+        .uri = "/api/system/statistics", 
+        .method = HTTP_GET, 
+        .handler = GET_system_statistics, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &system_statistics_get_uri);
 
     /* URI handler for fetching system statistic values for dashboard */
-    httpd_uri_t system_statistics_dashboard_get_uri = {.uri = "/api/system/statistics/dashboard",
-                                                       .method = HTTP_GET,
-                                                       .handler = GET_system_statistics_dashboard,
-                                                       .user_ctx = rest_context};
+    httpd_uri_t system_statistics_dashboard_get_uri = {
+        .uri = "/api/system/statistics/dashboard", 
+        .method = HTTP_GET, 
+        .handler = GET_system_statistics_dashboard, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &system_statistics_dashboard_get_uri);
 
     /* URI handler for WiFi scan */
     httpd_uri_t wifi_scan_get_uri = {
-        .uri = "/api/system/wifi/scan", .method = HTTP_GET, .handler = GET_wifi_scan, .user_ctx = rest_context};
+        .uri = "/api/system/wifi/scan",
+        .method = HTTP_GET,
+        .handler = GET_wifi_scan,
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &wifi_scan_get_uri);
 
     httpd_uri_t system_restart_uri = {
-        .uri = "/api/system/restart", .method = HTTP_POST, .handler = POST_restart, .user_ctx = rest_context};
+        .uri = "/api/system/restart", .method = HTTP_POST, 
+        .handler = POST_restart, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &system_restart_uri);
 
     httpd_uri_t system_restart_options_uri = {
-        .uri = "/api/system/restart", .method = HTTP_OPTIONS, .handler = handle_options_request, .user_ctx = NULL};
+        .uri = "/api/system/restart", 
+        .method = HTTP_OPTIONS, 
+        .handler = handle_options_request, 
+        .user_ctx = NULL
+    };
     httpd_register_uri_handler(server, &system_restart_options_uri);
 
     httpd_uri_t update_system_settings_uri = {
-        .uri = "/api/system", .method = HTTP_PATCH, .handler = PATCH_update_settings, .user_ctx = rest_context};
+        .uri = "/api/system", 
+        .method = HTTP_PATCH, 
+        .handler = PATCH_update_settings, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &update_system_settings_uri);
 
     httpd_uri_t system_options_uri = {
@@ -1357,14 +1287,28 @@ esp_err_t start_rest_server()
     httpd_register_uri_handler(server, &system_options_uri);
 
     httpd_uri_t update_post_ota_firmware = {
-        .uri = "/api/system/OTA", .method = HTTP_POST, .handler = POST_OTA_update, .user_ctx = NULL};
+        .uri = "/api/system/OTA", 
+        .method = HTTP_POST, 
+        .handler = POST_OTA_update, 
+        .user_ctx = NULL
+    };
     httpd_register_uri_handler(server, &update_post_ota_firmware);
 
     httpd_uri_t update_post_ota_www = {
-        .uri = "/api/system/OTAWWW", .method = HTTP_POST, .handler = POST_WWW_update, .user_ctx = NULL};
+        .uri = "/api/system/OTAWWW", 
+        .method = HTTP_POST, 
+        .handler = POST_WWW_update, 
+        .user_ctx = NULL
+    };
     httpd_register_uri_handler(server, &update_post_ota_www);
 
-    httpd_uri_t ws = {.uri = "/api/ws", .method = HTTP_GET, .handler = echo_handler, .user_ctx = NULL, .is_websocket = true};
+    httpd_uri_t ws = {
+        .uri = "/api/ws", 
+        .method = HTTP_GET, 
+        .handler = websocket_handler, 
+        .user_ctx = NULL, 
+        .is_websocket = true
+    };
     httpd_register_uri_handler(server, &ws);
 
     httpd_uri_t autotune_get_uri = {
@@ -1383,11 +1327,13 @@ esp_err_t start_rest_server()
     };
     httpd_register_uri_handler(server, &autotune_post_uri);
 
-
     if (enter_recovery) {
         /* Make default route serve Recovery */
         httpd_uri_t recovery_implicit_get_uri = {
-            .uri = "/*", .method = HTTP_GET, .handler = rest_recovery_handler, .user_ctx = rest_context};
+            .uri = "/*", .method = HTTP_GET, 
+            .handler = rest_recovery_handler, 
+            .user_ctx = rest_context
+        };
         httpd_register_uri_handler(server, &recovery_implicit_get_uri);
 
     } else {
@@ -1400,14 +1346,18 @@ esp_err_t start_rest_server()
         httpd_register_uri_handler(server, &api_common_uri);
         /* URI handler for getting web server files */
         httpd_uri_t common_get_uri = {
-            .uri = "/*", .method = HTTP_GET, .handler = rest_common_get_handler, .user_ctx = rest_context};
+            .uri = "/*", 
+            .method = HTTP_GET, 
+            .handler = rest_common_get_handler, 
+            .user_ctx = rest_context
+        };
         httpd_register_uri_handler(server, &common_get_uri);
     }
 
     httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
 
     // Start websocket log handler thread
-    xTaskCreate(&websocket_log_handler, "websocket_log_handler", 4096, NULL, 2, NULL);
+    xTaskCreate(websocket_task, "websocket_task", 4096, server, 2, NULL);
 
     // Start the DNS server that will redirect all queries to the softAP IP
     dns_server_config_t dns_config = DNS_SERVER_CONFIG_SINGLE("*" /* all A queries */, "WIFI_AP_DEF" /* softAP netif ID */);

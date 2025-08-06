@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MINING_MODULE_H_
+#define MINING_MODULE_H_
 
 #include <pthread.h>
 #include <stdbool.h>
@@ -82,12 +83,7 @@ typedef struct{
      */
     bool new_stratum_version_rolling_msg;
 
-    //maybe need a stratum module
-    int sock;
-
-    // A message ID that must be unique per request that expects a response.
-    // For requests not expecting a response (called notifications), this is null.
-    int send_uid;
 }mining_queues;
 
 extern mining_queues MINING_MODULE;
+#endif

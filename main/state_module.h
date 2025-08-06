@@ -1,4 +1,5 @@
-#pragma once
+#ifndef STATE_MODULE_H_
+#define STATE_MODULE_H_
 
 typedef struct
 {
@@ -11,8 +12,7 @@ typedef struct
     // Status information about power faults encountered by the device.
     uint16_t power_fault;
 
-    // Timestamp of the last clock synchronization event.
-    uint32_t lastClockSync;
+ 
 
     // A flag indicating whether the screen is currently active.
     bool is_screen_active;
@@ -37,3 +37,4 @@ typedef struct
 }StateModule;
 
 extern StateModule STATE_MODULE;
+#endif

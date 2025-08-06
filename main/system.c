@@ -46,20 +46,45 @@ static esp_err_t ensure_overheat_mode_config();
 static void _check_for_best_diff( double diff, uint8_t job_id);
 static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 
+typedef struct
+{
+    // The starting time for a certain period of mining activity.
+    double duration_start;
+
+    // The index to keep track of the rolling historical hashrate data.
+    int historical_hashrate_rolling_index;
+
+    // An array to store timestamps corresponding to historical hashrate values.
+    double historical_hashrate_time_stamps[HISTORY_LENGTH];
+
+    // An array to store historical hashrate values over a defined period.
+    double historical_hashrate[HISTORY_LENGTH];
+
+    // A flag indicating if the historical hashrate data is initialized.
+    int historical_hashrate_init;
+
+    
+} HashHistory;
+HashHistory HASH_HISTORY;
+
+// Timestamp of the last clock synchronization event.
+uint32_t lastClockSync;
+
+// The difficulty (nonce) for the best solution found during mining.
+uint64_t best_nonce_diff;
 void SYSTEM_init_system()
 {
 
-    SYSTEM_MODULE.duration_start = 0;
-    SYSTEM_MODULE.historical_hashrate_rolling_index = 0;
-    SYSTEM_MODULE.historical_hashrate_init = 0;
+    HASH_HISTORY.duration_start = 0;
+    HASH_HISTORY.historical_hashrate_rolling_index = 0;
+    HASH_HISTORY.historical_hashrate_init = 0;
     SYSTEM_MODULE.current_hashrate = 0;
-    SYSTEM_MODULE.screen_page = 0;
     SYSTEM_MODULE.shares_accepted = 0;
     SYSTEM_MODULE.shares_rejected = 0;
-    SYSTEM_MODULE.best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     SYSTEM_MODULE.best_session_nonce_diff = 0;
+    best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     SYSTEM_MODULE.start_time = esp_timer_get_time();
-    STATE_MODULE.lastClockSync = 0;
+    lastClockSync = 0;
     STATE_MODULE.FOUND_BLOCK = false;
     
     // set the pool url
@@ -97,8 +122,8 @@ void SYSTEM_init_system()
     STATE_MODULE.power_fault = 0;
 
     // set the best diff string
-    _suffix_string(SYSTEM_MODULE.best_nonce_diff, SYSTEM_MODULE.best_diff_string, DIFF_STRING_SIZE, 0);
     _suffix_string(SYSTEM_MODULE.best_session_nonce_diff, SYSTEM_MODULE.best_session_diff_string, DIFF_STRING_SIZE, 0);
+    _suffix_string(best_nonce_diff, SYSTEM_MODULE.best_diff_string, DIFF_STRING_SIZE, 0);
 }
 
 esp_err_t SYSTEM_init_peripherals() {
@@ -106,7 +131,7 @@ esp_err_t SYSTEM_init_peripherals() {
     ESP_RETURN_ON_ERROR(gpio_install_isr_service(0), TAG, "Error installing ISR service");
 
     // Initialize the core voltage regulator
-    ESP_RETURN_ON_ERROR(VCORE_init(NULL), TAG, "VCORE init failed!");
+    ESP_RETURN_ON_ERROR(VCORE_init(), TAG, "VCORE init failed!");
     ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
 
     ESP_RETURN_ON_ERROR(Thermal_init(DEVICE_CONFIG), TAG, "Thermal init failed!");
@@ -116,11 +141,11 @@ esp_err_t SYSTEM_init_peripherals() {
     // Ensure overheat_mode config exists
     ESP_RETURN_ON_ERROR(ensure_overheat_mode_config(), TAG, "Failed to ensure overheat_mode config");
 
-    ESP_RETURN_ON_ERROR(display_init(NULL), TAG, "Display init failed!");
+    ESP_RETURN_ON_ERROR(display_init(), TAG, "Display init failed!");
 
     ESP_RETURN_ON_ERROR(input_init(screen_next, toggle_wifi_softap), TAG, "Input init failed!");
 
-    ESP_RETURN_ON_ERROR(screen_start(NULL), TAG, "Screen start failed!");
+    ESP_RETURN_ON_ERROR(screen_start(), TAG, "Screen start failed!");
 
     return ESP_OK;
 }
@@ -165,17 +190,17 @@ void SYSTEM_notify_rejected_share(char * error_msg)
 
 void SYSTEM_notify_mining_started()
 {
-    SYSTEM_MODULE.duration_start = esp_timer_get_time();
+    HASH_HISTORY.duration_start = esp_timer_get_time();
 }
 
 void SYSTEM_notify_new_ntime( uint32_t ntime)
 {
     // Hourly clock sync
-    if (STATE_MODULE.lastClockSync + (60 * 60) > ntime) {
+    if (lastClockSync + (60 * 60) > ntime) {
         return;
     }
     ESP_LOGI(TAG, "Syncing clock");
-    STATE_MODULE.lastClockSync = ntime;
+    lastClockSync = ntime;
     struct timeval tv;
     tv.tv_sec = ntime;
     tv.tv_usec = 0;
@@ -187,29 +212,29 @@ void SYSTEM_notify_found_nonce(double found_diff, uint8_t job_id)
     // Calculate the time difference in seconds with sub-second precision
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
 
-    SYSTEM_MODULE.historical_hashrate[SYSTEM_MODULE.historical_hashrate_rolling_index] = DEVICE_CONFIG.family.asic.difficulty;
-    SYSTEM_MODULE.historical_hashrate_time_stamps[SYSTEM_MODULE.historical_hashrate_rolling_index] = esp_timer_get_time();
+    HASH_HISTORY.historical_hashrate[HASH_HISTORY.historical_hashrate_rolling_index] = DEVICE_CONFIG.family.asic.difficulty;
+    HASH_HISTORY.historical_hashrate_time_stamps[HASH_HISTORY.historical_hashrate_rolling_index] = esp_timer_get_time();
 
-    SYSTEM_MODULE.historical_hashrate_rolling_index = (SYSTEM_MODULE.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
+    HASH_HISTORY.historical_hashrate_rolling_index = (HASH_HISTORY.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
 
     // ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration,
     // historical_hashrate[historical_hashrate_rolling_index]);
 
-    if (SYSTEM_MODULE.historical_hashrate_init < HISTORY_LENGTH) {
-        SYSTEM_MODULE.historical_hashrate_init++;
+    if (HASH_HISTORY.historical_hashrate_init < HISTORY_LENGTH) {
+        HASH_HISTORY.historical_hashrate_init++;
     } else {
-        SYSTEM_MODULE.duration_start =
-            SYSTEM_MODULE.historical_hashrate_time_stamps[(SYSTEM_MODULE.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
+        HASH_HISTORY.duration_start =
+            HASH_HISTORY.historical_hashrate_time_stamps[(HASH_HISTORY.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
     }
     double sum = 0;
-    for (int i = 0; i < SYSTEM_MODULE.historical_hashrate_init; i++) {
-        sum += SYSTEM_MODULE.historical_hashrate[i];
+    for (int i = 0; i < HASH_HISTORY.historical_hashrate_init; i++) {
+        sum += HASH_HISTORY.historical_hashrate[i];
     }
 
-    double duration = (double) (esp_timer_get_time() - SYSTEM_MODULE.duration_start) / 1000000;
+    double duration = (double) (esp_timer_get_time() - HASH_HISTORY.duration_start) / 1000000;
 
     double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
-    if (SYSTEM_MODULE.historical_hashrate_init < HISTORY_LENGTH) {
+    if (HASH_HISTORY.historical_hashrate_init < HISTORY_LENGTH) {
         SYSTEM_MODULE.current_hashrate = rolling_rate;
     } else {
         // More smoothing
@@ -248,12 +273,12 @@ static void _check_for_best_diff( double diff, uint8_t job_id)
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
     }
 
-    if ((uint64_t) diff <= SYSTEM_MODULE.best_nonce_diff) {
+    if ((uint64_t) diff <= best_nonce_diff) {
         return;
     }
-    SYSTEM_MODULE.best_nonce_diff = (uint64_t) diff;
+    best_nonce_diff = (uint64_t) diff;
 
-    nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, SYSTEM_MODULE.best_nonce_diff);
+    nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, best_nonce_diff);
 
     // make the best_nonce_diff into a string
     _suffix_string((uint64_t) diff, SYSTEM_MODULE.best_diff_string, DIFF_STRING_SIZE, 0);

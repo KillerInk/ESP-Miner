@@ -5,12 +5,14 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
+#define THERMAL_MAX_SENSORS 2
+
 typedef enum
 {
-    BM1397 = 0,
-    BM1366 = 1,
-    BM1368 = 2,
-    BM1370 = 3,
+    BM1397,
+    BM1366,
+    BM1368,
+    BM1370,
 } Asic;
 
 typedef struct {

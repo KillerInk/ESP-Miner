@@ -39,6 +39,12 @@ void create_jobs_task(void * pvParameters)
             difficulty = POOL_MODULE.pool_difficulty;
         }
 
+        if (MINING_MODULE.new_stratum_version_rolling_msg) {
+            ESP_LOGI(TAG, "Set chip version rolls %i", (int)(MINING_MODULE.version_mask >> 13));
+            ASIC_set_version_mask(MINING_MODULE.version_mask);
+            MINING_MODULE.new_stratum_version_rolling_msg = false;
+        }
+
         uint32_t extranonce_2 = 0;
         while (MINING_MODULE.stratum_queue.count < 1 && MINING_MODULE.abandon_work == 0) {
             if (should_generate_more_work()) {
@@ -46,7 +52,9 @@ void create_jobs_task(void * pvParameters)
 
                 // Increase extranonce_2 for the next job.
                 extranonce_2++;
-            } else {
+            }
+            else
+            {
                 // If no more work needed, wait a bit before checking again.
                 vTaskDelay(100 / portTICK_PERIOD_MS);
             }
@@ -83,8 +91,7 @@ static void generate_work(mining_notify * notification, uint32_t extranonce_2, u
         return;
     }
 
-    char * merkle_root =
-        calculate_merkle_root_hash(coinbase_tx, (uint8_t (*)[32]) notification->merkle_branches, notification->n_merkle_branches);
+    char *merkle_root = calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])notification->merkle_branches, notification->n_merkle_branches);
     if (merkle_root == NULL) {
         ESP_LOGE(TAG, "Failed to calculate merkle_root");
         free(extranonce_2_str);
