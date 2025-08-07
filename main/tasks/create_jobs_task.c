@@ -63,7 +63,8 @@ void create_jobs_task(void * pvParameters)
         if (MINING_MODULE.abandon_work == 1) {
             MINING_MODULE.abandon_work = 0;
             ASIC_jobs_queue_clear(&MINING_MODULE.ASIC_jobs_queue);
-            xSemaphoreGive(ASIC_TASK_MODULE.semaphore);
+            // No longer needed - semaphore removed
+            // Work abandonment is handled through queue clearing
         }
 
         STRATUM_V1_free_mining_notify(mining_notification);

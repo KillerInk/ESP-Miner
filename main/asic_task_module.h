@@ -11,8 +11,6 @@ typedef struct
     // it also may return a previous nonce under some circumstances
     // so we keep a list of jobs indexed by the job id
     bm_job **active_jobs;
-    //semaphone
-    SemaphoreHandle_t semaphore;
     pthread_mutex_t valid_jobs_lock;
     uint8_t * valid_jobs;
 } AsicTaskModule;
