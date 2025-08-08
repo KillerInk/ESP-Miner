@@ -28,7 +28,7 @@ void create_jobs_task(void * pvParameters)
         // Wait for a notification from stratum_task
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-        mining_notify *mining_notification = get_mining_notification_from_stratum();
+       
         ESP_LOGI(TAG, "Processing new work...");
 
         if (MINING_MODULE.new_set_mining_difficulty_msg) {
@@ -46,11 +46,11 @@ void create_jobs_task(void * pvParameters)
         while (MINING_MODULE.abandon_work == 0) {
             if (should_generate_more_work()) {
                 // Get the mining notification from stratum_task
-                
+                 mining_notify *mining_notification = get_mining_notification_from_stratum();
 
                 if (mining_notification) {
                     generate_work(mining_notification, extranonce_2, difficulty);
-                    
+                    STRATUM_V1_free_mining_notify(mining_notification);
 
                     // Increase extranonce_2 for the next job.
                     extranonce_2++;
@@ -70,7 +70,7 @@ void create_jobs_task(void * pvParameters)
             MINING_MODULE.abandon_work = 0;
             ASIC_jobs_queue_clear(&MINING_MODULE.ASIC_jobs_queue);
         }
-        STRATUM_V1_free_mining_notify(mining_notification);
+       
     }
 }
 
