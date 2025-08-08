@@ -43,14 +43,15 @@ void create_jobs_task(void * pvParameters)
         }
 
         uint32_t extranonce_2 = 0;
+        mining_notify *mining_notification = get_mining_notification_from_stratum();
         while (MINING_MODULE.abandon_work == 0) {
             if (should_generate_more_work()) {
                 // Get the mining notification from stratum_task
-                 mining_notify *mining_notification = get_mining_notification_from_stratum();
+                 
 
                 if (mining_notification) {
                     generate_work(mining_notification, extranonce_2, difficulty);
-                    STRATUM_V1_free_mining_notify(mining_notification);
+                    
 
                     // Increase extranonce_2 for the next job.
                     extranonce_2++;
@@ -65,7 +66,7 @@ void create_jobs_task(void * pvParameters)
                 vTaskDelay(100 / portTICK_PERIOD_MS);
             }
         }
-
+        STRATUM_V1_free_mining_notify(mining_notification);
         if (MINING_MODULE.abandon_work == 1) {
             MINING_MODULE.abandon_work = 0;
             ASIC_jobs_queue_clear(&MINING_MODULE.ASIC_jobs_queue);
