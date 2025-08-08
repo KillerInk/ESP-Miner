@@ -48,6 +48,8 @@ struct timeval tcp_rcv_timeout = {
     .tv_usec = 0
 };
 
+mining_notify *current_mining_notification = NULL;
+
 bool is_wifi_connected() {
     wifi_ap_record_t ap_info;
     if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
@@ -60,14 +62,10 @@ bool is_wifi_connected() {
 void cleanQueue() {
     ESP_LOGI(TAG, "Clean Jobs: clearing queue");
     MINING_MODULE.abandon_work = 1;
-    queue_clear(&MINING_MODULE.stratum_queue);
-
-    pthread_mutex_lock(&ASIC_TASK_MODULE.valid_jobs_lock);
     ASIC_jobs_queue_clear(&MINING_MODULE.ASIC_jobs_queue);
     for (int i = 0; i < 128; i = i + 4) {
         ASIC_TASK_MODULE.valid_jobs[i] = 0;
     }
-    pthread_mutex_unlock(&ASIC_TASK_MODULE.valid_jobs_lock);
 }
 
 void stratum_reset_uid()
@@ -75,7 +73,6 @@ void stratum_reset_uid()
     ESP_LOGI(TAG, "Resetting stratum uid");
     send_uid = 1;
 }
-
 
 void stratum_close_connection()
 {
@@ -218,7 +215,6 @@ void stratum_task(void * pvParameters)
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
-
     xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL);
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
@@ -239,7 +235,7 @@ void stratum_task(void * pvParameters)
             }
 
             POOL_MODULE.is_using_fallback = !POOL_MODULE.is_using_fallback;
-            
+
             // Reset share stats at failover
             for (int i = 0; i < SYSTEM_MODULE.rejected_reason_stats_count; i++) {
                 SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
@@ -350,14 +346,20 @@ void stratum_task(void * pvParameters)
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
                 SYSTEM_notify_new_ntime(stratum_api_v1_message.mining_notification->ntime);
                 if (stratum_api_v1_message.should_abandon_work &&
-                    (uxQueueMessagesWaiting(MINING_MODULE.stratum_queue) > 0 || uxQueueMessagesWaiting(MINING_MODULE.ASIC_jobs_queue) > 0)) {
+                    (uxQueueMessagesWaiting(MINING_MODULE.ASIC_jobs_queue) > 0)) {
                     cleanQueue();
                 }
-                if (uxQueueMessagesWaiting(MINING_MODULE.stratum_queue) == QUEUE_SIZE) {
-                    mining_notify * next_notify_json_str = (mining_notify *) queue_dequeue(&MINING_MODULE.stratum_queue);
-                    STRATUM_V1_free_mining_notify(next_notify_json_str);
+
+                // Store the current mining notification for create_jobs_task to access
+                current_mining_notification = stratum_api_v1_message.mining_notification;
+
+                TaskHandle_t create_jobs_task_handle;
+                create_jobs_task_handle = xTaskGetHandle("stratum miner");
+                if (create_jobs_task_handle != NULL) {
+                    xTaskNotifyGive(create_jobs_task_handle);
+                } else {
+                    ESP_LOGE(TAG, "Failed to get handle for stratum miner task");
                 }
-                queue_enqueue(&MINING_MODULE.stratum_queue, stratum_api_v1_message.mining_notification);
             } else if (stratum_api_v1_message.method == MINING_SET_DIFFICULTY) {
                 ESP_LOGI(TAG, "Set pool difficulty: %ld", stratum_api_v1_message.new_difficulty);
                 POOL_MODULE.pool_difficulty = stratum_api_v1_message.new_difficulty;
@@ -404,4 +406,34 @@ void stratum_task(void * pvParameters)
         }
     }
     vTaskDelete(NULL);
+}
+
+// Function to get the current mining notification from stratum_task
+mining_notify *get_mining_notification_from_stratum() {
+    mining_notify *notification = current_mining_notification;
+    if (notification != NULL) {
+        // Make a copy of the notification since it will be freed by the caller
+        char *job_id = strdup(notification->job_id);
+        char *prev_block_hash = strdup(notification->prev_block_hash);
+        char *coinbase_1 = strdup(notification->coinbase_1);
+        char *coinbase_2 = strdup(notification->coinbase_2);
+
+        mining_notify *copy = malloc(sizeof(mining_notify));
+        memcpy(copy, notification, sizeof(mining_notify));
+
+        // Copy the strings
+        copy->job_id = job_id;
+        copy->prev_block_hash = prev_block_hash;
+        copy->coinbase_1 = coinbase_1;
+        copy->coinbase_2 = coinbase_2;
+
+        // Copy the merkle branches
+        if (notification->merkle_branches != NULL) {
+            copy->merkle_branches = malloc(notification->n_merkle_branches * sizeof(uint8_t[32]));
+            memcpy(copy->merkle_branches, notification->merkle_branches, notification->n_merkle_branches * sizeof(uint8_t[32]));
+        }
+
+        return copy;
+    }
+    return NULL;
 }

@@ -9,16 +9,10 @@
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
 
-
-
 /**
  * A structure containing various mining-related queues and parameters.
  */
 typedef struct{
-    /**
-     * Queue for stratum-related jobs.
-     */
-    work_queue stratum_queue;
     /**
      * Queue for ASIC job tasks.
      */

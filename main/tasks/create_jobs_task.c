@@ -12,6 +12,7 @@
 #include "asic.h"
 #include "mining_module.h"
 #include "pool_module.h"
+#include "stratum_task.h"
 
 static const char * TAG = "create_jobs_task";
 
@@ -22,17 +23,13 @@ static void generate_work(mining_notify * notification, uint32_t extranonce_2, u
 
 void create_jobs_task(void * pvParameters)
 {
-
     uint32_t difficulty = POOL_MODULE.pool_difficulty;
     while (1) {
-        mining_notify * mining_notification = (mining_notify *) queue_dequeue(&MINING_MODULE.stratum_queue);
-        if (mining_notification == NULL) {
-            ESP_LOGE(TAG, "Failed to dequeue mining notification");
-            vTaskDelay(100 / portTICK_PERIOD_MS); // Wait a bit before trying again
-            continue;
-        }
+        // Wait for a notification from stratum_task
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-        ESP_LOGI(TAG, "New Work Dequeued %s", mining_notification->job_id);
+        mining_notify *mining_notification = get_mining_notification_from_stratum();
+        ESP_LOGI(TAG, "Processing new work...");
 
         if (MINING_MODULE.new_set_mining_difficulty_msg) {
             ESP_LOGI(TAG, "New pool difficulty %i", POOL_MODULE.pool_difficulty);
@@ -46,12 +43,21 @@ void create_jobs_task(void * pvParameters)
         }
 
         uint32_t extranonce_2 = 0;
-        while (uxQueueMessagesWaiting(MINING_MODULE.stratum_queue) < 1 && MINING_MODULE.abandon_work == 0) {
+        while (MINING_MODULE.abandon_work == 0) {
             if (should_generate_more_work()) {
-                generate_work(mining_notification, extranonce_2, difficulty);
+                // Get the mining notification from stratum_task
+                
 
-                // Increase extranonce_2 for the next job.
-                extranonce_2++;
+                if (mining_notification) {
+                    generate_work(mining_notification, extranonce_2, difficulty);
+                    
+
+                    // Increase extranonce_2 for the next job.
+                    extranonce_2++;
+                } else {
+                    ESP_LOGE(TAG, "Failed to get mining notification");
+                    vTaskDelay(100 / portTICK_PERIOD_MS);
+                }
             }
             else
             {
@@ -63,17 +69,14 @@ void create_jobs_task(void * pvParameters)
         if (MINING_MODULE.abandon_work == 1) {
             MINING_MODULE.abandon_work = 0;
             ASIC_jobs_queue_clear(&MINING_MODULE.ASIC_jobs_queue);
-            // No longer needed - semaphore removed
-            // Work abandonment is handled through queue clearing
         }
-
         STRATUM_V1_free_mining_notify(mining_notification);
     }
 }
 
 static bool should_generate_more_work()
 {
-    return uxQueueMessagesWaiting(MINING_MODULE.stratum_queue) < QUEUE_LOW_WATER_MARK;
+    return uxQueueMessagesWaiting(MINING_MODULE.ASIC_jobs_queue) < QUEUE_LOW_WATER_MARK;
 }
 
 static void generate_work(mining_notify * notification, uint32_t extranonce_2, uint32_t difficulty)
