@@ -1,17 +1,13 @@
-#include "system.h"
-#include "work_queue.h"
-#include "serial.h"
-#include <string.h>
 #include "esp_log.h"
 
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "asic_task.h"
-#include "asic.h"
-#include "power_management_module.h"
+#include "freertos/queue.h"
 #include "mining_module.h"
 #include "device_config.h"
 #include "asic_task_module.h"
+#include "asic.h"
+#include "system.h"
+#include "power_management_module.h"
 
 static const char *TAG = "asic_task";
 
@@ -30,15 +26,10 @@ double ASIC_get_asic_job_frequency_ms(float frequency)
             return 500;
     }
 }
-
-void ASIC_task(void *pvParameters)
-{
-    
-
+void ASIC_task(void *pvParameters) {
     ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
     ASIC_TASK_MODULE.valid_jobs = malloc(sizeof(uint8_t) * 128);
-    for (int i = 0; i < 128; i++)
-    {
+    for (int i = 0; i < 128; i++) {
         ASIC_TASK_MODULE.active_jobs[i] = NULL;
         ASIC_TASK_MODULE.valid_jobs[i] = 0;
     }
@@ -49,16 +40,11 @@ void ASIC_task(void *pvParameters)
     SYSTEM_notify_mining_started();
     ESP_LOGI(TAG, "ASIC Ready!");
 
-    while (1)
-    {
-        bm_job *next_bm_job = (bm_job *)queue_dequeue(&MINING_MODULE.ASIC_jobs_queue);
-
-        //(*GLOBAL_STATE.ASIC_functions.send_work_fn)(next_bm_job); // send the job to the ASIC
+    while (1) {
+        bm_job *next_bm_job = queue_dequeue(&MINING_MODULE.ASIC_jobs_queue);
+        if(next_bm_job != NULL)
         ASIC_send_work(next_bm_job);
 
-        // Time to execute the above code is ~0.3ms
-        // Delay for ASIC(s) to finish the job
-        //vTaskDelay((asic_job_frequency_ms - 0.3) / portTICK_PERIOD_MS);
         vTaskDelay(asic_job_frequency_ms / portTICK_PERIOD_MS);
     }
 }

@@ -93,8 +93,8 @@ void app_main(void)
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
-    queue_init(&MINING_MODULE.stratum_queue);
-    queue_init(&MINING_MODULE.ASIC_jobs_queue);
+    queue_init(&MINING_MODULE.stratum_queue, sizeof(mining_notify*));
+    queue_init(&MINING_MODULE.ASIC_jobs_queue, sizeof(bm_job*));
 
     if (asic_reset() != ESP_OK) {
         STATE_MODULE.asic_status = "ASIC reset failed";

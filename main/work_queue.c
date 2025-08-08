@@ -1,85 +1,41 @@
 #include "work_queue.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "esp_log.h"
-#include <pthread.h>
 #include "mining.h"
 
-
-void queue_init(work_queue *queue)
-{
-    queue->head = 0;
-    queue->tail = 0;
-    queue->count = 0;
-    pthread_mutex_init(&queue->lock, NULL);
-    pthread_cond_init(&queue->not_empty, NULL);
-    pthread_cond_init(&queue->not_full, NULL);
+void queue_init(work_queue *queue, size_t size) {
+    *queue = xQueueCreate(QUEUE_SIZE, size);
 }
 
-void queue_enqueue(work_queue *queue, void *new_work)
-{
-    pthread_mutex_lock(&queue->lock);
-
-    while (queue->count == QUEUE_SIZE)
-    {
-        pthread_cond_wait(&queue->not_full, &queue->lock);
+void queue_enqueue(work_queue *queue, void *new_work) {
+    if (queue != NULL && new_work != NULL) {
+        xQueueSend(*queue, &new_work, portMAX_DELAY);
     }
-
-    queue->buffer[queue->tail] = new_work;
-    queue->tail = (queue->tail + 1) % QUEUE_SIZE;
-    queue->count++;
-
-    pthread_cond_signal(&queue->not_empty);
-    pthread_mutex_unlock(&queue->lock);
 }
 
-void *queue_dequeue(work_queue *queue)
-{
-    pthread_mutex_lock(&queue->lock);
-
-    while (queue->count == 0)
-    {
-        pthread_cond_wait(&queue->not_empty, &queue->lock);
+void *queue_dequeue(work_queue *queue) {
+    void *dequeued_work = NULL;
+    if (queue != NULL) {
+        xQueueReceive(*queue, &dequeued_work, portMAX_DELAY);
     }
-
-    void *next_work = queue->buffer[queue->head];
-    queue->head = (queue->head + 1) % QUEUE_SIZE;
-    queue->count--;
-
-    pthread_cond_signal(&queue->not_full);
-    pthread_mutex_unlock(&queue->lock);
-
-    return next_work;
+    return dequeued_work;
 }
 
-void queue_clear(work_queue *queue)
-{
-    pthread_mutex_lock(&queue->lock);
-
-    while (queue->count > 0)
-    {
-        mining_notify *next_work = queue->buffer[queue->head];
-        STRATUM_V1_free_mining_notify(next_work);
-        queue->head = (queue->head + 1) % QUEUE_SIZE;
-        queue->count--;
+void queue_clear(work_queue *queue) {
+    void *item;
+    while (xQueueReceive(*queue, &item, 0) == pdPASS) {
+        free(item);
     }
-
-    pthread_cond_signal(&queue->not_full);
-    pthread_mutex_unlock(&queue->lock);
 }
 
-void ASIC_jobs_queue_clear(work_queue *queue)
-{
-    pthread_mutex_lock(&queue->lock);
-
-    while (queue->count > 0)
-    {
-        bm_job *next_work = queue->buffer[queue->head];
-        free(next_work->jobid);
-        free(next_work->extranonce2);
-        free(next_work);
-        queue->head = (queue->head + 1) % QUEUE_SIZE;
-        queue->count--;
+void ASIC_jobs_queue_clear(work_queue *queue) {
+    bm_job *item;
+    while (xQueueReceive(*queue, &item, 0) == pdPASS) {
+        free(item->jobid);
+        free(item->extranonce2);
+        free(item);
     }
-
-    pthread_cond_signal(&queue->not_full);
-    pthread_mutex_unlock(&queue->lock);
 }
+
+

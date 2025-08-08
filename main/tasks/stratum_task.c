@@ -350,10 +350,10 @@ void stratum_task(void * pvParameters)
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
                 SYSTEM_notify_new_ntime(stratum_api_v1_message.mining_notification->ntime);
                 if (stratum_api_v1_message.should_abandon_work &&
-                    (MINING_MODULE.stratum_queue.count > 0 || MINING_MODULE.ASIC_jobs_queue.count > 0)) {
+                    (uxQueueMessagesWaiting(MINING_MODULE.stratum_queue) > 0 || uxQueueMessagesWaiting(MINING_MODULE.ASIC_jobs_queue) > 0)) {
                     cleanQueue();
                 }
-                if (MINING_MODULE.stratum_queue.count == QUEUE_SIZE) {
+                if (uxQueueMessagesWaiting(MINING_MODULE.stratum_queue) == QUEUE_SIZE) {
                     mining_notify * next_notify_json_str = (mining_notify *) queue_dequeue(&MINING_MODULE.stratum_queue);
                     STRATUM_V1_free_mining_notify(next_notify_json_str);
                 }

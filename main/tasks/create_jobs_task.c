@@ -46,7 +46,7 @@ void create_jobs_task(void * pvParameters)
         }
 
         uint32_t extranonce_2 = 0;
-        while (MINING_MODULE.stratum_queue.count < 1 && MINING_MODULE.abandon_work == 0) {
+        while (uxQueueMessagesWaiting(MINING_MODULE.stratum_queue) < 1 && MINING_MODULE.abandon_work == 0) {
             if (should_generate_more_work()) {
                 generate_work(mining_notification, extranonce_2, difficulty);
 
@@ -73,7 +73,7 @@ void create_jobs_task(void * pvParameters)
 
 static bool should_generate_more_work()
 {
-    return MINING_MODULE.ASIC_jobs_queue.count < QUEUE_LOW_WATER_MARK;
+    return uxQueueMessagesWaiting(MINING_MODULE.stratum_queue) < QUEUE_LOW_WATER_MARK;
 }
 
 static void generate_work(mining_notify * notification, uint32_t extranonce_2, uint32_t difficulty)
