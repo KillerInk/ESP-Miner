@@ -59,15 +59,6 @@ bool is_wifi_connected() {
     }
 }
 
-void cleanQueue() {
-    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
-    MINING_MODULE.abandon_work = 1;
-    ASIC_jobs_queue_clear(&MINING_MODULE.ASIC_jobs_queue);
-    for (int i = 0; i < 128; i = i + 4) {
-        ASIC_TASK_MODULE.valid_jobs[i] = 0;
-    }
-}
-
 void stratum_reset_uid()
 {
     ESP_LOGI(TAG, "Resetting stratum uid");
@@ -84,7 +75,6 @@ void stratum_close_connection()
     ESP_LOGE(TAG, "Shutting down socket and restarting...");
     shutdown(sock, SHUT_RDWR);
     close(sock);
-    cleanQueue();
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
@@ -305,7 +295,6 @@ void stratum_task(void * pvParameters)
         }
 
         stratum_reset_uid();
-        cleanQueue();
 
         ///// Start Stratum Action
         // mining.configure - ID: 1
@@ -344,11 +333,8 @@ void stratum_task(void * pvParameters)
             free(line);
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
+                MINING_MODULE.abandon_work = 1;
                 SYSTEM_notify_new_ntime(stratum_api_v1_message.mining_notification->ntime);
-                if (stratum_api_v1_message.should_abandon_work &&
-                    (uxQueueMessagesWaiting(MINING_MODULE.ASIC_jobs_queue) > 0)) {
-                    cleanQueue();
-                }
 
                 // Store the current mining notification for create_jobs_task to access
                 current_mining_notification = stratum_api_v1_message.mining_notification;

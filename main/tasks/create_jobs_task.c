@@ -43,16 +43,21 @@ void create_jobs_task(void * pvParameters)
         }
 
         uint32_t extranonce_2 = 0;
+        ESP_LOGI(TAG, "Clean Jobs: clearing queue");
+        MINING_MODULE.abandon_work = 1;
+        ASIC_jobs_queue_clear(&MINING_MODULE.ASIC_jobs_queue);
+        for (int i = 0; i < 128; i = i + 4) {
+            ASIC_TASK_MODULE.valid_jobs[i] = 0;
+        }
+        MINING_MODULE.abandon_work = 0;
         mining_notify *mining_notification = get_mining_notification_from_stratum();
         while (MINING_MODULE.abandon_work == 0) {
-            if (should_generate_more_work()) {
+            if (should_generate_more_work() && MINING_MODULE.abandon_work == 0) {
                 // Get the mining notification from stratum_task
-                 
-
-                if (mining_notification) {
+                
+                if (mining_notification && MINING_MODULE.abandon_work == 0) {
                     generate_work(mining_notification, extranonce_2, difficulty);
                     
-
                     // Increase extranonce_2 for the next job.
                     extranonce_2++;
                 } else {
@@ -67,11 +72,6 @@ void create_jobs_task(void * pvParameters)
             }
         }
         STRATUM_V1_free_mining_notify(mining_notification);
-        if (MINING_MODULE.abandon_work == 1) {
-            MINING_MODULE.abandon_work = 0;
-            ASIC_jobs_queue_clear(&MINING_MODULE.ASIC_jobs_queue);
-        }
-       
     }
 }
 
