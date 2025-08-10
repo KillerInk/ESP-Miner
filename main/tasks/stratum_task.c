@@ -18,6 +18,7 @@
 #include "mining_module.h"
 #include "device_config.h"
 #include "pool_module.h"
+#include "create_jobs_task.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
@@ -47,8 +48,6 @@ struct timeval tcp_rcv_timeout = {
     .tv_sec = 60 * 10,
     .tv_usec = 0
 };
-
-mining_notify *current_mining_notification = NULL;
 
 bool is_wifi_connected() {
     wifi_ap_record_t ap_info;
@@ -311,9 +310,6 @@ void stratum_task(void * pvParameters)
         STRATUM_V1_authorize(sock, authorize_message_id, username, password);
         STRATUM_V1_stamp_tx(authorize_message_id);
 
-        // Everything is set up, lets make sure we don't abandon work unnecessarily.
-        MINING_MODULE.abandon_work = 0;
-
         while (1) {
             char * line = STRATUM_V1_receive_jsonrpc_line(sock);
             if (!line) {
@@ -333,11 +329,10 @@ void stratum_task(void * pvParameters)
             free(line);
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
-                MINING_MODULE.abandon_work = 1;
                 SYSTEM_notify_new_ntime(stratum_api_v1_message.mining_notification->ntime);
 
                 // Store the current mining notification for create_jobs_task to access
-                current_mining_notification = stratum_api_v1_message.mining_notification;
+                set_new_mining_notification(stratum_api_v1_message.mining_notification);
 
                 TaskHandle_t create_jobs_task_handle;
                 create_jobs_task_handle = xTaskGetHandle("stratum miner");
@@ -392,34 +387,4 @@ void stratum_task(void * pvParameters)
         }
     }
     vTaskDelete(NULL);
-}
-
-// Function to get the current mining notification from stratum_task
-mining_notify *get_mining_notification_from_stratum() {
-    mining_notify *notification = current_mining_notification;
-    if (notification != NULL) {
-        // Make a copy of the notification since it will be freed by the caller
-        char *job_id = strdup(notification->job_id);
-        char *prev_block_hash = strdup(notification->prev_block_hash);
-        char *coinbase_1 = strdup(notification->coinbase_1);
-        char *coinbase_2 = strdup(notification->coinbase_2);
-
-        mining_notify *copy = malloc(sizeof(mining_notify));
-        memcpy(copy, notification, sizeof(mining_notify));
-
-        // Copy the strings
-        copy->job_id = job_id;
-        copy->prev_block_hash = prev_block_hash;
-        copy->coinbase_1 = coinbase_1;
-        copy->coinbase_2 = coinbase_2;
-
-        // Copy the merkle branches
-        if (notification->merkle_branches != NULL) {
-            copy->merkle_branches = malloc(notification->n_merkle_branches * sizeof(uint8_t[32]));
-            memcpy(copy->merkle_branches, notification->merkle_branches, notification->n_merkle_branches * sizeof(uint8_t[32]));
-        }
-
-        return copy;
-    }
-    return NULL;
 }

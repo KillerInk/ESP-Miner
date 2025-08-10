@@ -13,10 +13,14 @@
 #include "mining_module.h"
 #include "pool_module.h"
 #include "stratum_task.h"
+#include "create_jobs_task.h"
 
 static const char * TAG = "create_jobs_task";
 
 #define QUEUE_LOW_WATER_MARK 10 // Adjust based on your requirements
+
+mining_notify * mining_notification_current;
+mining_notify * mining_notification_new;
 
 static bool should_generate_more_work();
 static void generate_work(mining_notify * notification, uint32_t extranonce_2, uint32_t difficulty);
@@ -44,19 +48,18 @@ void create_jobs_task(void * pvParameters)
 
         uint32_t extranonce_2 = 0;
         ESP_LOGI(TAG, "Clean Jobs: clearing queue");
-        MINING_MODULE.abandon_work = 1;
         ASIC_jobs_queue_clear(&MINING_MODULE.ASIC_jobs_queue);
         for (int i = 0; i < 128; i = i + 4) {
             ASIC_TASK_MODULE.valid_jobs[i] = 0;
         }
-        MINING_MODULE.abandon_work = 0;
-        mining_notify *mining_notification = get_mining_notification_from_stratum();
-        while (MINING_MODULE.abandon_work == 0) {
-            if (should_generate_more_work() && MINING_MODULE.abandon_work == 0) {
+        mining_notification_current = mining_notification_new;
+        mining_notification_new = NULL;
+        while (mining_notification_new == NULL) {
+            if (should_generate_more_work() && mining_notification_new == NULL) {
                 // Get the mining notification from stratum_task
                 
-                if (mining_notification && MINING_MODULE.abandon_work == 0) {
-                    generate_work(mining_notification, extranonce_2, difficulty);
+                if (mining_notification_current && mining_notification_new == NULL) {
+                    generate_work(mining_notification_current, extranonce_2, difficulty);
                     
                     // Increase extranonce_2 for the next job.
                     extranonce_2++;
@@ -71,7 +74,35 @@ void create_jobs_task(void * pvParameters)
                 vTaskDelay(100 / portTICK_PERIOD_MS);
             }
         }
-        STRATUM_V1_free_mining_notify(mining_notification);
+        STRATUM_V1_free_mining_notify(mining_notification_current);
+    }
+}
+
+void set_new_mining_notification(mining_notify * notification)
+{
+    if (notification != NULL) {
+        // Make a copy of the notification since it will be freed by the caller
+        char *job_id = strdup(notification->job_id);
+        char *prev_block_hash = strdup(notification->prev_block_hash);
+        char *coinbase_1 = strdup(notification->coinbase_1);
+        char *coinbase_2 = strdup(notification->coinbase_2);
+
+        mining_notify *copy = malloc(sizeof(mining_notify));
+        memcpy(copy, notification, sizeof(mining_notify));
+
+        // Copy the strings
+        copy->job_id = job_id;
+        copy->prev_block_hash = prev_block_hash;
+        copy->coinbase_1 = coinbase_1;
+        copy->coinbase_2 = coinbase_2;
+
+        // Copy the merkle branches
+        if (notification->merkle_branches != NULL) {
+            copy->merkle_branches = malloc(notification->n_merkle_branches * sizeof(uint8_t[32]));
+            memcpy(copy->merkle_branches, notification->merkle_branches, notification->n_merkle_branches * sizeof(uint8_t[32]));
+        }
+
+        mining_notification_new = copy;
     }
 }
 

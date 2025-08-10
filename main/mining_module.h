@@ -25,10 +25,6 @@ typedef struct{
      * Length of the second extra nonce.
      */
     int extranonce_2_len;
-    /**
-     * Flag to indicate if the current job should be abandoned.
-     */
-    int abandon_work;
 
     /**
      * Indicates if a new set mining difficulty message is available.
