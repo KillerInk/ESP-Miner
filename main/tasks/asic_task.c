@@ -262,6 +262,6 @@ void ASIC_result_task(void *pvParameters)
             reset_counters();
             timecounter = 20;
         }
-        SYSTEM_notify_found_nonce(nonce_diff, job_id);
+        SYSTEM_notify_found_nonce(nonce_diff, active_job.target);
     }
 }

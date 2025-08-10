@@ -29,7 +29,6 @@
 #include "screen.h"
 #include "vcore.h"
 #include "thermal.h"
-#include "asic_task_module.h"
 #include "system_module.h"
 #include "device_config.h"
 #include "pool_module.h"
@@ -43,7 +42,7 @@ static void _suffix_string(uint64_t, char *, size_t, int);
 //local function prototypes
 static esp_err_t ensure_overheat_mode_config();
 
-static void _check_for_best_diff( double diff, uint8_t job_id);
+static void _check_for_best_diff( double diff, uint32_t job_id);
 static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 
 typedef struct
@@ -207,7 +206,7 @@ void SYSTEM_notify_new_ntime( uint32_t ntime)
     settimeofday(&tv, NULL);
 }
 
-void SYSTEM_notify_found_nonce(double found_diff, uint8_t job_id)
+void SYSTEM_notify_found_nonce(double found_diff, uint32_t target)
 {
     // Calculate the time difference in seconds with sub-second precision
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
@@ -245,7 +244,7 @@ void SYSTEM_notify_found_nonce(double found_diff, uint8_t job_id)
     // logArrayContents(historical_hashrate, HISTORY_LENGTH);
     // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
 
-    _check_for_best_diff(found_diff, job_id);
+    _check_for_best_diff(found_diff, target);
 }
 
 static double _calculate_network_difficulty(uint32_t nBits)
@@ -260,14 +259,14 @@ static double _calculate_network_difficulty(uint32_t nBits)
     return difficulty;
 }
 
-static void _check_for_best_diff( double diff, uint8_t job_id)
+static void _check_for_best_diff(double diff, uint32_t target)
 {
     if ((uint64_t) diff > SYSTEM_MODULE.best_session_nonce_diff) {
         SYSTEM_MODULE.best_session_nonce_diff = (uint64_t) diff;
         _suffix_string((uint64_t) diff, SYSTEM_MODULE.best_session_diff_string, DIFF_STRING_SIZE, 0);
     }
 
-    double network_diff = _calculate_network_difficulty(ASIC_TASK_MODULE.active_jobs[job_id]->target);
+    double network_diff = _calculate_network_difficulty(target);
     if (diff > network_diff) {
         STATE_MODULE.FOUND_BLOCK = true;
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
