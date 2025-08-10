@@ -18,7 +18,7 @@
 #include "mining_module.h"
 #include "device_config.h"
 #include "pool_module.h"
-#include "create_jobs_task.h"
+#include "asic_task.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5

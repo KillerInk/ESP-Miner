@@ -7,7 +7,6 @@
 #include "asic_task.h"
 #include "asic_task_module.h"
 #include "connect.h"
-#include "create_jobs_task.h"
 #include "device_config.h"
 #include "http_server.h"
 #include "i2c_bitaxe.h"
@@ -94,7 +93,7 @@ void app_main(void)
     }
 
     
-    queue_init(&MINING_MODULE.ASIC_jobs_queue, sizeof(bm_job*));
+    asic_task_init();
 
     if (asic_reset() != ESP_OK) {
         STATE_MODULE.asic_status = "ASIC reset failed";

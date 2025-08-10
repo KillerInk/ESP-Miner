@@ -3,6 +3,7 @@
 
 #include <esp_err.h>
 #include "common.h"
+#include "stdbool.h"
 
 void ASIC_init_methods(int id);
 uint8_t ASIC_init(float frequency, uint8_t asic_count,uint16_t difficulty);

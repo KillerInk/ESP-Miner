@@ -13,10 +13,7 @@
  * A structure containing various mining-related queues and parameters.
  */
 typedef struct{
-    /**
-     * Queue for ASIC job tasks.
-     */
-    work_queue ASIC_jobs_queue;
+
     /**
      * String to hold extra nonces used in mining.
      */
