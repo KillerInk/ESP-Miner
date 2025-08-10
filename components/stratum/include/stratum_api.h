@@ -81,8 +81,6 @@ void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
 
 void STRATUM_V1_stamp_tx(int request_id);
 
-void STRATUM_V1_free_mining_notify(mining_notify *params);
-
 int STRATUM_V1_authorize(int socket, int send_uid, const char *username, const char *pass);
 
 int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * version_mask);

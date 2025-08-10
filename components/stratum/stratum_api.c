@@ -320,16 +320,6 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
     cJSON_Delete(json);
 }
 
-void STRATUM_V1_free_mining_notify(mining_notify * params)
-{
-    free(params->job_id);
-    free(params->prev_block_hash);
-    free(params->coinbase_1);
-    free(params->coinbase_2);
-    free(params->merkle_branches);
-    free(params);
-}
-
 int _parse_stratum_subscribe_result_message(const char * result_json_str, char ** extranonce, int * extranonce2_len)
 {
     cJSON * root = cJSON_Parse(result_json_str);

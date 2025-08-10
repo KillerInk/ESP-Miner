@@ -74,6 +74,16 @@ void ASIC_task(void * pvParameters)
     }
 }
 
+void free_mining_notify(mining_notify * params)
+{
+    free(params->job_id);
+    free(params->prev_block_hash);
+    free(params->coinbase_1);
+    free(params->coinbase_2);
+    free(params->merkle_branches);
+    free(params);
+}
+
 void create_jobs_task(void * pvParameters)
 {
     while (1) {
@@ -114,7 +124,7 @@ void create_jobs_task(void * pvParameters)
                 vTaskDelay(100 / portTICK_PERIOD_MS);
             }
         }
-        STRATUM_V1_free_mining_notify(mining_notification_current);
+        free_mining_notify(mining_notification_current);
     }
 }
 
@@ -198,8 +208,6 @@ static void generate_work(mining_notify * notification, uint32_t extranonce_2, u
     free(coinbase_tx);
     free(merkle_root);
 }
-
-
 
 void ASIC_result_task(void *pvParameters)
 {
