@@ -330,7 +330,7 @@ void stratum_task(void * pvParameters)
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
                 SYSTEM_notify_new_ntime(stratum_api_v1_message.mining_notification->ntime);
-
+                stratum_api_v1_message.mining_notification->job_difficulty = POOL_MODULE.pool_difficulty;
                 // Store the current mining notification for create_jobs_task to access
                 set_new_mining_notification(stratum_api_v1_message.mining_notification);
 
@@ -344,7 +344,6 @@ void stratum_task(void * pvParameters)
             } else if (stratum_api_v1_message.method == MINING_SET_DIFFICULTY) {
                 ESP_LOGI(TAG, "Set pool difficulty: %ld", stratum_api_v1_message.new_difficulty);
                 POOL_MODULE.pool_difficulty = stratum_api_v1_message.new_difficulty;
-                MINING_MODULE.new_set_mining_difficulty_msg = true;
             } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK ||
                     stratum_api_v1_message.method == STRATUM_RESULT_VERSION_MASK) {
                 ESP_LOGI(TAG, "Set version mask: %08lx", stratum_api_v1_message.version_mask);
@@ -353,10 +352,8 @@ void stratum_task(void * pvParameters)
             } else if (stratum_api_v1_message.method == MINING_SET_EXTRANONCE ||
                     stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
                 ESP_LOGI(TAG, "Set extranonce: %s, extranonce_2_len: %d", stratum_api_v1_message.extranonce_str, stratum_api_v1_message.extranonce_2_len);
-                char * old_extranonce_str = MINING_MODULE.extranonce_str;
                 MINING_MODULE.extranonce_str = stratum_api_v1_message.extranonce_str;
                 MINING_MODULE.extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
-                free(old_extranonce_str);
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
                 ESP_LOGE(TAG, "Pool requested client reconnect...");
                 stratum_close_connection();

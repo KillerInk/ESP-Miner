@@ -24,10 +24,6 @@ typedef struct{
     int extranonce_2_len;
 
     /**
-     * Indicates if a new set mining difficulty message is available.
-     */
-    bool new_set_mining_difficulty_msg;
-    /**
      * Version mask for stratum protocol handling.
      */
     uint32_t version_mask;

@@ -76,17 +76,12 @@ void ASIC_task(void * pvParameters)
 
 void create_jobs_task(void * pvParameters)
 {
-    uint32_t difficulty = POOL_MODULE.pool_difficulty;
     while (1) {
         // Wait for a notification from stratum_task
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
         ESP_LOGI(TAG, "Processing new work...");
 
-        if (MINING_MODULE.new_set_mining_difficulty_msg) {
-            ESP_LOGI(TAG, "New pool difficulty %i", POOL_MODULE.pool_difficulty);
-            difficulty = POOL_MODULE.pool_difficulty;
-        }
         if (MINING_MODULE.new_stratum_version_rolling_msg) {
             ESP_LOGI(TAG, "Set chip version rolls %i", (int) (MINING_MODULE.version_mask >> 13));
             ASIC_set_version_mask(MINING_MODULE.version_mask);
@@ -106,7 +101,7 @@ void create_jobs_task(void * pvParameters)
                 // Get the mining notification from stratum_task
 
                 if (mining_notification_current && mining_notification_new == NULL) {
-                    generate_work(mining_notification_current, extranonce_2, difficulty);
+                    generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty);
 
                     // Increase extranonce_2 for the next job.
                     extranonce_2++;
