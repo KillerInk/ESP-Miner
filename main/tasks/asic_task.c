@@ -1,7 +1,6 @@
 #include "esp_log.h"
 
 #include "asic.h"
-#include "asic_task_module.h"
 #include "device_config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -26,6 +25,8 @@ const double NONCE_SPACE = 4294967296.0; //  2^32
 work_queue ASIC_jobs_queue;
 mining_notify * mining_notification_current;
 mining_notify * mining_notification_new;
+bm_job ** active_jobs;
+uint8_t * valid_jobs;
 #define QUEUE_LOW_WATER_MARK 10 // Adjust based on your requirements
 
 static bool should_generate_more_work();
@@ -34,6 +35,12 @@ static void generate_work(mining_notify * notification, uint32_t extranonce_2, u
 void asic_task_init()
 {
     queue_init(&ASIC_jobs_queue, sizeof(bm_job*));
+    active_jobs = malloc(sizeof(bm_job *) * 128);
+    valid_jobs = malloc(sizeof(uint8_t) * 128);
+    for (int i = 0; i < 128; i++) {
+        active_jobs[i] = NULL;
+        valid_jobs[i] = 0;
+    }
 }
 
 double ASIC_get_asic_job_frequency_ms(float frequency)
@@ -52,13 +59,6 @@ double ASIC_get_asic_job_frequency_ms(float frequency)
 
 void ASIC_task(void * pvParameters)
 {
-    ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
-    ASIC_TASK_MODULE.valid_jobs = malloc(sizeof(uint8_t) * 128);
-    for (int i = 0; i < 128; i++) {
-        ASIC_TASK_MODULE.active_jobs[i] = NULL;
-        ASIC_TASK_MODULE.valid_jobs[i] = 0;
-    }
-
     double asic_job_frequency_ms = ASIC_get_asic_job_frequency_ms(POWER_MANAGEMENT_MODULE.frequency_value);
 
     ESP_LOGI(TAG, "ASIC Job Interval: %.2f ms", asic_job_frequency_ms);
@@ -68,7 +68,9 @@ void ASIC_task(void * pvParameters)
     while (1) {
         bm_job * next_bm_job = queue_dequeue(&ASIC_jobs_queue);
         if (next_bm_job != NULL)
-            ASIC_send_work(next_bm_job);
+        {
+            ASIC_send_work(next_bm_job,active_jobs,valid_jobs);
+        }
 
         vTaskDelay(asic_job_frequency_ms / portTICK_PERIOD_MS);
     }
@@ -102,7 +104,7 @@ void create_jobs_task(void * pvParameters)
         ESP_LOGI(TAG, "Clean Jobs: clearing queue");
         ASIC_jobs_queue_clear(&ASIC_jobs_queue);
         for (int i = 0; i < 128; i = i + 4) {
-            ASIC_TASK_MODULE.valid_jobs[i] = 0;
+            valid_jobs[i] = 0;
         }
         mining_notification_current = mining_notification_new;
         mining_notification_new = NULL;
@@ -216,7 +218,7 @@ void ASIC_result_task(void *pvParameters)
     while (1)
     {
         //task_result *asic_result = (*GLOBAL_STATE.ASIC_functions.receive_result_fn)(GLOBAL_STATE);
-        task_result *asic_result = ASIC_process_work();
+        task_result *asic_result = ASIC_process_work(active_jobs, valid_jobs);
 
         if (asic_result == NULL)
         {
@@ -225,13 +227,12 @@ void ASIC_result_task(void *pvParameters)
 
         uint8_t job_id = asic_result->job_id;
 
-        if (ASIC_TASK_MODULE.valid_jobs[job_id] == 0)
+        if (valid_jobs[job_id] == 0)
         {
             ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
             continue;
         }
-
-        bm_job *active_job = ASIC_TASK_MODULE.active_jobs[job_id];
+        bm_job * active_job = active_jobs[job_id];
         // check the nonce difficulty
         double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
 
@@ -262,6 +263,6 @@ void ASIC_result_task(void *pvParameters)
             reset_counters();
             timecounter = 20;
         }
-        SYSTEM_notify_found_nonce(nonce_diff, active_job.target);
+        SYSTEM_notify_found_nonce(nonce_diff, active_job->target);
     }
 }

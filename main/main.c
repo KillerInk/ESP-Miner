@@ -4,7 +4,6 @@
 #include "asic.h"
 #include "asic_reset.h"
 #include "asic_task.h"
-#include "asic_task_module.h"
 #include "connect.h"
 #include "device_config.h"
 #include "http_server.h"
@@ -31,7 +30,6 @@ SystemModule SYSTEM_MODULE;
 PowerManagementModule POWER_MANAGEMENT_MODULE;
 DeviceConfig DEVICE_CONFIG;
 DisplayConfig DISPLAY_CONFIG;
-AsicTaskModule ASIC_TASK_MODULE;
 SelfTestModule SELF_TEST_MODULE;
 StatisticsModule STATISTICS_MODULE;
 mining_queues MINING_MODULE;

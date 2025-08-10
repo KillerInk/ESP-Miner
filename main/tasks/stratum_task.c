@@ -13,7 +13,6 @@
 #include <sys/time.h>
 #include "esp_timer.h"
 #include <stdbool.h>
-#include "asic_task_module.h"
 #include "system_module.h"
 #include "mining_module.h"
 #include "device_config.h"

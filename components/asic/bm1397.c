@@ -14,7 +14,6 @@
 #include "utils.h"
 #include "crc.h"
 #include "mining.h"
-#include "asic_task_module.h"
 
 #define BM1397_CHIP_ID 0x1397
 #define BM1397_CHIP_ID_RESPONSE_LENGTH 9
@@ -292,7 +291,7 @@ int BM1397_set_max_baud(void)
 
 static uint8_t id = 0;
 
-void BM1397_send_work(bm_job *next_bm_job)
+void BM1397_send_work(bm_job * next_bm_job,bm_job ** active_jobs, uint8_t * valid_jobs)
 {
     
 
@@ -317,16 +316,14 @@ void BM1397_send_work(bm_job *next_bm_job)
         memcpy(job.midstate3, next_bm_job->midstate3, 32);
     }
 
-    if (ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL)
+    if (active_jobs[job.job_id] != NULL)
     {
-        free_bm_job(ASIC_TASK_MODULE.active_jobs[job.job_id]);
+        free_bm_job(active_jobs[job.job_id]);
     }
 
-    ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
+    active_jobs[job.job_id] = next_bm_job;
 
-    pthread_mutex_lock(&ASIC_TASK_MODULE.valid_jobs_lock);
-    ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
-    pthread_mutex_unlock(&ASIC_TASK_MODULE.valid_jobs_lock);
+    valid_jobs[job.job_id] = 1;
 
     #if BM1397_DEBUG_JOBS
     ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
@@ -335,7 +332,7 @@ void BM1397_send_work(bm_job *next_bm_job)
     _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job_packet), BM1397_DEBUG_WORK);
 }
 
-task_result *BM1397_process_work()
+task_result *BM1397_process_work(bm_job ** active_jobs, uint8_t * valid_jobs)
 {
     bm1397_asic_result_t asic_result = {0};
 
@@ -350,16 +347,16 @@ task_result *BM1397_process_work()
     uint8_t rx_midstate_index = asic_result.job_id & 0x03;
 
     
-    if (ASIC_TASK_MODULE.valid_jobs[rx_job_id] == 0)
+    if (valid_jobs[rx_job_id] == 0)
     {
         ESP_LOGW(TAG, "Invalid job nonce found, id=%d", rx_job_id);
         return NULL;
     }
 
-    uint32_t rolled_version = ASIC_TASK_MODULE.active_jobs[rx_job_id]->version;
+    uint32_t rolled_version = active_jobs[rx_job_id]->version;
     for (int i = 0; i < rx_midstate_index; i++)
     {
-        rolled_version = increment_bitmask(rolled_version, ASIC_TASK_MODULE.active_jobs[rx_job_id]->version_mask);
+        rolled_version = increment_bitmask(rolled_version, active_jobs[rx_job_id]->version_mask);
     }
 
     // ASIC may return the same nonce multiple times

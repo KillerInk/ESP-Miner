@@ -10,9 +10,9 @@
 static const char *TAG = "asic";
 
 typedef struct {
-    task_result *(*process_work)();
+    task_result *(*process_work)(bm_job ** active_jobs, uint8_t * valid_jobs);
     int (*set_max_baud)();
-    void (*send_work)(bm_job *next_job);
+    void (*send_work)(bm_job * next_job,bm_job ** active_jobs, uint8_t * valid_jobs);
     void (*set_version_mask)(uint32_t mask);
     bool (*set_frequency)(float target_frequency);
     uint8_t (*asic_init)(uint64_t frequency, uint16_t asic_count, uint16_t difficulty);
@@ -36,16 +36,16 @@ uint8_t ASIC_init(float frequency, uint8_t _asic_count, uint16_t _difficulty) {
     return current_asics->asic_init(frequency, _asic_count, _difficulty);
 }
 
-task_result *ASIC_process_work() {
-    return current_asics->process_work();
+task_result *ASIC_process_work(bm_job ** active_jobs, uint8_t * valid_jobs) {
+    return current_asics->process_work(active_jobs,valid_jobs);
 }
 
 int ASIC_set_max_baud() {
     return current_asics->set_max_baud();
 }
 
-void ASIC_send_work(void *next_job) {
-    current_asics->send_work(next_job);
+void ASIC_send_work(bm_job * next_job,bm_job ** active_jobs, uint8_t * valid_jobs) {
+    current_asics->send_work(next_job,active_jobs,valid_jobs);
 }
 
 void ASIC_set_version_mask(uint32_t mask) {

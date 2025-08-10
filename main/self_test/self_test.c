@@ -33,7 +33,6 @@
 #include "bm1397.h"
 #include "device_config.h"
 #include "power_management_module.h"
-#include "asic_task_module.h"
 #include "serial.h"
 #include "self_test_module.h"
 #include "state_module.h"
@@ -381,12 +380,13 @@ bool self_test()
         tests_done(false);
     }
 
-    ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
-    ASIC_TASK_MODULE.valid_jobs = malloc(sizeof(uint8_t) * 128);
-
+    bm_job ** active_jobs;
+    uint8_t * valid_jobs;
+    active_jobs = malloc(sizeof(bm_job *) * 128);
+    valid_jobs = malloc(sizeof(uint8_t) * 128);
     for (int i = 0; i < 128; i++) {
-        ASIC_TASK_MODULE.active_jobs[i] = NULL;
-        ASIC_TASK_MODULE.valid_jobs[i] = 0;
+        active_jobs[i] = NULL;
+        valid_jobs[i] = 0;
     }
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -432,7 +432,7 @@ bool self_test()
     ESP_LOGI(TAG, "Sending work");
 
     //(*GLOBAL_STATE.ASIC_functions.send_work_fn)(&job);
-    ASIC_send_work(&job);
+    ASIC_send_work(&job,active_jobs,valid_jobs);
 
     double start = esp_timer_get_time();
     double sum = 0;
@@ -441,7 +441,7 @@ bool self_test()
     double hashtest_timeout = 5;
 
     while (duration < hashtest_timeout) {
-        task_result * asic_result = ASIC_process_work();
+        task_result * asic_result = ASIC_process_work(active_jobs,valid_jobs);
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
@@ -470,8 +470,8 @@ bool self_test()
         tests_done(false);
     }
 
-    free(ASIC_TASK_MODULE.active_jobs);
-    free(ASIC_TASK_MODULE.valid_jobs);
+    free(active_jobs);
+    free(valid_jobs);
 
     if (test_core_voltage() != ESP_OK) {
         tests_done(false);

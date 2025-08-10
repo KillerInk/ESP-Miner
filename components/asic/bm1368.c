@@ -1,7 +1,6 @@
 #include "bm1368.h"
 
 #include "crc.h"
-#include "asic_task_module.h"
 #include "serial.h"
 #include "utils.h"
 
@@ -259,7 +258,7 @@ int BM1368_set_max_baud(void)
 
 static uint8_t id = 0;
 
-void BM1368_send_work(bm_job * next_bm_job)
+void BM1368_send_work(bm_job * next_bm_job,bm_job ** active_jobs, uint8_t * valid_jobs)
 {
 
     BM1368_job job;
@@ -273,15 +272,13 @@ void BM1368_send_work(bm_job * next_bm_job)
     memcpy(job.prev_block_hash, next_bm_job->prev_block_hash_be, 32);
     memcpy(&job.version, &next_bm_job->version, 4);
 
-    if (ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
-        free_bm_job(ASIC_TASK_MODULE.active_jobs[job.job_id]);
+    if (active_jobs[job.job_id] != NULL) {
+        free_bm_job(active_jobs[job.job_id]);
     }
 
-    ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
+    active_jobs[job.job_id] = next_bm_job;
 
-    pthread_mutex_lock(&ASIC_TASK_MODULE.valid_jobs_lock);
-    ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
-    pthread_mutex_unlock(&ASIC_TASK_MODULE.valid_jobs_lock);
+    valid_jobs[job.job_id] = 1;
 
     #if BM1368_DEBUG_JOBS
     ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
@@ -290,7 +287,7 @@ void BM1368_send_work(bm_job * next_bm_job)
     _send_BM1368((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1368_job), BM1368_DEBUG_WORK);
 }
 
-task_result * BM1368_process_work()
+task_result * BM1368_process_work(bm_job ** active_jobs, uint8_t * valid_jobs)
 {
     bm1368_asic_result_t asic_result = {0};
 
@@ -305,12 +302,12 @@ task_result * BM1368_process_work()
     ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
 
 
-    if (ASIC_TASK_MODULE.valid_jobs[job_id] == 0) {
+    if (valid_jobs[job_id] == 0) {
         ESP_LOGW(TAG, "Invalid job found, 0x%02X", job_id);
         return NULL;
     }
 
-    uint32_t rolled_version = ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
+    uint32_t rolled_version = active_jobs[job_id]->version | version_bits;
 
     result.job_id = job_id;
     result.nonce = asic_result.nonce;
