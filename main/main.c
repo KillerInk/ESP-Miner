@@ -3,7 +3,6 @@
 #include "adc.h"
 #include "asic.h"
 #include "asic_reset.h"
-#include "asic_result_task.h"
 #include "asic_task.h"
 #include "asic_task_module.h"
 #include "connect.h"

@@ -5,6 +5,7 @@
 #include "bm1368.h"
 #include "bm1370.h"
 #include "asic.h"
+#include "device_config.h"
 
 static const char *TAG = "asic";
 
