@@ -165,8 +165,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 avg_fanspeed = 0.93 * avg_fanspeed + 0.07 * pid_output;
                 POWER_MANAGEMENT_MODULE.fan_perc = (uint16_t) avg_fanspeed;
                 Thermal_set_fan_percent(avg_fanspeed / 100.0);
-                ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
-                         pid_input, pid_setPoint, pid_output, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
+                //ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
+                //         pid_input, pid_setPoint, pid_output, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
             } else {
                 if (WIFI_MODULE.ap_enabled) {
                     ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%", POWER_MANAGEMENT_MODULE.chip_temp_avg);
@@ -192,14 +192,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         if (core_voltage != last_core_voltage) {
-            ESP_LOGI(TAG, "setting new vcore voltage to %fmV", core_voltage);
+            //ESP_LOGI(TAG, "setting new vcore voltage to %fmV", core_voltage);
             VCORE_set_voltage((double) core_voltage / 1000.0);
             last_core_voltage = core_voltage;
             POWER_MANAGEMENT_MODULE.core_voltage = core_voltage;
         }
 
         if (asic_frequency != last_asic_frequency) {
-            ESP_LOGI(TAG, "New ASIC frequency requested: %fMHz (current: %fMHz)", asic_frequency, last_asic_frequency);
+            //ESP_LOGI(TAG, "New ASIC frequency requested: %fMHz (current: %fMHz)", asic_frequency, last_asic_frequency);
             
             bool success = ASIC_set_frequency((float)asic_frequency);
             

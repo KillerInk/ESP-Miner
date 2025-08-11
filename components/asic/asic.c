@@ -57,11 +57,11 @@ bool ASIC_set_frequency(float target_frequency) {
     if (current_asics->set_frequency) {
         success = current_asics->set_frequency(target_frequency);
     }
-    if (success) {
+    /*if (success) {
         ESP_LOGI(TAG, "Successfully transitioned to new ASIC frequency: %.2f MHz", target_frequency);
     } else {
         ESP_LOGE(TAG, "Failed to transition to new ASIC frequency: %.2f MHz", target_frequency);
-    }
+    }*/
     return success;
 }
 

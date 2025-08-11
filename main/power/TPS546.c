@@ -985,7 +985,7 @@ esp_err_t TPS546_set_vout(float volts) {
                 return ESP_FAIL;
             }
 
-            ESP_LOGI(TAG, "Vout changed to %1.2f V", volts);
+            //ESP_LOGI(TAG, "Vout changed to %1.2f V", volts);
 
             /* turn on output */
            if (smb_write_byte(PMBUS_OPERATION, OPERATION_ON) != ESP_OK) {

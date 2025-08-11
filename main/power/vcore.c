@@ -87,7 +87,7 @@ esp_err_t VCORE_init() {
 
 esp_err_t VCORE_set_voltage(float core_voltage)
 {
-    ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
+    //ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
  
     if (DEVICE_CONFIG.DS4432U) {
         if (core_voltage != 0.0f) {

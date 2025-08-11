@@ -234,7 +234,7 @@ void dowork()
 
     enforce_voltage_frequency_ratio();
     respectLimits();
-    ESP_LOGI(TAG, "Hashrate %f Voltage %f Frequency %f", avg_hashrate_auto, last_core_voltage_auto, last_asic_frequency_auto);
+    //ESP_LOGI(TAG, "Hashrate %f Voltage %f Frequency %f", avg_hashrate_auto, last_core_voltage_auto, last_asic_frequency_auto);
     SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
     AUTO_TUNE.voltage = last_core_voltage_auto;
     AUTO_TUNE.frequency = last_asic_frequency_auto;
