@@ -291,7 +291,7 @@ int BM1397_set_max_baud(void)
 
 static uint8_t id = 0;
 
-void BM1397_send_work(bm_job * next_bm_job,bm_job ** active_jobs, uint8_t * valid_jobs)
+void BM1397_send_work(bm_job * next_bm_job,bm_job ** active_jobs)
 {
     
 
@@ -323,8 +323,6 @@ void BM1397_send_work(bm_job * next_bm_job,bm_job ** active_jobs, uint8_t * vali
 
     active_jobs[job.job_id] = next_bm_job;
 
-    valid_jobs[job.job_id] = 1;
-
     #if BM1397_DEBUG_JOBS
     ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
     #endif
@@ -332,7 +330,7 @@ void BM1397_send_work(bm_job * next_bm_job,bm_job ** active_jobs, uint8_t * vali
     _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job_packet), BM1397_DEBUG_WORK);
 }
 
-task_result *BM1397_process_work(bm_job ** active_jobs, uint8_t * valid_jobs)
+task_result *BM1397_process_work(bm_job ** active_jobs)
 {
     bm1397_asic_result_t asic_result = {0};
 
@@ -345,13 +343,6 @@ task_result *BM1397_process_work(bm_job ** active_jobs, uint8_t * valid_jobs)
 
     uint8_t rx_job_id = asic_result.job_id & 0xfc;
     uint8_t rx_midstate_index = asic_result.job_id & 0x03;
-
-    
-    if (valid_jobs[rx_job_id] == 0)
-    {
-        ESP_LOGW(TAG, "Invalid job nonce found, id=%d", rx_job_id);
-        return NULL;
-    }
 
     uint32_t rolled_version = active_jobs[rx_job_id]->version;
     for (int i = 0; i < rx_midstate_index; i++)

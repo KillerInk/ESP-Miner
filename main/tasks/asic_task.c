@@ -26,7 +26,6 @@ work_queue ASIC_jobs_queue;
 mining_notify * mining_notification_current;
 mining_notify * mining_notification_new;
 bm_job ** active_jobs;
-uint8_t * valid_jobs;
 #define QUEUE_LOW_WATER_MARK 10 // Adjust based on your requirements
 
 static bool should_generate_more_work();
@@ -36,10 +35,8 @@ void asic_task_init()
 {
     queue_init(&ASIC_jobs_queue, sizeof(bm_job*));
     active_jobs = malloc(sizeof(bm_job *) * 128);
-    valid_jobs = malloc(sizeof(uint8_t) * 128);
     for (int i = 0; i < 128; i++) {
         active_jobs[i] = NULL;
-        valid_jobs[i] = 0;
     }
 }
 
@@ -69,7 +66,7 @@ void ASIC_task(void * pvParameters)
         bm_job * next_bm_job = queue_dequeue(&ASIC_jobs_queue);
         if (next_bm_job != NULL)
         {
-            ASIC_send_work(next_bm_job,active_jobs,valid_jobs);
+            ASIC_send_work(next_bm_job,active_jobs);
         }
 
         vTaskDelay(asic_job_frequency_ms / portTICK_PERIOD_MS);
@@ -103,9 +100,7 @@ void create_jobs_task(void * pvParameters)
         uint32_t extranonce_2 = 0;
         ESP_LOGI(TAG, "Clean Jobs: clearing queue");
         ASIC_jobs_queue_clear(&ASIC_jobs_queue);
-        for (int i = 0; i < 128; i = i + 4) {
-            valid_jobs[i] = 0;
-        }
+        
         mining_notification_current = mining_notification_new;
         mining_notification_new = NULL;
         while (mining_notification_new == NULL) {
@@ -218,7 +213,7 @@ void ASIC_result_task(void *pvParameters)
     while (1)
     {
         //task_result *asic_result = (*GLOBAL_STATE.ASIC_functions.receive_result_fn)(GLOBAL_STATE);
-        task_result *asic_result = ASIC_process_work(active_jobs, valid_jobs);
+        task_result *asic_result = ASIC_process_work(active_jobs);
 
         if (asic_result == NULL)
         {
@@ -227,11 +222,6 @@ void ASIC_result_task(void *pvParameters)
 
         uint8_t job_id = asic_result->job_id;
 
-        if (valid_jobs[job_id] == 0)
-        {
-            ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
-            continue;
-        }
         bm_job * active_job = active_jobs[job_id];
         // check the nonce difficulty
         double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);

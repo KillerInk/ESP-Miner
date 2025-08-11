@@ -381,12 +381,9 @@ bool self_test()
     }
 
     bm_job ** active_jobs;
-    uint8_t * valid_jobs;
     active_jobs = malloc(sizeof(bm_job *) * 128);
-    valid_jobs = malloc(sizeof(uint8_t) * 128);
     for (int i = 0; i < 128; i++) {
         active_jobs[i] = NULL;
-        valid_jobs[i] = 0;
     }
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -432,7 +429,7 @@ bool self_test()
     ESP_LOGI(TAG, "Sending work");
 
     //(*GLOBAL_STATE.ASIC_functions.send_work_fn)(&job);
-    ASIC_send_work(&job,active_jobs,valid_jobs);
+    ASIC_send_work(&job,active_jobs);
 
     double start = esp_timer_get_time();
     double sum = 0;
@@ -441,7 +438,7 @@ bool self_test()
     double hashtest_timeout = 5;
 
     while (duration < hashtest_timeout) {
-        task_result * asic_result = ASIC_process_work(active_jobs,valid_jobs);
+        task_result * asic_result = ASIC_process_work(active_jobs);
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
@@ -471,7 +468,6 @@ bool self_test()
     }
 
     free(active_jobs);
-    free(valid_jobs);
 
     if (test_core_voltage() != ESP_OK) {
         tests_done(false);
