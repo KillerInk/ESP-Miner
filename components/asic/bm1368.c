@@ -298,7 +298,9 @@ task_result * BM1368_process_work(bm_job ** active_jobs)
     uint8_t small_core_id = asic_result.job_id & 0x0f;
     uint32_t version_bits = (ntohs(asic_result.version) << 13);
     ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
-
+    if (active_jobs[job_id] == NULL) {
+        return NULL;
+    }
     uint32_t rolled_version = active_jobs[job_id]->version | version_bits;
 
     result.job_id = job_id;

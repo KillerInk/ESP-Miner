@@ -216,7 +216,7 @@ void BM1370_send_hash_frequency(float target_freq)
 
     _send_BM1370(TYPE_CMD | GROUP_ALL | CMD_WRITE, freqbuf, 6, BM1370_SERIALTX_DEBUG);
 
-    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (actual %.2f)", target_freq, newf);
+    //ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (actual %.2f)", target_freq, newf);
 }
 
 static void do_frequency_ramp_up(float target_frequency) {
@@ -350,33 +350,31 @@ uint8_t BM1370_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty
 float get_hashrate_cnt()
 {
     uint8_t buf[9] = {0};
-    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]) {0x00, BM_UNK_CNT_90}, 2, true);
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]) {0x00, BM_UNK_CNT_90}, 2, BM1370_SERIALTX_DEBUG);
     int resp = SERIAL_rx(buf, 11, 10);
     int value = (int) ((buf[4] << 8) + buf[5]);
-    ESP_LOGI(TAG, "CNT     %02X: [%02x %02x %02x %02x %02x %02x %02x %02x %02x]", BM_UNK_CNT_90, buf[0], buf[1], buf[2],
-             buf[3], buf[4], buf[5], buf[6], buf[7], buf[8]);
+    //ESP_LOGI(TAG, "CNT     %02X: [%02x %02x %02x %02x %02x %02x %02x %02x %02x]", BM_UNK_CNT_90, buf[0], buf[1], buf[2],buf[3], buf[4], buf[5], buf[6], buf[7], buf[8]);
     float hashes = 4.096 * (float) value;
-    ESP_LOGW(TAG, "hashes %f", hashes);
+    //ESP_LOGW(TAG, "hashes %f", hashes);
     return hashes;
 }
 
 float get_hashrate_error_cnt()
 {
     uint8_t buf[9] = {0};
-    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]) {0x00, BM_NONCE_ERROR_CNT}, 2, true);
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]) {0x00, BM_NONCE_ERROR_CNT}, 2, BM1370_SERIALTX_DEBUG);
     int resp = SERIAL_rx(buf, 11, 10);
     int value = (int) ((buf[4] << 8) + buf[5]);
-    ESP_LOGI(TAG, "CNT ERR %02X: [%02x %02x %02x %02x %02x %02x %02x %02x %02x]", BM_NONCE_ERROR_CNT, buf[0], buf[1], buf[2],
-             buf[3], buf[4], buf[5], buf[6], buf[7], buf[8]);
+    //ESP_LOGI(TAG, "CNT ERR %02X: [%02x %02x %02x %02x %02x %02x %02x %02x %02x]", BM_NONCE_ERROR_CNT, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8]);
     float hashes_error = 4.096 * (float) value;
-    ESP_LOGW(TAG, "hashes error %f", hashes_error);
+    //ESP_LOGW(TAG, "hashes error %f", hashes_error);
     return hashes_error;
 }
 
 void reset_counters()
 {
-    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]) {0x00, BM_UNK_CNT_90, 0x00, 0x00, 0x00, 0x00}, 6, true);
-    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]) {0x00, BM_NONCE_ERROR_CNT, 0x00, 0x00, 0x00, 0x00}, 6, true);
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]) {0x00, BM_UNK_CNT_90, 0x00, 0x00, 0x00, 0x00}, 6, BM1370_SERIALTX_DEBUG);
+    _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), (uint8_t[]) {0x00, BM_NONCE_ERROR_CNT, 0x00, 0x00, 0x00, 0x00}, 6, BM1370_SERIALTX_DEBUG);
 }
 
 // static void _send_read_address(void)
@@ -459,6 +457,9 @@ task_result * BM1370_process_work(bm_job ** active_jobs)
     uint32_t version_bits = (ntohs(asic_result.version) << 13); // shift the 16 bit value left 13
     ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
 
+    if (active_jobs[job_id] == NULL) {
+        return NULL;
+    }
 
     uint32_t rolled_version = active_jobs[job_id]->version | version_bits;
 

@@ -343,6 +343,9 @@ task_result *BM1397_process_work(bm_job ** active_jobs)
 
     uint8_t rx_job_id = asic_result.job_id & 0xfc;
     uint8_t rx_midstate_index = asic_result.job_id & 0x03;
+    if (active_jobs[rx_job_id] == NULL) {
+        return NULL;
+    }
 
     uint32_t rolled_version = active_jobs[rx_job_id]->version;
     for (int i = 0; i < rx_midstate_index; i++)
