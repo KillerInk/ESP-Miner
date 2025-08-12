@@ -12,7 +12,7 @@ static const char *TAG = "asic";
 typedef struct {
     task_result *(*process_work)(bm_job ** active_jobs);
     int (*set_max_baud)();
-    void (*send_work)(bm_job * next_job,bm_job ** active_jobs);
+    uint8_t (*send_work)(bm_job * next_job,bm_job ** active_jobs);
     void (*set_version_mask)(uint32_t mask);
     bool (*set_frequency)(float target_frequency);
     uint8_t (*asic_init)(uint64_t frequency, uint16_t asic_count, uint16_t difficulty);
@@ -44,8 +44,8 @@ int ASIC_set_max_baud() {
     return current_asics->set_max_baud();
 }
 
-void ASIC_send_work(bm_job * next_job,bm_job ** active_jobs) {
-    current_asics->send_work(next_job,active_jobs);
+uint8_t ASIC_send_work(bm_job * next_job,bm_job ** active_jobs) {
+    return current_asics->send_work(next_job,active_jobs);
 }
 
 void ASIC_set_version_mask(uint32_t mask) {

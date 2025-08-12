@@ -66,7 +66,7 @@ void ASIC_task(void * pvParameters)
         bm_job * next_bm_job = queue_dequeue(&ASIC_jobs_queue);
         if (next_bm_job != NULL)
         {
-            ASIC_send_work(next_bm_job,active_jobs);
+            uint8_t jobid = ASIC_send_work(next_bm_job,active_jobs);
         }
 
         vTaskDelay(asic_job_frequency_ms / portTICK_PERIOD_MS);

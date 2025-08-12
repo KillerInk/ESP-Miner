@@ -22,7 +22,7 @@ typedef struct __attribute__((__packed__))
 } BM1366_job;
 
 uint8_t BM1366_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty);
-void BM1366_send_work(bm_job * next_bm_job,bm_job ** active_jobs);
+uint8_t BM1366_send_work(bm_job * next_bm_job,bm_job ** active_jobs);
 void BM1366_set_version_mask(uint32_t version_mask);
 int BM1366_set_max_baud(void);
 int BM1366_set_default_baud(void);

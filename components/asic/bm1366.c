@@ -318,7 +318,7 @@ int BM1366_set_max_baud(void)
 
 static uint8_t id = 0;
 
-void BM1366_send_work(bm_job * next_bm_job,bm_job ** active_jobs)
+uint8_t BM1366_send_work(bm_job * next_bm_job,bm_job ** active_jobs)
 {
 
 
@@ -345,6 +345,7 @@ void BM1366_send_work(bm_job * next_bm_job,bm_job ** active_jobs)
     #endif
 
     _send_BM1366((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1366_job), BM1366_DEBUG_WORK);
+    return id;
 }
 
 task_result * BM1366_process_work(bm_job ** active_jobs)
