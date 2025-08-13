@@ -47,6 +47,7 @@ INCLUDE_DIRS
     "../components/stratum/include"
     "thermal"
     "power"
+    "include"
 
 PRIV_REQUIRES
     "app_update"
