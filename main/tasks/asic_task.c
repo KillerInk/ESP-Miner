@@ -26,6 +26,11 @@ work_queue ASIC_jobs_queue;
 mining_notify * mining_notification_current;
 mining_notify * mining_notification_new;
 bm_job ** active_jobs;
+uint64_t * job_start_times;
+// Variables to track elapsed times
+double total_elapsed_ms = 0.0;
+int job_count = 0;
+double asic_job_frequency_ms;
 #define QUEUE_LOW_WATER_MARK 10 // Adjust based on your requirements
 
 static bool should_generate_more_work();
@@ -37,6 +42,11 @@ void asic_task_init()
     active_jobs = malloc(sizeof(bm_job *) * 128);
     for (int i = 0; i < 128; i++) {
         active_jobs[i] = NULL;
+    }
+        // Array to store start times for each job
+    job_start_times = malloc(sizeof(uint64_t) * 128);
+    for (int i = 0; i < 128; i++) {
+        job_start_times[i] = 0;
     }
 }
 
@@ -56,21 +66,31 @@ double ASIC_get_asic_job_frequency_ms(float frequency)
 
 void ASIC_task(void * pvParameters)
 {
-    double asic_job_frequency_ms = ASIC_get_asic_job_frequency_ms(POWER_MANAGEMENT_MODULE.frequency_value);
+    asic_job_frequency_ms = ASIC_get_asic_job_frequency_ms(POWER_MANAGEMENT_MODULE.frequency_value);
 
     ESP_LOGI(TAG, "ASIC Job Interval: %.2f ms", asic_job_frequency_ms);
     SYSTEM_notify_mining_started();
     ESP_LOGI(TAG, "ASIC Ready!");
 
-    while (1) {
+
+
+    while (1)
+    {
         bm_job * next_bm_job = queue_dequeue(&ASIC_jobs_queue);
         if (next_bm_job != NULL)
         {
-            uint8_t jobid = ASIC_send_work(next_bm_job,active_jobs);
-        }
+            uint8_t jobid = ASIC_send_work(next_bm_job, active_jobs);
 
-        vTaskDelay(asic_job_frequency_ms / portTICK_PERIOD_MS);
+            // Record the start time
+            uint64_t start_time = esp_timer_get_time();
+            job_start_times[jobid] = start_time;
+
+            vTaskDelay(asic_job_frequency_ms / portTICK_PERIOD_MS);
+        }
     }
+
+    // Free the job_start_times array when done
+    free(job_start_times);
 }
 
 void free_mining_notify(mining_notify * params)
@@ -210,9 +230,9 @@ void ASIC_result_task(void *pvParameters)
 {
     static long timegone = 1;
     static int timecounter = 4;
+
     while (1)
     {
-        //task_result *asic_result = (*GLOBAL_STATE.ASIC_functions.receive_result_fn)(GLOBAL_STATE);
         task_result *asic_result = ASIC_process_work(active_jobs);
 
         if (asic_result == NULL)
@@ -238,6 +258,29 @@ void ASIC_result_task(void *pvParameters)
                 asic_result->rolled_version ^ active_job->version);
         }
 
+        // Calculate the elapsed time
+        uint64_t end_time = esp_timer_get_time();
+        double elapsed_ms = (end_time - job_start_times[job_id]) / 1000.0;
+
+        //ESP_LOGI(TAG, "Job ID: %s, Elapsed Time: %.2f ms", active_job->jobid, elapsed_ms);
+
+        // Update total elapsed time and job count
+        total_elapsed_ms += elapsed_ms;
+        job_count++;
+
+        // Periodically update asic_job_frequency_ms based on average elapsed time
+        if (job_count == 10) // Update every 10 jobs
+        {
+            double average_elapsed_ms = total_elapsed_ms / job_count;
+            asic_job_frequency_ms = average_elapsed_ms * 1.1; // Adjust factor as needed
+            if(asic_job_frequency_ms > 2000)
+                asic_job_frequency_ms = 2000;
+            total_elapsed_ms = 0.0;
+            job_count = 0;
+
+            ESP_LOGI(TAG, "Updated ASIC Job Interval: %.2f ms", asic_job_frequency_ms);
+        }
+
         long now = esp_timer_get_time();
         float gh_hash = get_hashrate_cnt();
         if (gh_hash > 0)
@@ -255,4 +298,5 @@ void ASIC_result_task(void *pvParameters)
         }
         SYSTEM_notify_found_nonce(nonce_diff, active_job->target);
     }
+    free(job_start_times);
 }
