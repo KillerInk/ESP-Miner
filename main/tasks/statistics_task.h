@@ -16,7 +16,7 @@ struct StatisticsData
     uint16_t frequency;
     float current;
     int16_t coreVoltageActual;
-    int16_t coreVoltage;
+    float coreVoltage;
     uint16_t fanSpeed;
     uint16_t fanRPM;
     int8_t wifiRSSI;
