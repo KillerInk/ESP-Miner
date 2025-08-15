@@ -1,23 +1,23 @@
-#include "esp_log.h"
 #include "asic.h"
+#include "bm1370.h"
 #include "device_config.h"
+#include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "mining_module.h"
-#include "power_management_module.h"
-#include "system.h"
 #include "pool_module.h"
-#include <string.h>
+#include "power_management_module.h"
 #include "stratum_task.h"
-#include "esp_timer.h"
-#include "bm1370.h"
+#include "system.h"
 #include "system_module.h"
+#include <string.h>
 
 #define TAG "asic_task"
 
 // ASIC task configuration constants
-#define NONCE_SPACE 4294967296.0  // 2^32
-#define QUEUE_LOW_WATER_MARK 10    // Adjust based on requirements
+#define NONCE_SPACE 4294967296.0 // 2^32
+#define QUEUE_LOW_WATER_MARK 10  // Adjust based on requirements
 #define JOB_ARRAY_SIZE 128       // Size of job arrays
 
 // ASIC job queue
@@ -38,12 +38,15 @@ int job_count = 0;
 // Current ASIC job frequency in milliseconds
 double asic_job_frequency_ms;
 double avg_job_freq = 500;
+long timegone = 1;
+int timecounter = 4;
 
 /**
  * Initialize ASIC task resources
  */
-void asic_task_init() {
-    queue_init(&ASIC_jobs_queue, sizeof(bm_job*));
+void asic_task_init()
+{
+    queue_init(&ASIC_jobs_queue, sizeof(bm_job *));
     active_jobs = malloc(sizeof(bm_job *) * JOB_ARRAY_SIZE);
     if (!active_jobs) {
         ESP_LOGE(TAG, "Failed to allocate memory for active_jobs");
@@ -67,18 +70,19 @@ void asic_task_init() {
 /**
  * Get ASIC job frequency in milliseconds based on device type and frequency
  */
-double ASIC_get_asic_job_frequency_ms(float frequency) {
+double ASIC_get_asic_job_frequency_ms(float frequency)
+{
     // Cache device ASIC ID for performance
-        int asic_id = DEVICE_CONFIG.family.asic.id;
+    int asic_id = DEVICE_CONFIG.family.asic.id;
 
-        switch (asic_id) {
-        case BM1397:
-            return (NONCE_SPACE / (double) (frequency * DEVICE_CONFIG.family.asic.small_core_count * 1000)) /
-                   (double) DEVICE_CONFIG.family.asic_count;
-        case BM1366:
-            return 2000.0;
-        default:
-            return 500.0;
+    switch (asic_id) {
+    case BM1397:
+        return (NONCE_SPACE / (double) (frequency * DEVICE_CONFIG.family.asic.small_core_count * 1000)) /
+               (double) DEVICE_CONFIG.family.asic_count;
+    case BM1366:
+        return 2000.0;
+    default:
+        return 500.0;
     }
 }
 
@@ -94,14 +98,15 @@ double ASIC_get_asic_job_frequency_ms(float frequency) {
  * strings and merkle branches. The original notification can then be freed
  * by the caller. If allocation fails, the function logs an error.
  */
-void set_new_mining_notification(mining_notify * notification) {
+void set_new_mining_notification(mining_notify * notification)
+{
     // Validate notification parameter
-        if (notification == NULL) {
-            ESP_LOGE(TAG, "NULL mining notification provided");
-            return;
-        }
+    if (notification == NULL) {
+        ESP_LOGE(TAG, "NULL mining notification provided");
+        return;
+    }
 
-        if (notification != NULL) {
+    if (notification != NULL) {
         // Make a copy of the notification since it will be freed by the caller
         char * job_id = strdup(notification->job_id);
         char * prev_block_hash = strdup(notification->prev_block_hash);
@@ -131,27 +136,24 @@ void set_new_mining_notification(mining_notify * notification) {
             }
             memcpy(copy->merkle_branches, notification->merkle_branches, notification->n_merkle_branches * sizeof(uint8_t[32]));
         }
-        
+
         mining_notification_new = copy;
     }
 }
 /**
  * Process ASIC result and update statistics
  */
-static void process_asic_result(task_result *asic_result, bm_job *active_job, uint8_t job_id) {
+static void process_asic_result(task_result * asic_result, bm_job * active_job, uint8_t job_id)
+{
     // Check the nonce difficulty
     double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
 
     // Log the ASIC response
-    ESP_LOGI(TAG, "ID: %s, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.",
-            active_job->jobid, asic_result->rolled_version, asic_result->nonce,
-            nonce_diff, active_job->pool_diff);
+    ESP_LOGI(TAG, "ID: %s, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid,
+             asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
 
     if (nonce_diff >= active_job->pool_diff) {
-        stratum_submit_share(active_job->jobid,
-                             active_job->extranonce2,
-                             active_job->ntime,
-                             asic_result->nonce,
+        stratum_submit_share(active_job->jobid, active_job->extranonce2, active_job->ntime, asic_result->nonce,
                              asic_result->rolled_version ^ active_job->version);
     }
 
@@ -168,11 +170,12 @@ static void process_asic_result(task_result *asic_result, bm_job *active_job, ui
 /**
  * Update hashrate statistics
  */
-static void update_hashrate(long *timegone, int *timecounter) {
+static void update_hashrate(long * timegone, int * timecounter)
+{
     long now = esp_timer_get_time();
     float gh_hash = get_hashrate_cnt();
     if (gh_hash > 0) {
-        gh_hash = (gh_hash /(now - *timegone)) * 1000000.0f;
+        gh_hash = (gh_hash / (now - *timegone)) * 1000000.0f;
     }
 
     float gh_err = get_hashrate_error_cnt();
@@ -192,11 +195,12 @@ static void update_hashrate(long *timegone, int *timecounter) {
 /**
  * Update job frequency based on average elapsed time
  */
-static void update_job_frequency() {
+static void update_job_frequency()
+{
     double average_elapsed_ms = total_elapsed_ms / job_count;
     avg_job_freq = 0.9 * avg_job_freq + 0.1 * average_elapsed_ms;
     asic_job_frequency_ms = avg_job_freq * 1.1;
-    if(asic_job_frequency_ms > 2000.0) {
+    if (asic_job_frequency_ms > 2000.0) {
         asic_job_frequency_ms = 2000.0;
     }
     total_elapsed_ms = 0.0;
@@ -208,7 +212,8 @@ static void update_job_frequency() {
 /**
  * Check if more work should be generated based on queue status
  */
-static bool should_generate_more_work() {
+static bool should_generate_more_work()
+{
     return uxQueueMessagesWaiting(ASIC_jobs_queue) < QUEUE_LOW_WATER_MARK;
 }
 
@@ -223,24 +228,24 @@ static bool should_generate_more_work() {
  * for the job, and enqueues it to the ASIC jobs queue. It handles all necessary
  * memory management and error checking.
  */
-static void generate_work(mining_notify * notification, uint32_t extranonce_2, uint32_t difficulty) {
+static void generate_work(mining_notify * notification, uint32_t extranonce_2, uint32_t difficulty)
+{
     char * extranonce_2_str = extranonce_2_generate(extranonce_2, MINING_MODULE.extranonce_2_len);
     if (extranonce_2_str == NULL) {
         ESP_LOGE(TAG, "Failed to generate extranonce_2");
         return;
     }
 
-    char * coinbase_tx = construct_coinbase_tx(notification->coinbase_1, notification->coinbase_2,
-                                               MINING_MODULE.extranonce_str, extranonce_2_str);
+    char * coinbase_tx =
+        construct_coinbase_tx(notification->coinbase_1, notification->coinbase_2, MINING_MODULE.extranonce_str, extranonce_2_str);
     if (coinbase_tx == NULL) {
         ESP_LOGE(TAG, "Failed to construct coinbase_tx");
         free(extranonce_2_str);
         return;
     }
 
-    char * merkle_root = calculate_merkle_root_hash(coinbase_tx,
-                                                      (uint8_t (*)[32]) notification->merkle_branches,
-                                                      notification->n_merkle_branches);
+    char * merkle_root =
+        calculate_merkle_root_hash(coinbase_tx, (uint8_t (*)[32]) notification->merkle_branches, notification->n_merkle_branches);
     if (merkle_root == NULL) {
         ESP_LOGE(TAG, "Failed to calculate merkle_root");
         free(extranonce_2_str);
@@ -265,15 +270,15 @@ static void generate_work(mining_notify * notification, uint32_t extranonce_2, u
     queued_next_job->version_mask = MINING_MODULE.version_mask;
 
     // Check for queue overflow before enqueueing
-        if (uxQueueMessagesWaiting(ASIC_jobs_queue) >= JOB_ARRAY_SIZE - 1) {
-            ESP_LOGE(TAG, "Queue close to full, skipping job");
-            free(queued_next_job->extranonce2);
-            free(queued_next_job->jobid);
-            free(queued_next_job);
-            return;
-        }
+    if (uxQueueMessagesWaiting(ASIC_jobs_queue) >= JOB_ARRAY_SIZE - 1) {
+        ESP_LOGE(TAG, "Queue close to full, skipping job");
+        free(queued_next_job->extranonce2);
+        free(queued_next_job->jobid);
+        free(queued_next_job);
+        return;
+    }
 
-        queue_enqueue(&ASIC_jobs_queue, queued_next_job);
+    queue_enqueue(&ASIC_jobs_queue, queued_next_job);
 
     free(coinbase_tx);
     free(merkle_root);
@@ -288,7 +293,8 @@ static void generate_work(mining_notify * notification, uint32_t extranonce_2, u
  * a mining notification, including strings and merkle branches. If the
  * parameter is NULL, the function does nothing.
  */
-void free_mining_notify(mining_notify * params) {
+void free_mining_notify(mining_notify * params)
+{
     if (params) {
         free(params->job_id);
         free(params->prev_block_hash);
@@ -312,7 +318,8 @@ void free_mining_notify(mining_notify * params) {
  *
  * The task runs indefinitely, processing jobs as they become available.
  */
-void ASIC_task(void * pvParameters) {
+void ASIC_task(void * pvParameters)
+{
     asic_job_frequency_ms = ASIC_get_asic_job_frequency_ms(POWER_MANAGEMENT_MODULE.frequency_value);
 
     ESP_LOGI(TAG, "ASIC Job Interval: %.2f ms", asic_job_frequency_ms);
@@ -363,7 +370,8 @@ void ASIC_task(void * pvParameters) {
  * The task runs indefinitely, processing each notification to create
  * and enqueue the necessary mining jobs.
  */
-void create_jobs_task(void * pvParameters) {
+void create_jobs_task(void * pvParameters)
+{
     // Main loop handling
     while (1) {
         // Wait for a notification from stratum_task
@@ -412,15 +420,15 @@ void create_jobs_task(void * pvParameters) {
 /**
  * Process ASIC results and update statistics
  */
-void ASIC_result_task(void *pvParameters) {
+void ASIC_result_task(void * pvParameters)
+{
     // Initialize static variables
-    static long timegone = 1;
-    static int timecounter = 4;
+
     static double avg_job_freq = 0.0;
 
     // Main result processing loop
     while (1) {
-        task_result *asic_result = ASIC_process_work(active_jobs);
+        task_result * asic_result = ASIC_process_work(active_jobs);
 
         if (asic_result == NULL) {
             continue;
