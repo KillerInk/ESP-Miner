@@ -88,9 +88,6 @@ double ASIC_get_asic_job_frequency_ms(float frequency)
 
 /**
  * Set new mining notification with memory copy
- */
-/**
- * Set new mining notification with memory copy
  *
  * @param notification Mining notification to copy
  *
@@ -170,26 +167,27 @@ static void process_asic_result(task_result * asic_result, bm_job * active_job, 
 /**
  * Update hashrate statistics
  */
-static void update_hashrate(long * timegone, int * timecounter)
+static int update_hashrate(long current_time, int counter)
 {
-    long now = esp_timer_get_time();
     float gh_hash = get_hashrate_cnt();
     if (gh_hash > 0) {
-        gh_hash = (gh_hash / (now - *timegone)) * 1000000.0f;
+        gh_hash = (gh_hash / (current_time - timegone)) * 1000000.0f;
     }
 
     float gh_err = get_hashrate_error_cnt();
     if (gh_err > 0) {
-        gh_err = (gh_err / (now - *timegone)) * 1000000.0f;
+        gh_err = (gh_err / (current_time - timegone)) * 1000000.0f;
     }
     SYSTEM_MODULE.hashrate_no_error = gh_hash;
     SYSTEM_MODULE.hashrate_error = gh_err;
 
-    if (*timecounter-- == 0) {
-        *timegone = now;
+    if (counter == 0) {
+        timegone = current_time;
         reset_counters();
-        *timecounter = 20;
+        counter = 20;
+        return counter;
     }
+    return counter;
 }
 
 /**
@@ -422,11 +420,6 @@ void create_jobs_task(void * pvParameters)
  */
 void ASIC_result_task(void * pvParameters)
 {
-    // Initialize static variables
-
-    static double avg_job_freq = 0.0;
-
-    // Main result processing loop
     while (1) {
         task_result * asic_result = ASIC_process_work(active_jobs);
 
@@ -437,14 +430,12 @@ void ASIC_result_task(void * pvParameters)
         uint8_t job_id = asic_result->job_id;
         bm_job * active_job = active_jobs[job_id];
 
-        // Process result and check nonce difficulty
         process_asic_result(asic_result, active_job, job_id);
 
-        // Calculate and update hashrate
-        update_hashrate(&timegone, &timecounter);
+        // Update hashrate and job frequency
+        timecounter = update_hashrate(esp_timer_get_time(), timecounter);
 
-        // Periodically update job frequency based on average elapsed time
-        if (job_count == 10) { // Update every 10 jobs
+        if (job_count == 10) {
             update_job_frequency();
         }
     }
