@@ -6,6 +6,7 @@
 #include "bm1370.h"
 #include "asic.h"
 #include "device_config.h"
+#include "frequency_transition_bmXX.h"
 
 static const char *TAG = "asic";
 
@@ -14,15 +15,15 @@ typedef struct {
     int (*set_max_baud)();
     uint8_t (*send_work)(bm_job * next_job,bm_job ** active_jobs);
     void (*set_version_mask)(uint32_t mask);
-    bool (*set_frequency)(float target_frequency);
+    void (*set_frequency)(float target_frequency);
     uint8_t (*asic_init)(uint64_t frequency, uint16_t asic_count, uint16_t difficulty);
 } asic_methods_t;
 
 static asic_methods_t asic_methods[] = {
-    {BM1397_process_work, BM1397_set_max_baud, BM1397_send_work, BM1397_set_version_mask, NULL, BM1397_init},
-    {BM1366_process_work, BM1366_set_max_baud, BM1366_send_work, BM1366_set_version_mask, BM1366_set_frequency, BM1366_init},
-    {BM1368_process_work, BM1368_set_max_baud, BM1368_send_work, BM1368_set_version_mask, BM1368_set_frequency, BM1368_init},
-    {BM1370_process_work, BM1370_set_max_baud, BM1370_send_work, BM1370_set_version_mask, BM1370_set_frequency, BM1370_init}
+    {BM1397_process_work, BM1397_set_max_baud, BM1397_send_work, BM1397_set_version_mask, BM1397_send_hash_frequency, BM1397_init},
+    {BM1366_process_work, BM1366_set_max_baud, BM1366_send_work, BM1366_set_version_mask, BM1366_send_hash_frequency, BM1366_init},
+    {BM1368_process_work, BM1368_set_max_baud, BM1368_send_work, BM1368_set_version_mask, BM1368_send_hash_frequency, BM1368_init},
+    {BM1370_process_work, BM1370_set_max_baud, BM1370_send_work, BM1370_set_version_mask, BM1370_send_hash_frequency, BM1370_init}
 };
 
 static asic_methods_t *current_asics;
@@ -53,15 +54,7 @@ void ASIC_set_version_mask(uint32_t mask) {
 }
 
 bool ASIC_set_frequency(float target_frequency) {
-    bool success = false;
-    if (current_asics->set_frequency) {
-        success = current_asics->set_frequency(target_frequency);
-    }
-    /*if (success) {
-        ESP_LOGI(TAG, "Successfully transitioned to new ASIC frequency: %.2f MHz", target_frequency);
-    } else {
-        ESP_LOGE(TAG, "Failed to transition to new ASIC frequency: %.2f MHz", target_frequency);
-    }*/
-    return success;
+    current_asics->set_frequency(target_frequency);
+    return true;
 }
 

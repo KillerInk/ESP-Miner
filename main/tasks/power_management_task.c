@@ -13,7 +13,7 @@
 #include "PID.h"
 #include "power.h"
 #include "asic.h"
-#include "power_management_module.h"
+
 #include "auto_tune.h"
 #include "state_module.h"
 #include "wifi_module.h"
@@ -50,12 +50,29 @@ double avg_fanspeed = 15;
 #define PID_STARTUP_HOLD_DURATION 3  // Number of cycles to HOLD pid_d_startup
 #define PID_STARTUP_RAMP_DURATION 17 // Number of cycles to RAMP DOWN D (Total startup duration PID_STARTUP_HOLD_DURATION + PID_STARTUP_RAMP_DURATION)
 
-
 PIDController pid;
+
+void POWER_MANAGEMENT_init_frequency()
+{
+    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, -1);
+    if (frequency < 0) { // fallback if the float value is not yet set
+        frequency = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY, CONFIG_ASIC_FREQUENCY);
+
+        nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
+    }
+
+    ESP_LOGI(TAG, "ASIC Frequency: %g MHz", frequency);
+
+    POWER_MANAGEMENT_MODULE.frequency_value = frequency;
+}
 
 void POWER_MANAGEMENT_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
+
+    POWER_MANAGEMENT_init_frequency();
+    
+    double last_asic_frequency = POWER_MANAGEMENT_MODULE.frequency_value;
 
     pid_setPoint = (double) nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
     min_fan_pct = (double)nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED, min_fan_pct);
@@ -68,12 +85,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
-    double last_asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    POWER_MANAGEMENT_MODULE.frequency_value = last_asic_frequency;
     
     auto_tune_init();
     ESP_LOGI(TAG, "ASIC Frequency: %.2fMHz", (float)POWER_MANAGEMENT_MODULE.frequency_value);
-    
     while (1) {
 
         // Refresh PID setpoint from NVS in case it was changed via API
@@ -120,7 +134,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             VCORE_set_voltage(0.0f);
 
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
+            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, 50);
+            nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, 50);
             nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
             nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
             nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
@@ -183,7 +198,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         float core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-        float asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+        float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
 
         if(auto_tune_get_auto_tune_hashrate()) {
             auto_tune(pid_control_fanspeed);
