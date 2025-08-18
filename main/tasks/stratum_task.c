@@ -6,7 +6,6 @@
 #include <lwip/tcpip.h>
 #include "nvs_config.h"
 #include "stratum_task.h"
-#include "work_queue.h"
 #include "esp_wifi.h"
 #include <esp_sntp.h>
 #include <time.h>

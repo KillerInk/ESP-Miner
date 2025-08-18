@@ -8,7 +8,6 @@ SRCS
     "screen.c"
     "input.c"
     "system.c"
-    "work_queue.c"
     "nvs_device.c"
     "lv_font_portfolio-6x8.c"
     "logo.c"

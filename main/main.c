@@ -21,7 +21,6 @@
 #include "mining_module.h"
 #include "device_config.h"
 #include "display.h"
-#include "work_queue.h"
 #include "wifi_module.h"
 #include "pool_module.h"
 #include "state_module.h"
@@ -115,7 +114,7 @@ void app_main(void)
     STATE_MODULE.ASIC_initalized = true;
     xTaskCreate(stratum_task, "stratum admin", 8192, NULL, 5, NULL);
     xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
-    xTaskCreate(ASIC_task, "asic", 8192, NULL, 10, NULL);
+    //xTaskCreate(ASIC_task, "asic", 8192, NULL, 10, NULL);
     xTaskCreate(ASIC_result_task, "asic result", 8192, NULL, 15, NULL);
     xTaskCreate(statistics_task, "statistics", 8192, NULL, 3, NULL);
 }
