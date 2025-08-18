@@ -12,6 +12,7 @@
 #include "system.h"
 #include "system_module.h"
 #include <string.h>
+#include "asic.h"
 
 #define TAG "asic_task"
 
@@ -69,7 +70,7 @@ void asic_task_init()
 
 /**
  * Get ASIC job frequency in milliseconds based on device type and frequency
- */
+
 double ASIC_get_asic_job_frequency_ms(float frequency)
 {
     // Cache device ASIC ID for performance
@@ -84,7 +85,7 @@ double ASIC_get_asic_job_frequency_ms(float frequency)
     default:
         return 500.0;
     }
-}
+} */
 
 /**
  * Set new mining notification with memory copy
@@ -197,10 +198,10 @@ static void update_job_frequency()
 {
     double average_elapsed_ms = total_elapsed_ms / job_count;
     avg_job_freq = 0.9 * avg_job_freq + 0.1 * average_elapsed_ms;
-    asic_job_frequency_ms = avg_job_freq * 1.1;
+    /*asic_job_frequency_ms = avg_job_freq * 1.1;
     if (asic_job_frequency_ms > 2000.0) {
         asic_job_frequency_ms = 2000.0;
-    }
+    }*/
     total_elapsed_ms = 0.0;
     job_count = 0;
 
@@ -320,7 +321,6 @@ void ASIC_task(void * pvParameters)
 {
     asic_job_frequency_ms = ASIC_get_asic_job_frequency_ms(POWER_MANAGEMENT_MODULE.frequency_value);
 
-    ESP_LOGI(TAG, "ASIC Job Interval: %.2f ms", asic_job_frequency_ms);
     SYSTEM_notify_mining_started();
     ESP_LOGI(TAG, "ASIC Ready!");
 
@@ -397,9 +397,10 @@ void create_jobs_task(void * pvParameters)
             continue;
         }
         mining_notification_new = NULL;
+        generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty);
 
         // Generate work until queue is sufficient
-        while (mining_notification_new == NULL) {
+        /*while (mining_notification_new == NULL) {
             if (should_generate_more_work()) {
                 generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty);
 
@@ -409,7 +410,7 @@ void create_jobs_task(void * pvParameters)
                 // If no more work needed, wait a bit before checking again.
                 vTaskDelay(100 / portTICK_PERIOD_MS);
             }
-        }
+        }*/
 
         free_mining_notify(mining_notification_current);
     }

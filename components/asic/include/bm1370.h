@@ -9,6 +9,8 @@
 #define BM1370_DEBUG_WORK false //causes insane amount of debug output
 #define BM1370_DEBUG_JOBS false //causes insane amount of debug output
 
+static const float BM1370_MIDSTATE_ENGINES = 16.0;
+
 typedef struct __attribute__((__packed__))
 {
     uint8_t job_id;
@@ -31,5 +33,7 @@ task_result * BM1370_process_work(bm_job ** active_jobs);
 float get_hashrate_cnt();
 float get_hashrate_error_cnt();
 void reset_counters();
+void BM1370_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count);
+float BM1370_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll);
 
 #endif /* BM1370_H_ */

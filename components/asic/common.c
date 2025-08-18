@@ -8,6 +8,8 @@
 
 #define PREAMBLE 0xAA55
 
+# define XTAL_OSC_MHZ 25 // related to setting the nonce space
+
 static const char * TAG = "common";
 
 unsigned char _reverse_bits(unsigned char num)
@@ -125,6 +127,56 @@ esp_err_t receive_work(uint8_t * buffer, int buffer_size)
     }
 
     return ESP_OK;
+}
+
+static float calculate_fully_reserved_space(int big_cores, int chain_chip_count, float cno_interval)
+{
+    int address_interval = 256/_largest_power_of_two(chain_chip_count);
+    // Nonce Size for a particular setting
+    // 
+    // Calculates the  size of the distrobuted space
+    // This function enables the time and the hcn register to be set properly 
+    big_cores = _largest_power_of_two(big_cores);
+
+    uint32_t max_nonce_range = 0xffffffff;
+    uint32_t chain_reserve = 0x100;
+    uint32_t chain_reserve16 = chain_reserve << 8;
+    uint32_t address_interval16 = address_interval << 8;
+    uint32_t fully_divided_space = max_nonce_range / (uint32_t)big_cores / chain_reserve16;
+
+    // address interval calculation
+    float fully_reserved_space = (float)fully_divided_space * (float)address_interval16;
+
+    // cno_interval overrides address interval calc
+    if (cno_interval > 0) fully_reserved_space = fully_divided_space * cno_interval;
+
+    return fully_reserved_space;
+}
+
+int calculate_version_rolling_hcn(int big_cores, int chain_chip_count, int frequency, float cno_interval) {
+    // Register HCN Hash Counting Number
+    //          
+    // Calulates the nonce size for version rolling chips
+    // It signifies to the chip when generate the next version and restart the nonce range
+    // This function ensures HCN does not cause duplicates
+    // Warning: HCN can cause duplicates if set too large if you decide not to use this function.
+    float fully_reserved_space = calculate_fully_reserved_space(big_cores, chain_chip_count, cno_interval);
+    int hcn = (fully_reserved_space * ((float)XTAL_OSC_MHZ / (float)frequency) / 2.0);
+    ESP_LOGI(TAG, "Chip setting freq=%i chain_chip_count=%i size=%f", frequency, chain_chip_count, fully_reserved_space);
+    return hcn;
+}
+
+float calculate_timeout_ms(int big_cores, int chain_chip_count, int freq, int versions_per_core, float cno_interval) {
+    // Timeout 
+    // 
+    // Calculates the timeout based on control measures prodvided
+    // Dynamically adjusts time based on nonce size and version size
+    float fully_reserved_space = calculate_fully_reserved_space(big_cores, chain_chip_count, cno_interval);
+
+    // This is the total size in parralell (versions and nonces)
+    float total_nonce_version_size_per_core = (float)versions_per_core * fully_reserved_space;
+
+    return total_nonce_version_size_per_core/(float)freq/1000;
 }
 
 void get_difficulty_mask(uint16_t difficulty, uint8_t *job_difficulty_mask)

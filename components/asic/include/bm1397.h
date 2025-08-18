@@ -9,6 +9,8 @@
 #define BM1397_DEBUG_WORK false //causes insane amount of debug output
 #define BM1397_DEBUG_JOBS false //causes insane amount of debug output
 
+static const float BM1397_MIDSTATE_ENGINES = 4.0;
+
 typedef struct __attribute__((__packed__))
 {
     uint8_t job_id;
@@ -30,5 +32,7 @@ int BM1397_set_max_baud(void);
 int BM1397_set_default_baud(void);
 void BM1397_send_hash_frequency(float frequency);
 task_result * BM1397_process_work(bm_job ** active_jobs);
+void BM1397_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count);
+float BM1397_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll);
 
 #endif /* BM1397_H_ */

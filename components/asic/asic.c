@@ -7,6 +7,8 @@
 #include "asic.h"
 #include "device_config.h"
 #include "frequency_transition_bmXX.h"
+#include "mining_module.h"
+#include "power_management_module.h"
 
 static const char *TAG = "asic";
 
@@ -56,5 +58,46 @@ void ASIC_set_version_mask(uint32_t mask) {
 bool ASIC_set_frequency(float target_frequency) {
     current_asics->set_frequency(target_frequency);
     return true;
+}
+
+double ASIC_get_asic_job_frequency_ms()
+{
+    // default works for all chips
+    float asic_job_frequency_ms = 20;
+
+    // use 1/128 for timeout be approximatly equivalent to Antminer SXX hcn setting 
+    uint64_t frequency = POWER_MANAGEMENT_MODULE.frequency_value;
+    int chain_chip_count = DEVICE_CONFIG.family.asic_count;
+
+    int versions_to_roll =  MINING_MODULE.version_mask>>13;
+
+    ESP_LOGI(TAG, "ASIC Job Frequency: %llu Hz, Chain Chip Count: %i, Versions to Roll: %i", frequency, chain_chip_count, versions_to_roll);
+
+ switch (DEVICE_CONFIG.family.id) {
+        case BM1366:
+            BM1366_set_nonce_percent(frequency, chain_chip_count);
+            asic_job_frequency_ms = BM1366_get_timeout(frequency, chain_chip_count, versions_to_roll);
+            break;
+        case BM1368:
+            BM1368_set_nonce_percent(frequency, chain_chip_count);
+            asic_job_frequency_ms = BM1368_get_timeout(frequency, chain_chip_count, versions_to_roll);
+            break;
+        case BM1370:
+            BM1370_set_nonce_percent(frequency, chain_chip_count);
+            asic_job_frequency_ms = BM1370_get_timeout(frequency, chain_chip_count, versions_to_roll);
+            break;
+        case BM1397:
+            BM1397_set_nonce_percent(frequency, chain_chip_count);
+            asic_job_frequency_ms = BM1397_get_timeout(frequency, chain_chip_count, versions_to_roll);
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown ASIC");
+            return ESP_FAIL; 
+    }
+
+    // set minimum job frequency 
+    if (asic_job_frequency_ms < 20) asic_job_frequency_ms = 20;
+
+    return asic_job_frequency_ms;
 }
 
