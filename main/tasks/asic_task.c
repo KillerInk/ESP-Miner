@@ -4,7 +4,6 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
 #include "mining_module.h"
 #include "pool_module.h"
 #include "power_management_module.h"
@@ -29,7 +28,7 @@ mining_notify * mining_notification_new;
 bm_job ** active_jobs;
 
 long timegone = 1;
-int timecounter = 4;
+
 
 /**
  * Initialize ASIC task resources
@@ -121,7 +120,7 @@ static void process_asic_result(task_result * asic_result, bm_job * active_job, 
 /**
  * Update hashrate statistics
  */
-static int update_hashrate(long current_time, int counter)
+static void update_hashrate(long current_time)
 {
     float gh_hash = get_hashrate_cnt();
     if (gh_hash > 0) {
@@ -134,14 +133,6 @@ static int update_hashrate(long current_time, int counter)
     }
     SYSTEM_MODULE.hashrate_no_error = gh_hash;
     SYSTEM_MODULE.hashrate_error = gh_err;
-
-    if (counter == 0) {
-        timegone = current_time;
-        reset_counters();
-        counter = 20;
-        return counter;
-    }
-    return counter;
 }
 
 
@@ -289,6 +280,6 @@ void ASIC_result_task(void * pvParameters)
         process_asic_result(asic_result, active_job, job_id);
 
         // Update hashrate and job frequency
-        timecounter = update_hashrate(esp_timer_get_time(), timecounter);
+        update_hashrate(esp_timer_get_time());
     }
 }
