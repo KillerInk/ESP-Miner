@@ -59,7 +59,7 @@ void ASIC_set_version_mask(uint32_t mask) {
 
 bool ASIC_set_frequency(float target_frequency) {
     current_asics->set_frequency(target_frequency);
-    ASIC_get_asic_job_frequency_ms();
+    //ASIC_get_asic_job_frequency_ms();
     return true;
 }
 

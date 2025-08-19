@@ -207,7 +207,7 @@ void BM1370_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count) {
     float cno_interval = calculate_cno_interval(chain_chip_count);
     BM1370_set_chip_nonce_offset(chain_chip_count, cno_interval);
 
-    int hcn = calculate_version_rolling_hcn(ASIC_BM1370.core_count, chain_chip_count, (int)frequency, 0);
+    int hcn = calculate_version_rolling_hcn(ASIC_BM1370.core_count, chain_chip_count, (int)1200, 0);
     BM1370_set_hash_counting_number(hcn);
 
     ESP_LOGI(TAG, "Chip setting chips=%i freq=%i hcn=%i chain_chip_count=%i", chain_chip_count, (int)frequency, hcn, chain_chip_count);
