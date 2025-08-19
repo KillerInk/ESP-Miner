@@ -13,7 +13,7 @@
 #include "power_management_module.h"
 #include "system_module.h"
 
-#define DEFAULT_POLL_RATE 1000 // Collect data every second
+#define DEFAULT_POLL_RATE 5000
 
 static const char * TAG = "statistics_task";
 
@@ -24,29 +24,6 @@ static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 static const uint16_t maxDataCount = 720;
 static uint16_t currentDataCount;
 static uint16_t statsFrequency;
-
-typedef struct {
-    int64_t timestamp;
-    double hashrate;
-    double avghashrate;
-    float chipTemperature;
-    float vrTemperature;
-    float power;
-    float voltage;
-    uint16_t frequency;
-    float current;
-    int16_t coreVoltageActual;
-    float coreVoltage;
-    uint16_t fanSpeed;
-    uint16_t fanRPM;
-    int8_t wifiRSSI;
-    uint32_t freeHeap;
-    double hashrate_no_error;
-    double hashrate_error;
-} StatisticsDataAccumulator;
-
-static StatisticsDataAccumulator accData = {};
-static uint16_t accCount = 0;
 
 StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
 {
@@ -117,84 +94,37 @@ void statistics_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
 
+    struct StatisticsData statsData = {};
     TickType_t taskWakeTime = xTaskGetTickCount();
 
     while (1) {
         const int64_t currentTime = esp_timer_get_time() / 1000;
         statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0) * 1000;
+        const int64_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
 
-        if ((0 != statsFrequency) && (accCount < statsFrequency / DEFAULT_POLL_RATE)) {
+        if ((0 != statsFrequency) && (currentTime > waitingTime)) {
             int8_t wifiRSSI = -90;
             get_wifi_current_rssi(&wifiRSSI);
 
-            accData.timestamp += currentTime;
-            accData.hashrate += SYSTEM_MODULE.current_hashrate;
-            accData.chipTemperature += POWER_MANAGEMENT_MODULE.chip_temp_avg;
-            accData.vrTemperature += POWER_MANAGEMENT_MODULE.vr_temp;
-            accData.power += POWER_MANAGEMENT_MODULE.power;
-            accData.voltage += POWER_MANAGEMENT_MODULE.voltage;
-            accData.current += Power_get_current();
-            accData.coreVoltageActual += VCORE_get_voltage_mv();
-            accData.coreVoltage += POWER_MANAGEMENT_MODULE.core_voltage;
-            accData.fanSpeed += POWER_MANAGEMENT_MODULE.fan_perc;
-            accData.fanRPM += POWER_MANAGEMENT_MODULE.fan_rpm;
-            accData.wifiRSSI += wifiRSSI;
-            accData.freeHeap += esp_get_free_heap_size();
-            accData.frequency += POWER_MANAGEMENT_MODULE.frequency_value;
-            accData.avghashrate += SYSTEM_MODULE.avg_hashrate;
-            accData.hashrate_no_error += SYSTEM_MODULE.hashrate_no_error;
-            accData.hashrate_error += SYSTEM_MODULE.hashrate_error;
-            //ESP_LOGI(TAG, "Accumulating coreVoltage: %f", POWER_MANAGEMENT_MODULE.core_voltage);
+            statsData.timestamp = currentTime;
+            statsData.hashrate = SYSTEM_MODULE.current_hashrate;
+            statsData.chipTemperature = POWER_MANAGEMENT_MODULE.chip_temp_avg;
+            statsData.vrTemperature = POWER_MANAGEMENT_MODULE.vr_temp;
+            statsData.power = POWER_MANAGEMENT_MODULE.power;
+            statsData.voltage = POWER_MANAGEMENT_MODULE.voltage;
+            statsData.current = Power_get_current();
+            statsData.coreVoltageActual = VCORE_get_voltage_mv();
+            statsData.coreVoltage = POWER_MANAGEMENT_MODULE.core_voltage;
+            statsData.fanSpeed = POWER_MANAGEMENT_MODULE.fan_perc;
+            statsData.fanRPM = POWER_MANAGEMENT_MODULE.fan_rpm;
+            statsData.wifiRSSI = wifiRSSI;
+            statsData.freeHeap = esp_get_free_heap_size();
+            statsData.frequency = POWER_MANAGEMENT_MODULE.frequency_value;
+            statsData.avghashrate = SYSTEM_MODULE.avg_hashrate;
+            statsData.hashrate_no_error = SYSTEM_MODULE.hashrate_no_error;
+            statsData.hashrate_error = SYSTEM_MODULE.hashrate_error;
 
-            accCount++;
-        } else {
-            if (accCount > 0) {
-                struct StatisticsData avgData = {};
-                avgData.timestamp = accData.timestamp / accCount;
-                avgData.hashrate = accData.hashrate / accCount;
-                avgData.avghashrate = accData.avghashrate / accCount;
-                avgData.chipTemperature = accData.chipTemperature / accCount;
-                avgData.vrTemperature = accData.vrTemperature / accCount;
-                avgData.power = accData.power / accCount;
-                avgData.voltage = accData.voltage / accCount;
-                avgData.current = accData.current / accCount;
-                avgData.coreVoltageActual = accData.coreVoltageActual / accCount;
-                avgData.coreVoltage = accData.coreVoltage / accCount;
-                avgData.fanSpeed = accData.fanSpeed / accCount;
-                avgData.fanRPM = accData.fanRPM / accCount;
-                avgData.wifiRSSI = accData.wifiRSSI / accCount;
-                avgData.freeHeap = accData.freeHeap / accCount;
-                avgData.frequency = accData.frequency / accCount;
-                avgData.avghashrate = accData.avghashrate / accCount;
-                avgData.hashrate_no_error = accData.hashrate_no_error / accCount;
-                avgData.hashrate_error = accData.hashrate_error / accCount;
-
-                //ESP_LOGI(TAG, "Adding statistic data: coreVoltage=%f", avgData.coreVoltage);
-
-                addStatisticData(&avgData);
-
-                // Reset accumulator
-                accData.timestamp = 0;
-                accData.hashrate = 0;
-                accData.avghashrate = 0;
-                accData.chipTemperature = 0;
-                accData.vrTemperature = 0;
-                accData.power = 0;
-                accData.voltage = 0;
-                accData.current = 0;
-                accData.coreVoltageActual = 0;
-                accData.coreVoltage = 0;
-                accData.fanSpeed = 0;
-                accData.fanRPM = 0;
-                accData.wifiRSSI = 0;
-                accData.freeHeap = 0;
-                accData.frequency = 0;
-                accData.avghashrate = 0;
-                accData.hashrate_no_error = 0;
-                accData.hashrate_error = 0;
-
-                accCount = 0;
-            }
+            addStatisticData(&statsData);
         }
 
         vTaskDelayUntil(&taskWakeTime, DEFAULT_POLL_RATE / portTICK_PERIOD_MS); // taskWakeTime is automatically updated
