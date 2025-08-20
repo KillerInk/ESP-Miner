@@ -120,6 +120,7 @@ static void process_asic_result(task_result * asic_result, bm_job * active_job, 
 /**
  * Update hashrate statistics
  */
+int counter = 20;
 static void update_hashrate(long current_time)
 {
     float gh_hash = get_hashrate_cnt();
@@ -133,6 +134,11 @@ static void update_hashrate(long current_time)
     }
     SYSTEM_MODULE.hashrate_no_error = gh_hash;
     SYSTEM_MODULE.hashrate_error = gh_err;
+    if (counter-- == 0) {
+        timegone = current_time;
+        reset_counters();
+        counter = 20;
+    }
 }
 
 
