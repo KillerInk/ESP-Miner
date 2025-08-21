@@ -26,6 +26,7 @@ mining_notify * mining_notification_new;
 
 // Active jobs and their start times
 bm_job ** active_jobs;
+bm_job *active_job;
 
 long timegone = 1;
 
@@ -115,6 +116,7 @@ static void process_asic_result(task_result * asic_result, bm_job * active_job, 
                              asic_result->rolled_version ^ active_job->version);
     }
     SYSTEM_notify_found_nonce(nonce_diff, active_job->target);
+    
 }
 
 /**
@@ -255,6 +257,7 @@ void create_jobs_task(void * pvParameters)
         ESP_LOGI(TAG, "Clean Jobs: clearing queue");
         free_mining_notify(mining_notification_current);
         mining_notification_current = mining_notification_new;
+        mining_notification_new = NULL;
 
         // Validate current notification
         if (mining_notification_current == NULL) {
@@ -262,9 +265,19 @@ void create_jobs_task(void * pvParameters)
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
         }
-        mining_notification_new = NULL;
-        bm_job * next_job = generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty);
-        ASIC_send_work(next_job, active_jobs);
+        if(active_job != NULL)
+        {
+            free(active_job->jobid);
+            free(active_job->extranonce2);
+            free(active_job);
+        }
+        for (int i = 0; i < JOB_ARRAY_SIZE; i++) {
+            active_jobs[i] = NULL;
+        }
+        active_job = NULL;
+       
+        active_job = generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty);
+        ASIC_send_work(active_job, active_jobs);
     }
 }
 
@@ -281,9 +294,10 @@ void ASIC_result_task(void * pvParameters)
         }
 
         uint8_t job_id = asic_result->job_id;
-        bm_job * active_job = active_jobs[job_id];
-
-        process_asic_result(asic_result, active_job, job_id);
+        bm_job * aj = active_jobs[job_id];
+        if(aj == NULL)
+            return;
+        process_asic_result(asic_result, aj, job_id);
 
         // Update hashrate and job frequency
         update_hashrate(esp_timer_get_time());
