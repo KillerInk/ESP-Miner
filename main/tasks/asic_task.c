@@ -11,7 +11,6 @@
 #include "system.h"
 #include "system_module.h"
 #include <string.h>
-#include "asic.h"
 
 #define TAG "asic_task"
 
@@ -21,20 +20,21 @@
 #define JOB_ARRAY_SIZE 128       // Size of job arrays
 
 // Mining notifications
-mining_notify * mining_notification_current;
-mining_notify * mining_notification_new;
+mining_notify * mining_notification_current = NULL;
+mining_notify * mining_notification_new = NULL;
 
 // Active jobs and their start times
-bm_job ** active_jobs;
-bm_job *active_job;
+bm_job ** active_jobs = NULL;
+bm_job *active_job = NULL;
 
-long timegone = 1;
-
+// Time tracking
+static long timegone = 1;
+static int hashrate_counter = 20;
 
 /**
  * Initialize ASIC task resources
  */
-void asic_task_init()
+void asic_task_init(void)
 {
     active_jobs = malloc(sizeof(bm_job *) * JOB_ARRAY_SIZE);
     if (!active_jobs) {
@@ -59,46 +59,46 @@ void asic_task_init()
  */
 void set_new_mining_notification(mining_notify * notification)
 {
-    // Validate notification parameter
     if (notification == NULL) {
         ESP_LOGE(TAG, "NULL mining notification provided");
         return;
     }
 
-    if (notification != NULL) {
-        // Make a copy of the notification since it will be freed by the caller
-        char * job_id = strdup(notification->job_id);
-        char * prev_block_hash = strdup(notification->prev_block_hash);
-        char * coinbase_1 = strdup(notification->coinbase_1);
-        char * coinbase_2 = strdup(notification->coinbase_2);
+    // Make a copy of the notification since it will be freed by the caller
+    char * job_id = strdup(notification->job_id);
+    char * prev_block_hash = strdup(notification->prev_block_hash);
+    char * coinbase_1 = strdup(notification->coinbase_1);
+    char * coinbase_2 = strdup(notification->coinbase_2);
 
-        mining_notify * copy = malloc(sizeof(mining_notify));
-        if (!copy) {
-            ESP_LOGE(TAG, "Failed to allocate memory for mining notification copy");
+    mining_notify * copy = malloc(sizeof(mining_notify));
+    
+    if (!copy) {
+        ESP_LOGE(TAG, "Failed to allocate memory for mining notification copy");
+        return;
+    }
+
+    memcpy(copy, notification, sizeof(mining_notify));
+    copy->job_difficulty = notification->job_difficulty;
+    // Copy the strings
+    copy->job_id = job_id;
+    copy->prev_block_hash = prev_block_hash;
+    copy->coinbase_1 = coinbase_1;
+    copy->coinbase_2 = coinbase_2;
+
+    // Copy the merkle branches
+    if (notification->merkle_branches != NULL) {
+        copy->merkle_branches = malloc(notification->n_merkle_branches * sizeof(uint8_t[32]));
+        if (!copy->merkle_branches) {
+            free(copy);
+            ESP_LOGE(TAG, "Failed to allocate memory for merkle branches");
             return;
         }
-        memcpy(copy, notification, sizeof(mining_notify));
-
-        // Copy the strings
-        copy->job_id = job_id;
-        copy->prev_block_hash = prev_block_hash;
-        copy->coinbase_1 = coinbase_1;
-        copy->coinbase_2 = coinbase_2;
-
-        // Copy the merkle branches
-        if (notification->merkle_branches != NULL) {
-            copy->merkle_branches = malloc(notification->n_merkle_branches * sizeof(uint8_t[32]));
-            if (!copy->merkle_branches) {
-                free(copy);
-                ESP_LOGE(TAG, "Failed to allocate memory for merkle branches");
-                return;
-            }
-            memcpy(copy->merkle_branches, notification->merkle_branches, notification->n_merkle_branches * sizeof(uint8_t[32]));
-        }
-        
-        mining_notification_new = copy;
+        memcpy(copy->merkle_branches, notification->merkle_branches, notification->n_merkle_branches * sizeof(uint8_t[32]));
     }
+
+    mining_notification_new = copy;
 }
+
 /**
  * Process ASIC result and update statistics
  */
@@ -108,21 +108,24 @@ static void process_asic_result(task_result * asic_result, bm_job * active_job, 
     double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
 
     // Log the ASIC response
-    ESP_LOGI(TAG, "ID: %s, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid,
-             asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
+    ESP_LOGI(TAG, "ID: %s, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", 
+             active_job->jobid,
+             asic_result->rolled_version, 
+             asic_result->nonce, 
+             nonce_diff, 
+             active_job->pool_diff);
 
     if (nonce_diff >= active_job->pool_diff) {
-        stratum_submit_share(active_job->jobid, active_job->extranonce2, active_job->ntime, asic_result->nonce,
+        stratum_submit_share(active_job->jobid, active_job->extranonce2, active_job->ntime, 
+                             asic_result->nonce, 
                              asic_result->rolled_version ^ active_job->version);
     }
     SYSTEM_notify_found_nonce(nonce_diff, active_job->target);
-    
 }
 
 /**
  * Update hashrate statistics
  */
-int counter = 20;
 static void update_hashrate(long current_time)
 {
     float gh_hash = get_hashrate_cnt();
@@ -134,15 +137,16 @@ static void update_hashrate(long current_time)
     if (gh_err > 0) {
         gh_err = (gh_err / (current_time - timegone)) * 1000000.0f;
     }
+    
     SYSTEM_MODULE.hashrate_no_error = gh_hash;
     SYSTEM_MODULE.hashrate_error = gh_err;
-    if (counter-- == 0) {
+    
+    if (--hashrate_counter == 0) {
         timegone = current_time;
         reset_counters();
-        counter = 20;
+        hashrate_counter = 20;
     }
 }
-
 
 /**
  * Generate work from mining notification
@@ -158,22 +162,22 @@ static void update_hashrate(long current_time)
 static bm_job * generate_work(mining_notify * notification, uint32_t extranonce_2, uint32_t difficulty)
 {
     char * extranonce_2_str = extranonce_2_generate(extranonce_2, MINING_MODULE.extranonce_2_len);
-    if (extranonce_2_str == NULL) {
+    if (!extranonce_2_str) {
         ESP_LOGE(TAG, "Failed to generate extranonce_2");
         return NULL;
     }
 
-    char * coinbase_tx =
-        construct_coinbase_tx(notification->coinbase_1, notification->coinbase_2, MINING_MODULE.extranonce_str, extranonce_2_str);
-    if (coinbase_tx == NULL) {
+    char * coinbase_tx = construct_coinbase_tx(notification->coinbase_1, notification->coinbase_2, 
+                                               MINING_MODULE.extranonce_str, extranonce_2_str);
+    if (!coinbase_tx) {
         ESP_LOGE(TAG, "Failed to construct coinbase_tx");
         free(extranonce_2_str);
         return NULL;
     }
 
-    char * merkle_root =
-        calculate_merkle_root_hash(coinbase_tx, (uint8_t (*)[32]) notification->merkle_branches, notification->n_merkle_branches);
-    if (merkle_root == NULL) {
+    char * merkle_root = calculate_merkle_root_hash(coinbase_tx, (uint8_t (*)[32]) notification->merkle_branches, 
+                                                  notification->n_merkle_branches);
+    if (!merkle_root) {
         ESP_LOGE(TAG, "Failed to calculate merkle_root");
         free(extranonce_2_str);
         free(coinbase_tx);
@@ -183,7 +187,7 @@ static bm_job * generate_work(mining_notify * notification, uint32_t extranonce_
     bm_job next_job = construct_bm_job(notification, merkle_root, MINING_MODULE.version_mask, difficulty);
 
     bm_job * queued_next_job = malloc(sizeof(bm_job));
-    if (queued_next_job == NULL) {
+    if (!queued_next_job) {
         ESP_LOGE(TAG, "Failed to allocate memory for queued_next_job");
         free(extranonce_2_str);
         free(coinbase_tx);
@@ -222,7 +226,6 @@ void free_mining_notify(mining_notify * params)
     }
 }
 
-
 /**
  * Create jobs task for processing mining notifications
  *
@@ -239,7 +242,6 @@ void free_mining_notify(mining_notify * params)
  */
 void create_jobs_task(void * pvParameters)
 {
-    // Main loop handling
     while (1) {
         // Wait for a notification from stratum_task
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -254,30 +256,41 @@ void create_jobs_task(void * pvParameters)
         }
 
         uint32_t extranonce_2 = 0;
-        ESP_LOGI(TAG, "Clean Jobs: clearing queue");
+        
+        // Clear the current notification and update to new one
         free_mining_notify(mining_notification_current);
         mining_notification_current = mining_notification_new;
         mining_notification_new = NULL;
 
         // Validate current notification
-        if (mining_notification_current == NULL) {
+        if (!mining_notification_current) {
             ESP_LOGE(TAG, "No mining notification available");
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
         }
-        if(active_job != NULL)
-        {
+
+        // Clean up active job
+        if (active_job) {
             free(active_job->jobid);
             free(active_job->extranonce2);
             free(active_job);
+            active_job = NULL;
         }
+
+        // Clear the active jobs array
         for (int i = 0; i < JOB_ARRAY_SIZE; i++) {
-            active_jobs[i] = NULL;
+            if (active_jobs[i]) {
+                active_jobs[i] = NULL;
+            }
         }
-        active_job = NULL;
-       
+
+        // Generate new work and send to ASIC
         active_job = generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty);
-        ASIC_send_work(active_job, active_jobs);
+        if (active_job) {
+            ASIC_send_work(active_job, active_jobs);
+        } else {
+            ESP_LOGE(TAG, "Failed to generate work for mining notification");
+        }
     }
 }
 
@@ -288,17 +301,21 @@ void ASIC_result_task(void * pvParameters)
 {
     while (1) {
         task_result * asic_result = ASIC_process_work(active_jobs);
-
-        if (asic_result == NULL) {
+        
+        if (!asic_result) {
             continue;
         }
 
         uint8_t job_id = asic_result->job_id;
         bm_job * aj = active_jobs[job_id];
-        if(aj == NULL)
-            return;
-        process_asic_result(asic_result, aj, job_id);
+        
+        if (!aj) {
+            ESP_LOGW(TAG, "Received result for job ID %d but no active job found", job_id);
+            continue;
+        }
 
+        process_asic_result(asic_result, aj, job_id);
+        
         // Update hashrate and job frequency
         update_hashrate(esp_timer_get_time());
     }
