@@ -196,33 +196,34 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             POWER_MANAGEMENT_MODULE.fan_perc = fs;
             Thermal_set_fan_percent((float) fs / 100.0);
         }
+        if(STATE_MODULE.ASIC_initalized){
+            float core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
+            float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
 
-        float core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-        float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
-
-        if(auto_tune_get_auto_tune_hashrate()) {
-            auto_tune(pid_control_fanspeed);
-            core_voltage = auto_tune_get_voltage();
-            asic_frequency = auto_tune_get_frequency();
-        }
-
-        if (core_voltage != last_core_voltage) {
-            //ESP_LOGI(TAG, "setting new vcore voltage to %fmV", core_voltage);
-            VCORE_set_voltage((double) core_voltage / 1000.0);
-            last_core_voltage = core_voltage;
-            POWER_MANAGEMENT_MODULE.core_voltage = core_voltage;
-        }
-
-        if (asic_frequency != last_asic_frequency) {
-            //ESP_LOGI(TAG, "New ASIC frequency requested: %fMHz (current: %fMHz)", asic_frequency, last_asic_frequency);
-            
-            bool success = ASIC_set_frequency((float)asic_frequency);
-            
-            if (success) {
-                POWER_MANAGEMENT_MODULE.frequency_value = (float)asic_frequency;
+            if(auto_tune_get_auto_tune_hashrate()) {
+                auto_tune(pid_control_fanspeed);
+                core_voltage = auto_tune_get_voltage();
+                asic_frequency = auto_tune_get_frequency();
             }
-            
-            last_asic_frequency = asic_frequency;
+
+            if (core_voltage != last_core_voltage) {
+                //ESP_LOGI(TAG, "setting new vcore voltage to %fmV", core_voltage);
+                VCORE_set_voltage((double) core_voltage / 1000.0);
+                last_core_voltage = core_voltage;
+                POWER_MANAGEMENT_MODULE.core_voltage = core_voltage;
+            }
+
+            if (asic_frequency != last_asic_frequency) {
+                //ESP_LOGI(TAG, "New ASIC frequency requested: %fMHz (current: %fMHz)", asic_frequency, last_asic_frequency);
+                
+                bool success = ASIC_set_frequency((float)asic_frequency);
+                
+                if (success) {
+                    POWER_MANAGEMENT_MODULE.frequency_value = (float)asic_frequency;
+                }
+                
+                last_asic_frequency = asic_frequency;
+            }
         }
 
         // Check for changing of overheat mode
