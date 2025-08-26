@@ -49,6 +49,27 @@ void asic_task_init(void)
 }
 
 /**
+ * Free mining notification resources
+ *
+ * @param params Mining notification to free
+ *
+ * This function frees all dynamically allocated memory associated with
+ * a mining notification, including strings and merkle branches. If the
+ * parameter is NULL, the function does nothing.
+ */
+void free_mining_notify(mining_notify * params)
+{
+    if (params) {
+        free(params->job_id);
+        free(params->prev_block_hash);
+        free(params->coinbase_1);
+        free(params->coinbase_2);
+        free(params->merkle_branches);
+        free(params);
+    }
+}
+
+/**
  * Set new mining notification with memory copy
  *
  * @param notification Mining notification to copy
@@ -59,11 +80,6 @@ void asic_task_init(void)
  */
 void set_new_mining_notification(mining_notify * notification)
 {
-    if (notification == NULL) {
-        ESP_LOGE(TAG, "NULL mining notification provided");
-        return;
-    }
-
     // Make a copy of the notification since it will be freed by the caller
     char * job_id = strdup(notification->job_id);
     char * prev_block_hash = strdup(notification->prev_block_hash);
@@ -71,7 +87,6 @@ void set_new_mining_notification(mining_notify * notification)
     char * coinbase_2 = strdup(notification->coinbase_2);
 
     mining_notify * copy = malloc(sizeof(mining_notify));
-    
     if (!copy) {
         ESP_LOGE(TAG, "Failed to allocate memory for mining notification copy");
         return;
@@ -97,6 +112,8 @@ void set_new_mining_notification(mining_notify * notification)
     }
 
     mining_notification_new = copy;
+    // Free the original notification when it's no longer needed
+    free_mining_notify(notification);
 }
 
 /**
@@ -205,26 +222,6 @@ static bm_job * generate_work(mining_notify * notification, uint32_t extranonce_
     return queued_next_job;
 }
 
-/**
- * Free mining notification resources
- *
- * @param params Mining notification to free
- *
- * This function frees all dynamically allocated memory associated with
- * a mining notification, including strings and merkle branches. If the
- * parameter is NULL, the function does nothing.
- */
-void free_mining_notify(mining_notify * params)
-{
-    if (params) {
-        free(params->job_id);
-        free(params->prev_block_hash);
-        free(params->coinbase_1);
-        free(params->coinbase_2);
-        free(params->merkle_branches);
-        free(params);
-    }
-}
 
 /**
  * Create jobs task for processing mining notifications
