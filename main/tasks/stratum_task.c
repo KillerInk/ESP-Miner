@@ -202,6 +202,8 @@ void stratum_task(void * pvParameters)
     int ip_protocol = IPPROTO_IP;
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
+    TaskHandle_t create_jobs_task_handle;
+    create_jobs_task_handle = xTaskGetHandle("stratum miner");
 
     xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL);
 
@@ -333,8 +335,7 @@ void stratum_task(void * pvParameters)
                 // Store the current mining notification for create_jobs_task to access
                 set_new_mining_notification(stratum_api_v1_message.mining_notification);
 
-                TaskHandle_t create_jobs_task_handle;
-                create_jobs_task_handle = xTaskGetHandle("stratum miner");
+                
                 if (create_jobs_task_handle != NULL) {
                     xTaskNotifyGive(create_jobs_task_handle);
                 } else {
