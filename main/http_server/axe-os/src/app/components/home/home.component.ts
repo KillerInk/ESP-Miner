@@ -315,11 +315,11 @@ export class HomeComponent {
       this.temperatureData.push(temperature);
       this.powerData.push(Number(power.toFixed(2)));
       this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + timestamp);
-      this.coreVoltageData.push(voltage);
-      this.mhzData.push(freq);
+      this.coreVoltageData.push(Number(voltage.toFixed(2)));
+      this.mhzData.push(Number(freq.toFixed(2)));
       this.fanspeed.push(fanspeed);
       this.avghashrateData.push(avghashrate * 1e9);
-      this.coreVoltageCurrentData.push(voltageCur);
+      this.coreVoltageCurrentData.push(Number(voltageCur.toFixed(2)));
       this.espRam.push(freeHeap);
       this.hashrate_no_error.push(hashrate_no_error * 1e9);
       this.hashrate_error.push(hashrate_error * 1e9);
@@ -327,13 +327,13 @@ export class HomeComponent {
       // For info$ subscription
       this.hashrateData.push(info.hashRate * 1e9);
       this.temperatureData.push(info.temp);
-      this.mhzData.push(info.frequency);
+      this.mhzData.push(Number(info.frequency.toFixed(2)));
       this.coreVoltageData.push(Number(info.coreVoltage.toFixed(2)));
       this.powerData.push(Number(info.power.toFixed(2)));
       this.fanspeed.push(info.fanspeed);
       this.avghashrateData.push(info.avghashRate * 1e9);
       this.dataLabel.push(new Date().getTime());
-      this.coreVoltageCurrentData.push(info.coreVoltageActual);
+      this.coreVoltageCurrentData.push(Number(info.coreVoltageActual.toFixed(2)));
       this.espRam.push(info.freeHeap);
       this.hashrate_no_error.push(info.hashRate_no_error * 1e9);
       this.hashrate_error.push(info.hashRate_error * 1e9);
@@ -774,7 +774,7 @@ Chart.register({
           case 'Hashrate error':
             return suffix;
           default:
-            return value.toString() + suffix;
+            return value.toFixed(2) + suffix;
         }
       };
 
