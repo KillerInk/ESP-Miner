@@ -88,9 +88,10 @@ void app_main(void)
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
-    
+    set_new_mining_notification_callback = set_new_mining_notification;
+    stratum_submit_share_callback = stratum_submit_share;
     asic_task_init();
-
+    
     if (asic_reset() != ESP_OK) {
         STATE_MODULE.asic_status = "ASIC reset failed";
         ESP_LOGE(TAG, "ASIC reset failed!");

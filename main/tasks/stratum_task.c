@@ -16,7 +16,6 @@
 #include "mining_module.h"
 #include "device_config.h"
 #include "pool_module.h"
-#include "asic_task.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
@@ -31,6 +30,7 @@ static StratumApiV1Message stratum_api_v1_message = {};
 static const char * primary_stratum_url;
 static uint16_t primary_stratum_port;
 
+void (*set_new_mining_notification_callback)(mining_notify * notify);
  //maybe need a stratum module
 int sock;
 
@@ -333,7 +333,7 @@ void stratum_task(void * pvParameters)
                 SYSTEM_notify_new_ntime(stratum_api_v1_message.mining_notification->ntime);
                 stratum_api_v1_message.mining_notification->job_difficulty = POOL_MODULE.pool_difficulty;
                 // Store the current mining notification for create_jobs_task to access
-                set_new_mining_notification(stratum_api_v1_message.mining_notification);
+                set_new_mining_notification_callback(stratum_api_v1_message.mining_notification);
 
                 
                 if (create_jobs_task_handle != NULL) {

@@ -7,7 +7,6 @@
 #include "mining_module.h"
 #include "pool_module.h"
 #include "power_management_module.h"
-#include "stratum_task.h"
 #include "system.h"
 #include "system_module.h"
 #include <string.h>
@@ -30,6 +29,7 @@ bm_job *active_job = NULL;
 // Time tracking
 static long timegone = 1;
 static int hashrate_counter = 20;
+int (*stratum_submit_share_callback)(char * jobid, char * extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version);
 
 /**
  * Initialize ASIC task resources
@@ -133,7 +133,7 @@ static void process_asic_result(task_result * asic_result, bm_job * active_job, 
              active_job->pool_diff);
 
     if (nonce_diff >= active_job->pool_diff) {
-        stratum_submit_share(active_job->jobid, active_job->extranonce2, active_job->ntime, 
+        stratum_submit_share_callback(active_job->jobid, active_job->extranonce2, active_job->ntime, 
                              asic_result->nonce, 
                              asic_result->rolled_version ^ active_job->version);
     }
