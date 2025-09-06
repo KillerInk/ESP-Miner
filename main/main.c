@@ -90,6 +90,7 @@ void app_main(void)
 
     set_new_mining_notification_callback = set_new_mining_notification;
     stratum_submit_share_callback = stratum_submit_share;
+    SYSTEM_notify_found_nonce_callback = SYSTEM_notify_found_nonce;
     asic_task_init();
     
     if (asic_reset() != ESP_OK) {

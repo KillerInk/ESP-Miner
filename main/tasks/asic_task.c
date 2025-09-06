@@ -1,13 +1,9 @@
 #include "asic.h"
 #include "bm1370.h"
-#include "device_config.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "mining_module.h"
-#include "pool_module.h"
-#include "power_management_module.h"
-#include "system.h"
 #include "system_module.h"
 #include <string.h>
 
@@ -30,6 +26,7 @@ bm_job *active_job = NULL;
 static long timegone = 1;
 static int hashrate_counter = 20;
 int (*stratum_submit_share_callback)(char * jobid, char * extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version);
+void (*SYSTEM_notify_found_nonce_callback)(double found_diff, uint32_t target);
 
 /**
  * Initialize ASIC task resources
@@ -100,7 +97,7 @@ static void process_asic_result(task_result * asic_result, bm_job * active_job, 
                              asic_result->nonce, 
                              asic_result->rolled_version ^ active_job->version);
     }
-    SYSTEM_notify_found_nonce(nonce_diff, active_job->target);
+    SYSTEM_notify_found_nonce_callback(nonce_diff, active_job->target);
 }
 
 /**
@@ -276,7 +273,6 @@ void ASIC_result_task(void * pvParameters)
 
         process_asic_result(asic_result, aj, job_id);
         
-        // Update hashrate and job frequency
         update_hashrate(esp_timer_get_time());
     }
 }
