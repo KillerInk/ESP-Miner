@@ -19,6 +19,7 @@ SRCS
     "./self_test/self_test.c"
     "./tasks/stratum_task.c"
     "./tasks/asic_task.c"
+    "./tasks/asic_task_common.c"
     "./tasks/power_management_task.c"
     "./tasks/statistics_task.c"
     "./thermal/EMC2101.c"
