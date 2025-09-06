@@ -70,50 +70,13 @@ void free_mining_notify(mining_notify * params)
 }
 
 /**
- * Set new mining notification with memory copy
+ * Set new mining notification
  *
- * @param notification Mining notification to copy
- *
- * This function creates a deep copy of the mining notification, including all
- * strings and merkle branches. The original notification can then be freed
- * by the caller. If allocation fails, the function logs an error.
+ * @param notification Mining notification
  */
 void set_new_mining_notification(mining_notify * notification)
 {
-    // Make a copy of the notification since it will be freed by the caller
-    char * job_id = strdup(notification->job_id);
-    char * prev_block_hash = strdup(notification->prev_block_hash);
-    char * coinbase_1 = strdup(notification->coinbase_1);
-    char * coinbase_2 = strdup(notification->coinbase_2);
-
-    mining_notify * copy = malloc(sizeof(mining_notify));
-    if (!copy) {
-        ESP_LOGE(TAG, "Failed to allocate memory for mining notification copy");
-        return;
-    }
-
-    memcpy(copy, notification, sizeof(mining_notify));
-    copy->job_difficulty = notification->job_difficulty;
-    // Copy the strings
-    copy->job_id = job_id;
-    copy->prev_block_hash = prev_block_hash;
-    copy->coinbase_1 = coinbase_1;
-    copy->coinbase_2 = coinbase_2;
-
-    // Copy the merkle branches
-    if (notification->merkle_branches != NULL) {
-        copy->merkle_branches = malloc(notification->n_merkle_branches * sizeof(uint8_t[32]));
-        if (!copy->merkle_branches) {
-            free(copy);
-            ESP_LOGE(TAG, "Failed to allocate memory for merkle branches");
-            return;
-        }
-        memcpy(copy->merkle_branches, notification->merkle_branches, notification->n_merkle_branches * sizeof(uint8_t[32]));
-    }
-
-    mining_notification_new = copy;
-    // Free the original notification when it's no longer needed
-    free_mining_notify(notification);
+    mining_notification_new = notification;
 }
 
 /**
