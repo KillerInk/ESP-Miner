@@ -7,7 +7,6 @@
 #include "asic.h"
 #include "device_config.h"
 #include "frequency_transition_bmXX.h"
-#include "mining_module.h"
 #include "power_management_module.h"
 
 static const char *TAG = "asic";
@@ -63,7 +62,7 @@ bool ASIC_set_frequency(float target_frequency) {
     return true;
 }
 
-double ASIC_get_asic_job_frequency_ms()
+double ASIC_get_asic_job_frequency_ms(uint32_t version_mask)
 {
     // default works for all chips
     float asic_job_frequency_ms = 20;
@@ -72,7 +71,7 @@ double ASIC_get_asic_job_frequency_ms()
     uint64_t frequency = POWER_MANAGEMENT_MODULE.frequency_value;
     int chain_chip_count = DEVICE_CONFIG.family.asic_count;
 
-    int versions_to_roll =  MINING_MODULE.version_mask>>13;
+    int versions_to_roll =  version_mask>>13;
 
     //ESP_LOGI(TAG, "ASIC Job Frequency: %llu Hz, Chain Chip Count: %i, Versions to Roll: %i", frequency, chain_chip_count, versions_to_roll);
     current_asics->set_nonce_percent(frequency, chain_chip_count);

@@ -14,6 +14,6 @@ int ASIC_set_max_baud();
 uint8_t ASIC_send_work(bm_job * next_job,bm_job ** active_jobs);
 void ASIC_set_version_mask(uint32_t mask);
 bool ASIC_set_frequency(float target_frequency);
-double ASIC_get_asic_job_frequency_ms();
+double ASIC_get_asic_job_frequency_ms(uint32_t version_mask);
 
 #endif // ASIC_H

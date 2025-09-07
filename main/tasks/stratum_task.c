@@ -13,7 +13,6 @@
 #include "esp_timer.h"
 #include <stdbool.h>
 #include "system_module.h"
-#include "mining_module.h"
 #include "device_config.h"
 #include "pool_module.h"
 
@@ -31,6 +30,8 @@ static const char * primary_stratum_url;
 static uint16_t primary_stratum_port;
 
 void (*set_new_mining_notification_callback)(mining_notify * notify);
+void (*set_extranonce_callback)(char * extranonce_str, int extranonce_2_len);
+void (*set_version_mask_callback)(uint32_t _version_mask);
  //maybe need a stratum module
 int sock;
 
@@ -298,7 +299,7 @@ void stratum_task(void * pvParameters)
 
         ///// Start Stratum Action
         // mining.configure - ID: 1
-        STRATUM_V1_configure_version_rolling(sock, send_uid++, &MINING_MODULE.version_mask);
+        STRATUM_V1_configure_version_rolling(sock, send_uid++, &stratum_api_v1_message.version_mask);
 
         // mining.subscribe - ID: 2
         STRATUM_V1_subscribe(sock, send_uid++, DEVICE_CONFIG.family.asic.name);
@@ -347,8 +348,7 @@ void stratum_task(void * pvParameters)
             } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK ||
                     stratum_api_v1_message.method == STRATUM_RESULT_VERSION_MASK) {
                 ESP_LOGI(TAG, "Set version mask: %08lx", stratum_api_v1_message.version_mask);
-                MINING_MODULE.version_mask = stratum_api_v1_message.version_mask;
-                MINING_MODULE.new_stratum_version_rolling_msg = true;
+                set_version_mask_callback(stratum_api_v1_message.version_mask);
             } else if (stratum_api_v1_message.method == MINING_SET_EXTRANONCE ||
                     stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
                 // Validate extranonce_2_len to prevent buffer overflow
@@ -358,8 +358,7 @@ void stratum_task(void * pvParameters)
                     stratum_api_v1_message.extranonce_2_len = MAX_EXTRANONCE_2_LEN;
                 }
                 ESP_LOGI(TAG, "Set extranonce: %s, extranonce_2_len: %d", stratum_api_v1_message.extranonce_str, stratum_api_v1_message.extranonce_2_len);
-                MINING_MODULE.extranonce_str = stratum_api_v1_message.extranonce_str;
-                MINING_MODULE.extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
+                set_extranonce_callback(stratum_api_v1_message.extranonce_str, stratum_api_v1_message.extranonce_2_len);
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
                 ESP_LOGE(TAG, "Pool requested client reconnect...");
                 stratum_close_connection();

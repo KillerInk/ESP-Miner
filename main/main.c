@@ -18,7 +18,6 @@
 #include "power_management_task.h"
 #include "system_module.h"
 #include "self_test_module.h"
-#include "mining_module.h"
 #include "device_config.h"
 #include "display.h"
 #include "wifi_module.h"
@@ -31,7 +30,6 @@ DeviceConfig DEVICE_CONFIG;
 DisplayConfig DISPLAY_CONFIG;
 SelfTestModule SELF_TEST_MODULE;
 StatisticsModule STATISTICS_MODULE;
-mining_queues MINING_MODULE;
 WifiSettings WIFI_MODULE;
 PoolModule POOL_MODULE;
 StateModule STATE_MODULE;
@@ -91,6 +89,8 @@ void app_main(void)
     set_new_mining_notification_callback = set_new_mining_notification;
     stratum_submit_share_callback = stratum_submit_share;
     SYSTEM_notify_found_nonce_callback = SYSTEM_notify_found_nonce;
+    set_extranonce_callback = set_extranonce;
+    set_version_mask_callback = asic_task_set_version_mask;
     asic_task_init();
     
     if (asic_reset() != ESP_OK) {

@@ -1,7 +1,6 @@
 #include "auto_tune.h"
 #include "PID.h"
 #include "esp_log.h"
-#include "mining_module.h"
 #include "nvs_config.h"
 #include "power_management_module.h"
 #include "power_management_task.h"

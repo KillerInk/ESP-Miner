@@ -1,6 +1,5 @@
 #include "asic_task_common.h"
 #include "esp_log.h"
-#include "mining_module.h"
 #define TAG "asic_task_common"
 
 /**
@@ -42,16 +41,16 @@ void process_asic_result(task_result * asic_result,
  * for the job, and enqueues it to the ASIC jobs queue. It handles all necessary
  * memory management and error checking.
  */
-bm_job * generate_work(mining_notify * notification, uint32_t extranonce_2, uint32_t difficulty)
+bm_job * generate_work(mining_notify * notification, uint32_t extranonce_2, uint32_t difficulty,char * _extranonce_str, int _extranonce_2_len, uint32_t version_mask)
 {
-    char * extranonce_2_str = extranonce_2_generate(extranonce_2, MINING_MODULE.extranonce_2_len);
+    char * extranonce_2_str = extranonce_2_generate(extranonce_2, _extranonce_2_len);
     if (!extranonce_2_str) {
         ESP_LOGE(TAG, "Failed to generate extranonce_2");
         return NULL;
     }
 
     char * coinbase_tx = construct_coinbase_tx(notification->coinbase_1, notification->coinbase_2, 
-                                               MINING_MODULE.extranonce_str, extranonce_2_str);
+                                               _extranonce_str, extranonce_2_str);
     if (!coinbase_tx) {
         ESP_LOGE(TAG, "Failed to construct coinbase_tx");
         free(extranonce_2_str);
@@ -67,7 +66,7 @@ bm_job * generate_work(mining_notify * notification, uint32_t extranonce_2, uint
         return NULL;
     }
 
-    bm_job next_job = construct_bm_job(notification, merkle_root, MINING_MODULE.version_mask, difficulty);
+    bm_job next_job = construct_bm_job(notification, merkle_root, version_mask, difficulty);
 
     bm_job * queued_next_job = malloc(sizeof(bm_job));
     if (!queued_next_job) {
@@ -81,7 +80,7 @@ bm_job * generate_work(mining_notify * notification, uint32_t extranonce_2, uint
     memcpy(queued_next_job, &next_job, sizeof(bm_job));
     queued_next_job->extranonce2 = extranonce_2_str; // Transfer ownership
     queued_next_job->jobid = strdup(notification->job_id);
-    queued_next_job->version_mask = MINING_MODULE.version_mask;
+    queued_next_job->version_mask = version_mask;
 
     free(coinbase_tx);
     free(merkle_root);
