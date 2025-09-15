@@ -63,9 +63,13 @@ export interface ISystemInfo {
     boardtemp1?: number,
     boardtemp2?: number,
     overheat_mode: number,
-    power_fault?: string
+    power_fault?: string,
     overclockEnabled?: number,
     avghashRate: number,
     hashRate_no_error: number,
     hashRate_error: number,
+
+    blockHeight?: number,
+    scriptsig?: string,
+    networkDifficulty?: string,
 }

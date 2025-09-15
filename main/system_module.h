@@ -56,6 +56,10 @@ typedef struct
 
     // A string representing the difficulty of the best session nonce in readable format.
     char best_session_diff_string[DIFF_STRING_SIZE];
+    uint64_t work_received;
+    int block_height;
+    char * scriptsig;
+    char network_diff_string[DIFF_STRING_SIZE];
 } SystemModule;
 
 extern SystemModule SYSTEM_MODULE;

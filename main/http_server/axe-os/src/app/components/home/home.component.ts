@@ -1,5 +1,5 @@
-import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
-import { interval, map, Observable, shareReplay, startWith, switchMap, tap, first } from 'rxjs';
+import { Component, ElementRef, HostListener, OnInit, ViewChild,OnDestroy } from '@angular/core';
+import { interval, map, Observable, shareReplay, startWith, switchMap, tap, first, Subject, takeUntil } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
@@ -18,7 +18,7 @@ import { saveAs } from 'file-saver';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit, OnDestroy {
 
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
@@ -50,6 +50,7 @@ export class HomeComponent {
   public activePoolUser!: string;
   public activePoolLabel!: 'Primary' | 'Fallback';
   public responseTime!: number;
+
   @ViewChild('chart')
   private chart?: UIChart;
 
@@ -61,6 +62,7 @@ export class HomeComponent {
   private mousestartposition = 0;
   private pageDefaultTitle: string = '';
   public datasetVisibility: boolean[] = [];
+  private destroy$ = new Subject<void>();
   public isMouseOverChart = false;
   public diffData: number[] = [];
 
@@ -75,9 +77,11 @@ export class HomeComponent {
     this.initializeChart();
 
     // Subscribe to theme changes
-    this.themeService.getThemeSettings().subscribe(() => {
-      this.updateChartColors();
-    });
+    this.themeService.getThemeSettings()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.updateChartColors();
+      });
   }
 
   ngOnInit() {
@@ -88,6 +92,11 @@ export class HomeComponent {
   private get zoomPanFactor(): number {
     return Math.max(1, Math.floor(this.visibleItemCount / 40));
   }
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
 
   onMouseWheel(event: WheelEvent) {
     if (!this.isMouseOverChart) return;
@@ -172,12 +181,10 @@ export class HomeComponent {
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
     const colors = this.getThemeColors(documentStyle);
-
     this.applyColorsToDatasets(colors);
     this.applyColorsToOptions(colors, documentStyle);
     this.chartData = { ...this.chartData };
   }
-
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
     const colors = this.getThemeColors(documentStyle);
@@ -415,13 +422,11 @@ export class HomeComponent {
 
     );
 
-    this.info$.pipe(
-      first()
-    ).subscribe({
-      next: () => {
-        this.loadingService.loading$.next(false)
-      }
-    });
+    this.info$
+      .pipe(first())
+      .subscribe(() => {
+        this.loadingService.loading$.next(false);
+      });
 
     this.quickLink$ = this.info$.pipe(
       map(info => {

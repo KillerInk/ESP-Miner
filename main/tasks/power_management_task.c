@@ -85,7 +85,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
     double last_core_voltage = 0.0;
-    
+
     auto_tune_init();
     ESP_LOGI(TAG, "ASIC Frequency: %.2fMHz", (float)POWER_MANAGEMENT_MODULE.frequency_value);
     while (1) {
@@ -98,17 +98,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         POWER_MANAGEMENT_MODULE.fan_rpm = Thermal_get_fan_speed();
         POWER_MANAGEMENT_MODULE.chip_temp_avg = Thermal_get_chip_temp();
-        
+        POWER_MANAGEMENT_MODULE.chip_temp2_avg = Thermal_get_chip_temp2();
         POWER_MANAGEMENT_MODULE.vr_temp = Power_get_vreg_temp();
-        // Only get second temperature for dual-sensor devices (GAMMA_TURBO)
-        if (Thermal_has_dual_sensors()) {
-            thermal_temps_t temps = Thermal_get_chip_temps();
-            POWER_MANAGEMENT_MODULE.chip_temp_avg = temps.temp1;
-            POWER_MANAGEMENT_MODULE.chip_temp2_avg = temps.temp2;
-        } else {
-            POWER_MANAGEMENT_MODULE.chip_temp2_avg = 0.0f;
-        }
-
 
         // ASIC Thermal Diode will give bad readings if the ASIC is turned off
         // if(POWER_MANAGEMENT_MODULE.voltage < tps546_config.TPS546_INIT_VOUT_MIN){
@@ -116,15 +107,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         // }
 
         //overheat mode if the voltage regulator or ASIC is too hot
-        bool asic_overheat = POWER_MANAGEMENT_MODULE.chip_temp_avg > THROTTLE_TEMP;
-        
-        // For EMC2103 devices, check second chip temperature
-        if (DEVICE_CONFIG.EMC2103) {
-            asic_overheat = asic_overheat || (POWER_MANAGEMENT_MODULE.chip_temp2_avg > THROTTLE_TEMP);
-        }
+        bool asic_overheat = 
+            POWER_MANAGEMENT_MODULE.chip_temp_avg > THROTTLE_TEMP
+            || POWER_MANAGEMENT_MODULE.chip_temp2_avg > THROTTLE_TEMP;
         
         if ((POWER_MANAGEMENT_MODULE.vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (POWER_MANAGEMENT_MODULE.frequency_value > 50 || POWER_MANAGEMENT_MODULE.voltage > 1000)) {
-            if (DEVICE_CONFIG.EMC2103) {
+            if (POWER_MANAGEMENT_MODULE.chip_temp2_avg > 0) {
                 ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC1: %fC ASIC2: %fC", POWER_MANAGEMENT_MODULE.vr_temp, POWER_MANAGEMENT_MODULE.chip_temp_avg, POWER_MANAGEMENT_MODULE.chip_temp2_avg);
             } else {
                 ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC: %fC", POWER_MANAGEMENT_MODULE.vr_temp, POWER_MANAGEMENT_MODULE.chip_temp_avg);
@@ -141,11 +129,15 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
             exit(EXIT_FAILURE);
         }
-        bool pid_control_fanspeed = nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1;
-        // enable the PID auto control for the FAN if set
-        if (pid_control_fanspeed) {
+
+        //enable the PID auto control for the FAN if set
+        if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
             if (POWER_MANAGEMENT_MODULE.chip_temp_avg >= 0) { // Ignore invalid temperature readings (-1)
-                pid_input = POWER_MANAGEMENT_MODULE.chip_temp_avg;
+                if (POWER_MANAGEMENT_MODULE.chip_temp2_avg > 0) {
+                    pid_input = (POWER_MANAGEMENT_MODULE.chip_temp_avg + POWER_MANAGEMENT_MODULE.chip_temp2_avg) / 2.0; // TODO: Or max of both?
+                } else {
+                    pid_input = POWER_MANAGEMENT_MODULE.chip_temp_avg;
+                }
                 
                 // Hold and Ramp logic for startup D value
                 if (pid_startup_phase) {
@@ -201,7 +193,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             double asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
 
             if(auto_tune_get_auto_tune_hashrate()) {
-                auto_tune(pid_control_fanspeed);
+                auto_tune(true);
                 core_voltage = auto_tune_get_voltage();
                 asic_frequency = auto_tune_get_frequency();
             }

@@ -34,6 +34,8 @@ typedef struct
 
     // A flag indicating whether PSRAM (Pseudo-Static RAM) is available on the device.
     bool psram_is_available;
+
+
 }StateModule;
 
 extern StateModule STATE_MODULE;

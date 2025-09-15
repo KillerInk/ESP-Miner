@@ -88,6 +88,10 @@ export class SystemService {
         hashRate_no_error: 475,
         hashRate_error: 475,
 
+
+        blockHeight: 811111,
+        scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",
+        networkDifficulty: "25.3T",
       }
     ).pipe(delay(1000));
   }
