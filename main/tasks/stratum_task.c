@@ -54,8 +54,6 @@ void (*set_new_mining_notification_callback)(mining_notify * notify);
 void (*set_extranonce_callback)(char * extranonce_str, int extranonce_2_len);
 void (*set_version_mask_callback)(uint32_t _version_mask);
 
-int sock;
-int hb_sock;
 int send_uid;
 bool extranonce_subscribe;
 uint16_t difficulty;
@@ -67,7 +65,7 @@ int authorize_message_id;
 
 int stratum_submit_share(char * jobid, char * extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version)
 {
-    return stratum_submit_share_(jobid, extranonce2, ntime, nonce, version, &sock, send_uid++);
+    return stratum_submit_share_(jobid, extranonce2, ntime, nonce, version, &POOL_MODULE.pools[POOL_MODULE.active_pool].sock, send_uid++);
 }
 
 bool switch_to_fallback_pool()
@@ -116,28 +114,28 @@ void stratum_primary_heartbeat(void * pvParameters)
         }
 
         if (!connect_to_stratum_server(primary_stratum_url, primary_stratum_port, &retry_attempts, &retry_critical_attempts,
-                                       &hb_sock))
+                                       &POOL_MODULE.pools[POOL_MAIN].sock))
             continue;
 
         int send_uid = 1;
-        STRATUM_V1_subscribe(hb_sock, send_uid++, DEVICE_CONFIG.family.asic.name);
-        STRATUM_V1_authorize(hb_sock, send_uid++, POOL_MODULE.pools[POOL_MODULE.active_pool].user, POOL_MODULE.pools[POOL_MODULE.active_pool].pass);
+        STRATUM_V1_subscribe(POOL_MODULE.pools[POOL_MAIN].sock, send_uid++, DEVICE_CONFIG.family.asic.name);
+        STRATUM_V1_authorize(POOL_MODULE.pools[POOL_MAIN].sock, send_uid++, POOL_MODULE.pools[POOL_MAIN].user, POOL_MODULE.pools[POOL_MAIN].pass);
 
         char recv_buffer[BUFFER_SIZE];
         memset(recv_buffer, 0, sizeof(recv_buffer));
-        int bytes_received = recv(hb_sock, recv_buffer, BUFFER_SIZE - 1, 0);
+        int bytes_received = recv(POOL_MODULE.pools[POOL_MAIN].sock, recv_buffer, BUFFER_SIZE - 1, 0);
 
         bool hb_ok = (bytes_received != -1 && strstr(recv_buffer, "mining.notify") != NULL);
         if (hb_ok) {
             POOL_MODULE.active_pool = POOL_MAIN;
             ESP_LOGI(TAG, "Primary Pool is back online");
             // stratum_close_connection(&sock);
-            stratum_close_connection(&hb_sock);
+            stratum_close_connection(&POOL_MODULE.pools[POOL_MAIN].sock);
             vTaskDelay(pdMS_TO_TICKS(5000));
             current_state = STRATUM_STATE_ERROR_RETRY; // reconnect to primary
         } else {
-            shutdown(hb_sock, SHUT_RDWR);
-            close(hb_sock);
+            shutdown(POOL_MODULE.pools[POOL_MAIN].sock, SHUT_RDWR);
+            close(POOL_MODULE.pools[POOL_MAIN].sock);
         }
         vTaskDelay(pdMS_TO_TICKS(60000));
     }
@@ -176,11 +174,11 @@ void stratum_task(void * pvParameters)
             break;
 
         case STRATUM_STATE_WAIT_NOTIFY: 
-            char * line = STRATUM_V1_receive_jsonrpc_line(sock);
+            char * line = STRATUM_V1_receive_jsonrpc_line(POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
             if (!line) {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
                 retry_attempts++;
-                stratum_close_connection(&sock);
+                stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
                 handle_retry_or_fallback();
                 break;
             }
@@ -216,30 +214,30 @@ void do_connect(void)
     char * stratum_url = POOL_MODULE.pools[POOL_MODULE.active_pool].url;
     uint16_t port = POOL_MODULE.pools[POOL_MODULE.active_pool].port;
 
-    if (!connect_to_stratum_server(stratum_url, port, &retry_attempts, &retry_critical_attempts, &sock)) {
+    if (!connect_to_stratum_server(stratum_url, port, &retry_attempts, &retry_critical_attempts, &POOL_MODULE.pools[POOL_MODULE.active_pool].sock)) {
         /* Failed – go to retry/fallback logic */
         handle_retry_or_fallback();
         return;
     }
 
     /* Connection succeeded – authenticate immediately */
-    send_uid = send_initial_messages(authorize_message_id, &sock, stratum_api_v1_message.version_mask);
+    send_uid = send_initial_messages(authorize_message_id, &POOL_MODULE.pools[POOL_MODULE.active_pool].sock, stratum_api_v1_message.version_mask);
     current_state = STRATUM_STATE_WAIT_NOTIFY; // next step
 }
 
 void handle_authenticating(void)
 {
-    send_uid = send_initial_messages(authorize_message_id, &sock, stratum_api_v1_message.version_mask);
+    send_uid = send_initial_messages(authorize_message_id, &POOL_MODULE.pools[POOL_MODULE.active_pool].sock, stratum_api_v1_message.version_mask);
     current_state = STRATUM_STATE_WAIT_NOTIFY;
 }
 
 void handle_wait_notify(void)
 {
-    char * line = STRATUM_V1_receive_jsonrpc_line(sock);
+    char * line = STRATUM_V1_receive_jsonrpc_line(POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
     if (!line) {
         ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
         retry_attempts++;
-        stratum_close_connection(&sock);
+        stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
         current_state = STRATUM_STATE_ERROR_RETRY;
         return;
     }
@@ -255,11 +253,11 @@ void handle_wait_notify(void)
 void handle_process_shares(void)
 {
     /* Process a single JSON‑RPC line from the socket. */
-    char * line = STRATUM_V1_receive_jsonrpc_line(sock);
+    char * line = STRATUM_V1_receive_jsonrpc_line(POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
     if (!line) {
         ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
         retry_attempts++;
-        stratum_close_connection(&sock);
+        stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
         current_state = STRATUM_STATE_ERROR_RETRY;
         return;
     }
@@ -310,7 +308,7 @@ void handle_process_shares(void)
 
     case CLIENT_RECONNECT:
         ESP_LOGE(TAG, "Pool requested client reconnect...");
-        stratum_close_connection(&sock);
+        stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
         current_state = STRATUM_STATE_ERROR_RETRY;
         return;
 
@@ -329,10 +327,10 @@ void handle_process_shares(void)
         if (stratum_api_v1_message.response_success) {
             ESP_LOGI(TAG, "setup message accepted");
             if (stratum_api_v1_message.message_id == authorize_message_id) {
-                STRATUM_V1_suggest_difficulty(sock, send_uid++, difficulty);
+                STRATUM_V1_suggest_difficulty(POOL_MODULE.pools[POOL_MODULE.active_pool].sock, send_uid++, difficulty);
             }
             if (extranonce_subscribe) {
-                STRATUM_V1_extranonce_subscribe(sock, send_uid++);
+                STRATUM_V1_extranonce_subscribe(POOL_MODULE.pools[POOL_MODULE.active_pool].sock, send_uid++);
             }
         } else {
             ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);

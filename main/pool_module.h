@@ -1,24 +1,27 @@
 #ifndef POOL_MODULE_H_
 #define POOL_MODULE_H_
 
-typedef struct {
+typedef struct
+{
     // The URL of the mining pool.
-    char *url;
+    char * url;
 
     // The port number on which the mining pool operates.
     uint16_t port;
 
     // Username for authenticating with the mining pool.
-    char *user;
+    char * user;
 
     // Password for authenticating with the mining pool.
-    char *pass;
+    char * pass;
 
     // Difficulty level set on the mining pool.
     uint16_t difficulty;
 
     // Flag indicating whether this pool supports extranonce subscription.
     bool extranonce_subscribe;
+    // Socket file descriptor used to communicate with the pool.
+    int sock;
 } PoolInfo;
 
 #define POOL_MAIN 0
