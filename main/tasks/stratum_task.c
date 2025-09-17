@@ -50,7 +50,6 @@ void handle_error_retry(void);
 void handle_switch_fallback(void);
 void handle_shutdown(void);
 
-
 static StratumApiV1Message stratum_api_v1_message = {};
 static char * primary_stratum_url;
 static uint16_t primary_stratum_port;
@@ -136,10 +135,12 @@ void stratum_primary_heartbeat(void * pvParameters)
         close(hb_sock);
 
         bool hb_ok = (bytes_received != -1 && strstr(recv_buffer, "mining.notify") != NULL);
-        POOL_MODULE.is_using_fallback = !hb_ok;
-        ESP_LOGI(TAG, "Primary Pool is back online");
-        stratum_close_connection(&sock);
-        current_state = STRATUM_STATE_CONNECTING; // reconnect to primary
+        if (hb_ok) {
+            POOL_MODULE.is_using_fallback = !hb_ok;
+            ESP_LOGI(TAG, "Primary Pool is back online");
+            stratum_close_connection(&sock);
+            current_state = STRATUM_STATE_CONNECTING; // reconnect to primary
+        }
         vTaskDelay(pdMS_TO_TICKS(60000));
     }
 }
