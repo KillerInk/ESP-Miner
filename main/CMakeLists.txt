@@ -23,6 +23,7 @@ SRCS
     "./http_server/axe-os/api/system/asic_settings.c"
     "./self_test/self_test.c"
     "./tasks/stratum_task.c"
+    "./tasks/stratum_task_common.c"
     "./tasks/asic_task.c"
     "./tasks/asic_task_common.c"
     "./tasks/power_management_task.c"

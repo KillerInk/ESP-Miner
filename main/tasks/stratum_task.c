@@ -17,9 +17,10 @@
 #include <stdbool.h>
 #include <sys/time.h>
 #include <time.h>
+#include "stratum_task_common.h"
 
 #define MAX_RETRY_ATTEMPTS      3
-#define MAX_CRITICAL_RETRY_ATTEMPTS 5
+
 #define MAX_EXTRANONCE_2_LEN   32
 #define BUFFER_SIZE            1024
 
@@ -69,136 +70,10 @@ int retry_critical_attempts = 0;
 int retry_attempts = 0;
 TaskHandle_t create_jobs_task_handle;
 int authorize_message_id;
-char host_ip[20];
 
-struct timeval tcp_snd_timeout = {.tv_sec = 5, .tv_usec = 0};
-struct timeval tcp_rcv_timeout = {.tv_sec = 60 * 10, .tv_usec = 0};
-
-bool is_wifi_connected()
+int stratum_submit_share(char * jobid, char * extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version)
 {
-    wifi_ap_record_t ap_info;
-    return esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK;
-}
-
-void stratum_reset_uid()
-{
-    ESP_LOGI(TAG, "Resetting stratum uid");
-    send_uid = 1;
-}
-
-void stratum_close_connection()
-{
-    if (sock < 0) {
-        ESP_LOGE(TAG, "Socket already shutdown, not shutting down again..");
-        return;
-    }
-
-    ESP_LOGE(TAG, "Shutting down socket and restarting...");
-    shutdown(sock, SHUT_RDWR);
-    close(sock);
-    vTaskDelay(pdMS_TO_TICKS(1000));
-}
-
-int stratum_submit_share(char * jobid, char * extranonce2,
-                         uint32_t ntime, uint32_t nonce, uint32_t version)
-{
-    char * user = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
-    int ret = STRATUM_V1_submit_share(sock, send_uid++, user,
-                                      jobid, extranonce2, ntime, nonce, version);
-
-    if (ret < 0) {
-        ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)",
-                 ret, errno, strerror(errno));
-        stratum_close_connection();
-    }
-    return ret;
-}
-
-void decode_mining_notification(const mining_notify * mining_notification)
-{
-    double network_difficulty = networkDifficulty(mining_notification->target);
-    suffixString(network_difficulty,
-                 SYSTEM_MODULE.network_diff_string,
-                 DIFF_STRING_SIZE, 0);
-
-    int coinbase_1_len = strlen(mining_notification->coinbase_1) / 2;
-    int coinbase_2_len = strlen(mining_notification->coinbase_2) / 2;
-
-    int coinbase_1_offset = 41; // Skip version (4), inputcount (1),
-                                // prevhash (32), vout (4)
-    if (coinbase_1_len < coinbase_1_offset)
-        return;
-
-    uint8_t scriptsig_len;
-    hex2bin(mining_notification->coinbase_1 + (coinbase_1_offset * 2),
-            &scriptsig_len, 1);
-    coinbase_1_offset++;
-
-    if (coinbase_1_len < coinbase_1_offset)
-        return;
-
-    uint8_t block_height_len;
-    hex2bin(mining_notification->coinbase_1 + (coinbase_1_offset * 2),
-            &block_height_len, 1);
-    coinbase_1_offset++;
-
-    if (coinbase_1_len < coinbase_1_offset ||
-        block_height_len == 0 || block_height_len > 4)
-        return;
-
-    uint32_t block_height = 0;
-    hex2bin(mining_notification->coinbase_1 + (coinbase_1_offset * 2),
-            (uint8_t *) &block_height, block_height_len);
-    coinbase_1_offset += block_height_len;
-
-    if (block_height != SYSTEM_MODULE.block_height) {
-        ESP_LOGI(TAG, "Block height %d", block_height);
-        SYSTEM_MODULE.block_height = block_height;
-    }
-
-    size_t scriptsig_length =
-            scriptsig_len - 1 - block_height_len -
-            (strlen(stratum_api_v1_message.extranonce_str) / 2) -
-            stratum_api_v1_message.extranonce_2_len;
-    if (scriptsig_length <= 0)
-        return;
-
-    char * scriptsig = malloc(scriptsig_length + 1);
-
-    int coinbase_1_tag_len = coinbase_1_len - coinbase_1_offset;
-    hex2bin(mining_notification->coinbase_1 +
-            (coinbase_1_offset * 2),
-            (uint8_t *) scriptsig, coinbase_1_tag_len);
-
-    int coinbase_2_tag_len = scriptsig_length - coinbase_1_tag_len;
-
-    if (coinbase_2_len < coinbase_2_tag_len)
-        return;
-
-    if (coinbase_2_tag_len > 0) {
-        hex2bin(mining_notification->coinbase_2,
-                (uint8_t *) scriptsig + coinbase_1_tag_len,
-                coinbase_2_tag_len);
-    }
-
-    for (int i = 0; i < scriptsig_length; i++) {
-        if (!isprint((unsigned char) scriptsig[i])) {
-            scriptsig[i] = '.';
-        }
-    }
-
-    scriptsig[scriptsig_length] = '\0';
-
-    if (SYSTEM_MODULE.scriptsig == NULL ||
-        strcmp(scriptsig, SYSTEM_MODULE.scriptsig) != 0) {
-        ESP_LOGI(TAG, "Scriptsig: %s", scriptsig);
-
-        char * previous_miner_tag = SYSTEM_MODULE.scriptsig;
-        SYSTEM_MODULE.scriptsig = scriptsig;
-        free(previous_miner_tag);
-    } else {
-        free(scriptsig);
-    }
+    return stratum_submit_share_(jobid,extranonce2,ntime,nonce,version,&sock,send_uid++);
 }
 
 bool switch_to_fallback_pool()
@@ -236,100 +111,6 @@ bool switch_to_fallback_pool()
     return true;
 }
 
-bool connect_to_stratum_server(char * stratum_url, uint16_t port)
-{
-    struct hostent * dns_addr = gethostbyname(stratum_url);
-    if (dns_addr == NULL) {
-        retry_attempts++;
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        return false;
-    }
-    inet_ntop(AF_INET,
-              (void *) dns_addr->h_addr_list[0],
-              host_ip, sizeof(host_ip));
-
-    ESP_LOGI(TAG,
-             "Connecting to: stratum+tcp://%s:%d (%s)",
-             stratum_url, port, host_ip);
-
-    struct sockaddr_in dest_addr;
-    dest_addr.sin_addr.s_addr = inet_addr(host_ip);
-    dest_addr.sin_family      = AF_INET;
-    dest_addr.sin_port        = htons(port);
-
-    sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-    vTaskDelay(pdMS_TO_TICKS(300));
-    if (sock < 0) {
-        ESP_LOGE(TAG,
-                 "Unable to create socket: errno %d",
-                 errno);
-        if (++retry_critical_attempts > MAX_CRITICAL_RETRY_ATTEMPTS) {
-            ESP_LOGE(TAG,
-                     "Max retry attempts reached, restarting...");
-            esp_restart();
-        }
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        return false;
-    }
-    retry_critical_attempts = 0;
-
-    ESP_LOGI(TAG,
-             "Socket created, connecting to %s:%d",
-             host_ip, port);
-    int err = connect(sock,
-                      (struct sockaddr *) &dest_addr,
-                      sizeof(struct sockaddr_in));
-    if (err != 0) {
-        retry_attempts++;
-        ESP_LOGE(TAG,
-                 "Socket unable to connect to %s:%d "
-                 "(errno %d: %s)",
-                 stratum_url, port,
-                 errno, strerror(errno));
-        shutdown(sock, SHUT_RDWR);
-        close(sock);
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        return false;
-    }
-
-    if (setsockopt(sock,
-                   SOL_SOCKET,
-                   SO_SNDTIMEO,
-                   &tcp_snd_timeout,
-                   sizeof(tcp_snd_timeout)) != 0) {
-        ESP_LOGE(TAG, "Fail to setsockopt SO_SNDTIMEO");
-    }
-
-    if (setsockopt(sock,
-                   SOL_SOCKET,
-                   SO_RCVTIMEO,
-                   &tcp_rcv_timeout,
-                   sizeof(tcp_rcv_timeout)) != 0) {
-        ESP_LOGE(TAG, "Fail to setsockopt SO_RCVTIMEO ");
-    }
-    return true;
-}
-
-void send_initial_messages()
-{
-    stratum_reset_uid();
-    STRATUM_V1_configure_version_rolling(sock,
-                                         send_uid++,
-                                         &stratum_api_v1_message.version_mask);
-    STRATUM_V1_subscribe(sock, send_uid++, DEVICE_CONFIG.family.asic.name);
-
-    char * username = POOL_MODULE.is_using_fallback ?
-                      POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
-    char * password = POOL_MODULE.is_using_fallback ?
-                      POOL_MODULE.fallback_pool_pass : POOL_MODULE.pool_pass;
-
-    authorize_message_id = send_uid++;
-    STRATUM_V1_authorize(sock,
-                         authorize_message_id,
-                         username, password);
-    STRATUM_V1_stamp_tx(authorize_message_id);
-}
-
 void stratum_primary_heartbeat(void * pvParameters)
 {
     ESP_LOGI(TAG,
@@ -344,7 +125,7 @@ void stratum_primary_heartbeat(void * pvParameters)
         }
 
         if (!connect_to_stratum_server(primary_stratum_url,
-                                       primary_stratum_port))
+                                       primary_stratum_port,&retry_attempts,&retry_critical_attempts,&sock))
             continue;
 
         int send_uid = 1;
@@ -375,8 +156,6 @@ void stratum_task(void * pvParameters)
 {
     primary_stratum_url = POOL_MODULE.pool_url;
     primary_stratum_port = POOL_MODULE.pool_port;
-    char * stratum_url = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_url : POOL_MODULE.pool_url;
-    uint16_t port = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_port : POOL_MODULE.pool_port;
     extranonce_subscribe = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_extranonce_subscribe : POOL_MODULE.pool_extranonce_subscribe;
     difficulty =  POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_difficulty : POOL_MODULE.pool_difficulty;
 
@@ -422,7 +201,7 @@ void stratum_task(void * pvParameters)
     uint16_t port = POOL_MODULE.is_using_fallback ?
                     POOL_MODULE.fallback_pool_port : POOL_MODULE.pool_port;
 
-    if (!connect_to_stratum_server(stratum_url, port)) {
+    if (!connect_to_stratum_server(stratum_url, port,&retry_attempts,&retry_critical_attempts,&sock)) {
         current_state = STRATUM_STATE_ERROR_RETRY;
         return;
     }
@@ -433,7 +212,7 @@ void stratum_task(void * pvParameters)
 
  void handle_authenticating(void)
 {
-    send_initial_messages();
+    send_uid = send_initial_messages(authorize_message_id, &sock, stratum_api_v1_message.version_mask);
     current_state = STRATUM_STATE_WAIT_NOTIFY;
 }
 
@@ -450,7 +229,7 @@ void stratum_task(void * pvParameters)
     if (!line) {
         ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
         retry_attempts++;
-        stratum_close_connection();
+        stratum_close_connection(&sock);
         current_state = STRATUM_STATE_ERROR_RETRY;
         return;
     }
@@ -470,7 +249,7 @@ void handle_process_shares(void)
     if (!line) {
         ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
         retry_attempts++;
-        stratum_close_connection();
+        stratum_close_connection(&sock);
         current_state = STRATUM_STATE_ERROR_RETRY;
         return;
     }
@@ -494,7 +273,7 @@ void handle_process_shares(void)
             if (create_jobs_task_handle != NULL) {
                 xTaskNotifyGive(create_jobs_task_handle);
             }
-            decode_mining_notification(stratum_api_v1_message.mining_notification);
+            decode_mining_notification(stratum_api_v1_message.mining_notification,stratum_api_v1_message.extranonce_str,stratum_api_v1_message.extranonce_2_len);
             break;
 
         case MINING_SET_DIFFICULTY:
@@ -522,7 +301,7 @@ void handle_process_shares(void)
 
         case CLIENT_RECONNECT:
             ESP_LOGE(TAG, "Pool requested client reconnect...");
-            stratum_close_connection();
+            stratum_close_connection(&sock);
             current_state = STRATUM_STATE_ERROR_RETRY;
             return;
 
@@ -582,6 +361,6 @@ void handle_process_shares(void)
 
  void handle_shutdown(void)
 {
-    stratum_close_connection();
+    stratum_close_connection(&sock);
     esp_restart();
 }
