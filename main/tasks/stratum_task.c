@@ -62,6 +62,7 @@ void (*set_extranonce_callback)(char * extranonce_str, int extranonce_2_len);
 void (*set_version_mask_callback)(uint32_t _version_mask);
 
 int sock;
+int hb_sock;
 int send_uid;
 bool extranonce_subscribe;
 uint16_t difficulty;
@@ -125,27 +126,28 @@ void stratum_primary_heartbeat(void * pvParameters)
         }
 
         if (!connect_to_stratum_server(primary_stratum_url,
-                                       primary_stratum_port,&retry_attempts,&retry_critical_attempts,&sock))
+                                       primary_stratum_port,&retry_attempts,&retry_critical_attempts,&hb_sock))
             continue;
 
         int send_uid = 1;
-        STRATUM_V1_subscribe(sock, send_uid++, DEVICE_CONFIG.family.asic.name);
-        STRATUM_V1_authorize(sock, send_uid++,
+        STRATUM_V1_subscribe(hb_sock, send_uid++, DEVICE_CONFIG.family.asic.name);
+        STRATUM_V1_authorize(hb_sock, send_uid++,
                              POOL_MODULE.pool_user,
                              POOL_MODULE.pool_pass);
 
         char recv_buffer[BUFFER_SIZE];
         memset(recv_buffer, 0, sizeof(recv_buffer));
-        int bytes_received = recv(sock,
+        int bytes_received = recv(hb_sock,
                                   recv_buffer,
                                   BUFFER_SIZE - 1,
                                   0);
 
-        shutdown(sock, SHUT_RDWR);
-        close(sock);
+        shutdown(hb_sock, SHUT_RDWR);
+        close(hb_sock);
 
         bool hb_ok = (bytes_received != -1 &&
                       strstr(recv_buffer, "mining.notify") != NULL);
+        POOL_MODULE.is_using_fallback = !hb_ok;
         xQueueSend(g_heartbeat_q, &hb_ok, portMAX_DELAY);
 
         vTaskDelay(pdMS_TO_TICKS(60000));
