@@ -39,9 +39,7 @@ typedef enum
 
 static StratumState current_state = STRATUM_STATE_IDLE;
 
-/* Forward declarations of state handlers */
 void do_connect(void);
-void handle_authenticating(void);
 void handle_wait_notify(void);
 void handle_process_shares(void);
 void handle_retry_or_fallback(void);
@@ -58,68 +56,93 @@ int send_uid;
 bool extranonce_subscribe;
 uint16_t difficulty;
 
-int retry_critical_attempts = 0;
-int retry_attempts = 0;
 TaskHandle_t create_jobs_task_handle;
 int authorize_message_id;
 
-int stratum_submit_share(char * jobid, char * extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version)
+typedef struct
 {
-    return stratum_submit_share_(jobid, extranonce2, ntime, nonce, version, &POOL_MODULE.pools[POOL_MODULE.active_pool].sock, send_uid++);
+    int normal;
+    int critical;
+} StratumRetry;
+
+StratumRetry retry = {.normal = 0, .critical = 0};
+
+/* Reset share statistics and retry counters after a failover       */
+static void reset_state_for_retry(void)
+{
+    for (int i = 0; i < SYSTEM_MODULE.rejected_reason_stats_count; ++i) {
+        SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
+        SYSTEM_MODULE.rejected_reason_stats[i].message[0] = '\0';
+    }
+    SYSTEM_MODULE.rejected_reason_stats_count = 0;
+    SYSTEM_MODULE.shares_accepted = 0;
+    SYSTEM_MODULE.shares_rejected = 0;
+    SYSTEM_MODULE.work_received = 0;
+
+    retry.normal = 0;
+    retry.critical = 0;
 }
 
-bool switch_to_fallback_pool()
+/* Simple wrapper to avoid repetitive assignments                   */
+static inline void set_next_state(StratumState state)
 {
-    if (retry_attempts >= MAX_RETRY_ATTEMPTS) {
-        if (POOL_MODULE.pools[POOL_FALLBACK].url == NULL || POOL_MODULE.pools[POOL_FALLBACK].url[0] == '\0') {
-            ESP_LOGI(TAG,
-                     "Unable to switch to fallback. No url configured. "
-                     "(retries: %d)...",
-                     retry_attempts);
-            POOL_MODULE.active_pool = POOL_MAIN;
-            retry_attempts = 0;
-            return false;
-        }
+    current_state = state;
+}
 
-        POOL_MODULE.active_pool = POOL_MODULE.active_pool == POOL_MAIN ? POOL_FALLBACK : POOL_MAIN;
+int stratum_submit_share(char * jobid, char * extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version)
+{
+    return stratum_submit_share_(jobid, extranonce2, ntime, nonce, version, &POOL_MODULE.pools[POOL_MODULE.active_pool].sock,
+                                 send_uid++);
+}
 
-        /* Reset share stats at failover */
-        for (int i = 0; i < SYSTEM_MODULE.rejected_reason_stats_count; i++) {
-            SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
-            SYSTEM_MODULE.rejected_reason_stats[i].message[0] = '\0';
-        }
-        SYSTEM_MODULE.rejected_reason_stats_count = 0;
-        SYSTEM_MODULE.shares_accepted = 0;
-        SYSTEM_MODULE.shares_rejected = 0;
-        SYSTEM_MODULE.work_received = 0;
-
-        ESP_LOGI(TAG,
-                 "Switching target due to too many failures "
-                 "(retries: %d)...",
-                 retry_attempts);
-        retry_attempts = 0;
+static bool switch_to_fallback_pool(void)
+{
+    if (retry.normal < MAX_RETRY_ATTEMPTS) {
+        return true; /* keep current pool */
     }
+
+    /* Switch active pool */
+    POOL_MODULE.active_pool = (POOL_MODULE.active_pool == POOL_MAIN) ? POOL_FALLBACK : POOL_MAIN;
+
+    reset_state_for_retry();
+    ESP_LOGI(TAG, "Switched active pool to %s", POOL_MODULE.active_pool == POOL_MAIN ? "MAIN" : "FALLBACK");
     return true;
+}
+
+void handle_retry_or_fallback(void)
+{
+    if (!switch_to_fallback_pool()) {
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+    set_next_state(STRATUM_STATE_CONNECTING);
 }
 
 void stratum_primary_heartbeat(void * pvParameters)
 {
+    (void) pvParameters; /* unused */
+
     ESP_LOGI(TAG, "Starting heartbeat thread for primary pool: %s:%d", primary_stratum_url, primary_stratum_port);
     vTaskDelay(pdMS_TO_TICKS(10000));
 
     while (1) {
-        if (!(POOL_MODULE.active_pool > 0)) {
+        if (!POOL_MODULE.active_pool) { /* 0 == POOL_MAIN */
             vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
 
-        if (!connect_to_stratum_server(primary_stratum_url, primary_stratum_port, &retry_attempts, &retry_critical_attempts,
+        /* Attempt heartbeat connection using the current retry struct   */
+        if (!connect_to_stratum_server(primary_stratum_url, primary_stratum_port, &retry.normal, &retry.critical,
                                        &POOL_MODULE.pools[POOL_MAIN].sock))
             continue;
 
+        /* Reset counters on success                                   */
+        retry.normal = 0;
+        retry.critical = 0;
+
         int send_uid = 1;
         STRATUM_V1_subscribe(POOL_MODULE.pools[POOL_MAIN].sock, send_uid++, DEVICE_CONFIG.family.asic.name);
-        STRATUM_V1_authorize(POOL_MODULE.pools[POOL_MAIN].sock, send_uid++, POOL_MODULE.pools[POOL_MAIN].user, POOL_MODULE.pools[POOL_MAIN].pass);
+        STRATUM_V1_authorize(POOL_MODULE.pools[POOL_MAIN].sock, send_uid++, POOL_MODULE.pools[POOL_MAIN].user,
+                             POOL_MODULE.pools[POOL_MAIN].pass);
 
         char recv_buffer[BUFFER_SIZE];
         memset(recv_buffer, 0, sizeof(recv_buffer));
@@ -129,10 +152,9 @@ void stratum_primary_heartbeat(void * pvParameters)
         if (hb_ok) {
             POOL_MODULE.active_pool = POOL_MAIN;
             ESP_LOGI(TAG, "Primary Pool is back online");
-            // stratum_close_connection(&sock);
             stratum_close_connection(&POOL_MODULE.pools[POOL_MAIN].sock);
             vTaskDelay(pdMS_TO_TICKS(5000));
-            current_state = STRATUM_STATE_ERROR_RETRY; // reconnect to primary
+            set_next_state(STRATUM_STATE_ERROR_RETRY); /* reconnect to primary */
         } else {
             shutdown(POOL_MODULE.pools[POOL_MAIN].sock, SHUT_RDWR);
             close(POOL_MODULE.pools[POOL_MAIN].sock);
@@ -143,6 +165,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 
 void stratum_task(void * pvParameters)
 {
+    /* Pull current pool configuration once at start                  */
     primary_stratum_url = POOL_MODULE.pools[POOL_MODULE.active_pool].url;
     primary_stratum_port = POOL_MODULE.pools[POOL_MODULE.active_pool].port;
     extranonce_subscribe = POOL_MODULE.pools[POOL_MODULE.active_pool].extranonce_subscribe;
@@ -161,39 +184,25 @@ void stratum_task(void * pvParameters)
         case STRATUM_STATE_IDLE:
             if (!is_wifi_connected()) {
                 vTaskDelay(pdMS_TO_TICKS(10000));
-                break; // stay idle
+                break; /* stay idle */
             }
             /* fall through to CONNECTING */
+
         case STRATUM_STATE_CONNECTING:
             do_connect();
             break;
 
         case STRATUM_STATE_AUTHENTICATING:
             /* Auth already done in do_connect(); just wait for notify.   */
-            current_state = STRATUM_STATE_WAIT_NOTIFY;
+            set_next_state(STRATUM_STATE_WAIT_NOTIFY);
             break;
 
-        case STRATUM_STATE_WAIT_NOTIFY: 
-            char * line = STRATUM_V1_receive_jsonrpc_line(POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
-            if (!line) {
-                ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
-                retry_attempts++;
-                stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
-                handle_retry_or_fallback();
-                break;
-            }
-            double response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id);
-            if (response_time_ms >= 0) {
-                ESP_LOGI(TAG, "Stratum response time: %.2f ms", response_time_ms);
-                POOL_MODULE.response_time = response_time_ms;
-            }
-            current_state = STRATUM_STATE_PROCESS_SHARES;
+        case STRATUM_STATE_WAIT_NOTIFY:
+            handle_wait_notify();
             break;
-        
 
         case STRATUM_STATE_PROCESS_SHARES:
-            /* Existing share‑processing logic unchanged */
-            handle_process_shares(); // keep original implementation
+            handle_process_shares(); /* unchanged logic */
             break;
 
         case STRATUM_STATE_ERROR_RETRY:
@@ -201,8 +210,7 @@ void stratum_task(void * pvParameters)
             break;
 
         case STRATUM_STATE_SWITCH_FALLBACK:
-            /* The state machine will automatically move to CONNECTING next tick. */
-            current_state = STRATUM_STATE_CONNECTING;
+            set_next_state(STRATUM_STATE_CONNECTING);
             break;
         }
     }
@@ -210,25 +218,22 @@ void stratum_task(void * pvParameters)
 
 void do_connect(void)
 {
-    /* Resolve the URL that is currently active (primary or fallback) */
     char * stratum_url = POOL_MODULE.pools[POOL_MODULE.active_pool].url;
     uint16_t port = POOL_MODULE.pools[POOL_MODULE.active_pool].port;
 
-    if (!connect_to_stratum_server(stratum_url, port, &retry_attempts, &retry_critical_attempts, &POOL_MODULE.pools[POOL_MODULE.active_pool].sock)) {
-        /* Failed – go to retry/fallback logic */
+    if (!connect_to_stratum_server(stratum_url, port, &retry.normal, &retry.critical,
+                                   &POOL_MODULE.pools[POOL_MODULE.active_pool].sock)) {
         handle_retry_or_fallback();
         return;
     }
 
-    /* Connection succeeded – authenticate immediately */
-    send_uid = send_initial_messages(authorize_message_id, &POOL_MODULE.pools[POOL_MODULE.active_pool].sock, stratum_api_v1_message.version_mask);
-    current_state = STRATUM_STATE_WAIT_NOTIFY; // next step
-}
+    /* Reset counters on success */
+    retry.normal = 0;
+    retry.critical = 0;
 
-void handle_authenticating(void)
-{
-    send_uid = send_initial_messages(authorize_message_id, &POOL_MODULE.pools[POOL_MODULE.active_pool].sock, stratum_api_v1_message.version_mask);
-    current_state = STRATUM_STATE_WAIT_NOTIFY;
+    send_uid = send_initial_messages(authorize_message_id, &POOL_MODULE.pools[POOL_MODULE.active_pool].sock,
+                                     stratum_api_v1_message.version_mask);
+    set_next_state(STRATUM_STATE_WAIT_NOTIFY);
 }
 
 void handle_wait_notify(void)
@@ -236,9 +241,9 @@ void handle_wait_notify(void)
     char * line = STRATUM_V1_receive_jsonrpc_line(POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
     if (!line) {
         ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
-        retry_attempts++;
+        retry.normal++;
         stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
-        current_state = STRATUM_STATE_ERROR_RETRY;
+        set_next_state(STRATUM_STATE_ERROR_RETRY);
         return;
     }
 
@@ -247,7 +252,7 @@ void handle_wait_notify(void)
         ESP_LOGI(TAG, "Stratum response time: %.2f ms", response_time_ms);
         POOL_MODULE.response_time = response_time_ms;
     }
-    current_state = STRATUM_STATE_PROCESS_SHARES;
+    set_next_state(STRATUM_STATE_PROCESS_SHARES);
 }
 
 void handle_process_shares(void)
@@ -256,9 +261,9 @@ void handle_process_shares(void)
     char * line = STRATUM_V1_receive_jsonrpc_line(POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
     if (!line) {
         ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
-        retry_attempts++;
+        retry.normal++;
         stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
-        current_state = STRATUM_STATE_ERROR_RETRY;
+        set_next_state(STRATUM_STATE_ERROR_RETRY);
         return;
     }
 
@@ -309,7 +314,7 @@ void handle_process_shares(void)
     case CLIENT_RECONNECT:
         ESP_LOGE(TAG, "Pool requested client reconnect...");
         stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
-        current_state = STRATUM_STATE_ERROR_RETRY;
+        set_next_state(STRATUM_STATE_ERROR_RETRY);
         return;
 
     case STRATUM_RESULT:
@@ -323,7 +328,7 @@ void handle_process_shares(void)
         break;
 
     case STRATUM_RESULT_SETUP:
-        retry_attempts = 0;
+        retry.normal = 0;
         if (stratum_api_v1_message.response_success) {
             ESP_LOGI(TAG, "setup message accepted");
             if (stratum_api_v1_message.message_id == authorize_message_id) {
@@ -344,17 +349,3 @@ void handle_process_shares(void)
 
     /* Remain in the same state to continue processing further shares. */
 }
-
-void handle_retry_or_fallback(void)
-{
-    /* Retry logic – if we hit max attempts we switch to fallback */
-    if (!switch_to_fallback_pool()) {
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        current_state = STRATUM_STATE_CONNECTING; // retry with same pool
-        return;
-    }
-
-    /* If we switched, reconnect using the new pool URL */
-    current_state = STRATUM_STATE_CONNECTING;
-}
-
