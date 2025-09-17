@@ -73,17 +73,17 @@ int stratum_submit_share(char * jobid, char * extranonce2, uint32_t ntime, uint3
 bool switch_to_fallback_pool()
 {
     if (retry_attempts >= MAX_RETRY_ATTEMPTS) {
-        if (POOL_MODULE.fallback_pool_url == NULL || POOL_MODULE.fallback_pool_url[0] == '\0') {
+        if (POOL_MODULE.pools[POOL_FALLBACK].url == NULL || POOL_MODULE.pools[POOL_FALLBACK].url[0] == '\0') {
             ESP_LOGI(TAG,
                      "Unable to switch to fallback. No url configured. "
                      "(retries: %d)...",
                      retry_attempts);
-            POOL_MODULE.is_using_fallback = false;
+            POOL_MODULE.active_pool = POOL_MAIN;
             retry_attempts = 0;
             return false;
         }
 
-        POOL_MODULE.is_using_fallback = !POOL_MODULE.is_using_fallback;
+        POOL_MODULE.active_pool = POOL_MODULE.active_pool == POOL_MAIN ? POOL_FALLBACK : POOL_MAIN;
 
         /* Reset share stats at failover */
         for (int i = 0; i < SYSTEM_MODULE.rejected_reason_stats_count; i++) {
@@ -110,7 +110,7 @@ void stratum_primary_heartbeat(void * pvParameters)
     vTaskDelay(pdMS_TO_TICKS(10000));
 
     while (1) {
-        if (!POOL_MODULE.is_using_fallback) {
+        if (!(POOL_MODULE.active_pool > 0)) {
             vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
@@ -121,7 +121,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 
         int send_uid = 1;
         STRATUM_V1_subscribe(hb_sock, send_uid++, DEVICE_CONFIG.family.asic.name);
-        STRATUM_V1_authorize(hb_sock, send_uid++, POOL_MODULE.pool_user, POOL_MODULE.pool_pass);
+        STRATUM_V1_authorize(hb_sock, send_uid++, POOL_MODULE.pools[POOL_MODULE.active_pool].user, POOL_MODULE.pools[POOL_MODULE.active_pool].pass);
 
         char recv_buffer[BUFFER_SIZE];
         memset(recv_buffer, 0, sizeof(recv_buffer));
@@ -129,7 +129,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 
         bool hb_ok = (bytes_received != -1 && strstr(recv_buffer, "mining.notify") != NULL);
         if (hb_ok) {
-            POOL_MODULE.is_using_fallback = !hb_ok;
+            POOL_MODULE.active_pool = POOL_MAIN;
             ESP_LOGI(TAG, "Primary Pool is back online");
             // stratum_close_connection(&sock);
             stratum_close_connection(&hb_sock);
@@ -145,11 +145,10 @@ void stratum_primary_heartbeat(void * pvParameters)
 
 void stratum_task(void * pvParameters)
 {
-    primary_stratum_url = POOL_MODULE.pool_url;
-    primary_stratum_port = POOL_MODULE.pool_port;
-    extranonce_subscribe =
-        POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_extranonce_subscribe : POOL_MODULE.pool_extranonce_subscribe;
-    difficulty = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_difficulty : POOL_MODULE.pool_difficulty;
+    primary_stratum_url = POOL_MODULE.pools[POOL_MODULE.active_pool].url;
+    primary_stratum_port = POOL_MODULE.pools[POOL_MODULE.active_pool].port;
+    extranonce_subscribe = POOL_MODULE.pools[POOL_MODULE.active_pool].extranonce_subscribe;
+    difficulty = POOL_MODULE.pools[POOL_MODULE.active_pool].difficulty;
 
     STRATUM_V1_initialize_buffer();
 
@@ -214,8 +213,8 @@ void stratum_task(void * pvParameters)
 void do_connect(void)
 {
     /* Resolve the URL that is currently active (primary or fallback) */
-    char * stratum_url = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_url : POOL_MODULE.pool_url;
-    uint16_t port = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_port : POOL_MODULE.pool_port;
+    char * stratum_url = POOL_MODULE.pools[POOL_MODULE.active_pool].url;
+    uint16_t port = POOL_MODULE.pools[POOL_MODULE.active_pool].port;
 
     if (!connect_to_stratum_server(stratum_url, port, &retry_attempts, &retry_critical_attempts, &sock)) {
         /* Failed – go to retry/fallback logic */
@@ -278,7 +277,7 @@ void handle_process_shares(void)
     switch (stratum_api_v1_message.method) {
     case MINING_NOTIFY:
         SYSTEM_notify_new_ntime(stratum_api_v1_message.mining_notification->ntime);
-        stratum_api_v1_message.mining_notification->job_difficulty = POOL_MODULE.pool_difficulty;
+        stratum_api_v1_message.mining_notification->job_difficulty = POOL_MODULE.pools[POOL_MODULE.active_pool].difficulty;
         set_new_mining_notification_callback(stratum_api_v1_message.mining_notification);
 
         if (create_jobs_task_handle != NULL) {
@@ -290,7 +289,7 @@ void handle_process_shares(void)
 
     case MINING_SET_DIFFICULTY:
         ESP_LOGI(TAG, "Set pool difficulty: %ld", stratum_api_v1_message.new_difficulty);
-        POOL_MODULE.pool_difficulty = stratum_api_v1_message.new_difficulty;
+        POOL_MODULE.pools[POOL_MODULE.active_pool].difficulty = stratum_api_v1_message.new_difficulty;
         break;
 
     case MINING_SET_VERSION_MASK:

@@ -23,10 +23,8 @@ int send_initial_messages(int authorize_message_id, int * sock, uint32_t version
                                          &version_mask);
     STRATUM_V1_subscribe(*sock, send_uid++, DEVICE_CONFIG.family.asic.name);
 
-    char * username = POOL_MODULE.is_using_fallback ?
-                      POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
-    char * password = POOL_MODULE.is_using_fallback ?
-                      POOL_MODULE.fallback_pool_pass : POOL_MODULE.pool_pass;
+    char * username = POOL_MODULE.pools[POOL_MODULE.active_pool].user;
+    char * password = POOL_MODULE.pools[POOL_MODULE.active_pool].pass;
 
     authorize_message_id = send_uid++;
     STRATUM_V1_authorize(*sock,
@@ -147,7 +145,7 @@ void stratum_close_connection(int * sock)
 int stratum_submit_share_(char * jobid, char * extranonce2,
                          uint32_t ntime, uint32_t nonce, uint32_t version, int * sock,int send_uid)
 {
-    char * user = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
+    char * user = POOL_MODULE.pools[POOL_MODULE.active_pool].user;
     int ret = STRATUM_V1_submit_share(*sock, send_uid, user,
                                       jobid, extranonce2, ntime, nonce, version);
 

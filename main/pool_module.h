@@ -1,50 +1,39 @@
 #ifndef POOL_MODULE_H_
 #define POOL_MODULE_H_
 
+typedef struct {
+    // The URL of the mining pool.
+    char *url;
+
+    // The port number on which the mining pool operates.
+    uint16_t port;
+
+    // Username for authenticating with the mining pool.
+    char *user;
+
+    // Password for authenticating with the mining pool.
+    char *pass;
+
+    // Difficulty level set on the mining pool.
+    uint16_t difficulty;
+
+    // Flag indicating whether this pool supports extranonce subscription.
+    bool extranonce_subscribe;
+} PoolInfo;
+
+#define POOL_MAIN 0
+#define POOL_FALLBACK 1
+
 typedef struct
 {
-    // The URL of the main mining pool.
-    char * pool_url;
+    PoolInfo pools[2];
 
-    // The URL of the fallback mining pool in case the main one fails.
-    char * fallback_pool_url;
-
-    // The port number on which the main mining pool operates.
-    uint16_t pool_port;
-
-    // The port number on which the fallback mining pool operates.
-    uint16_t fallback_pool_port;
-
-    // The username for authenticating with the main mining pool.
-    char * pool_user;
-
-    // The username for authenticating with the fallback mining pool.
-    char * fallback_pool_user;
-
-    // The password for authenticating with the main mining pool.
-    char * pool_pass;
-
-    // The password for authenticating with the fallback mining pool.
-    char * fallback_pool_pass;
-
-    // The difficulty level set on the main mining pool.
-    uint16_t pool_difficulty;
-
-    // The difficulty level set on the fallback mining pool.
-    uint16_t fallback_pool_difficulty;
-
-    // A flag indicating whether the main mining pool supports extranonce subscription.
-    bool pool_extranonce_subscribe;
-
-    // A flag indicating whether the fallback mining pool supports extranonce subscription.
-    bool fallback_pool_extranonce_subscribe;
-
-    // The average response time of the main mining pool to requests.
+    // The average response time of the current (main or fallback) pool to requests.
     double response_time;
 
     // A flag indicating if the system is currently using the fallback pool instead of the main one.
-    bool is_using_fallback;
-}PoolModule;
+    int active_pool;
+} PoolModule;
 
 extern PoolModule POOL_MODULE;
 #endif

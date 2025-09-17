@@ -660,9 +660,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "expectedHashrate", expected_hashrate);
     cJSON_AddStringToObject(root, "bestDiff", SYSTEM_MODULE.best_diff_string);
     cJSON_AddStringToObject(root, "bestSessionDiff", SYSTEM_MODULE.best_session_diff_string);
-    cJSON_AddNumberToObject(root, "poolDifficulty", POOL_MODULE.pool_difficulty);
+    cJSON_AddNumberToObject(root, "poolDifficulty", POOL_MODULE.pools[POOL_MODULE.active_pool].difficulty);
 
-    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", POOL_MODULE.is_using_fallback);
+    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", POOL_MODULE.active_pool > 0);
 
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", STATE_MODULE.psram_is_available);
 
