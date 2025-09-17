@@ -19,7 +19,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#define MAX_RETRY_ATTEMPTS 3
+#define MAX_RETRY_ATTEMPTS 2
 
 #define MAX_EXTRANONCE_2_LEN 32
 #define BUFFER_SIZE 1024
@@ -131,15 +131,20 @@ void stratum_primary_heartbeat(void * pvParameters)
         memset(recv_buffer, 0, sizeof(recv_buffer));
         int bytes_received = recv(hb_sock, recv_buffer, BUFFER_SIZE - 1, 0);
 
-        shutdown(hb_sock, SHUT_RDWR);
-        close(hb_sock);
+        
 
         bool hb_ok = (bytes_received != -1 && strstr(recv_buffer, "mining.notify") != NULL);
         if (hb_ok) {
             POOL_MODULE.is_using_fallback = !hb_ok;
             ESP_LOGI(TAG, "Primary Pool is back online");
-            stratum_close_connection(&sock);
-            current_state = STRATUM_STATE_CONNECTING; // reconnect to primary
+            //stratum_close_connection(&sock);
+            stratum_close_connection(&hb_sock);
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            current_state = STRATUM_STATE_ERROR_RETRY; // reconnect to primary
+        }else
+        {
+            shutdown(hb_sock, SHUT_RDWR);
+            close(hb_sock);
         }
         vTaskDelay(pdMS_TO_TICKS(60000));
     }

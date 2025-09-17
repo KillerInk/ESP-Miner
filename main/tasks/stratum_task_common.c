@@ -13,6 +13,7 @@
 #include "netdb.h"
 
 static const char * TAG = "stratum_task_common";
+#define MAX_CRITICAL_RETRY_ATTEMPTS 1
 
 int send_initial_messages(int authorize_message_id, int * sock, uint32_t version_mask)
 {
@@ -137,7 +138,7 @@ void stratum_close_connection(int * sock)
         return;
     }
 
-    ESP_LOGE(TAG, "Shutting down socket and restarting...");
+    ESP_LOGE(TAG, "Shutting down socket");
     shutdown(*sock, SHUT_RDWR);
     close(*sock);
     vTaskDelay(pdMS_TO_TICKS(1000));
@@ -159,7 +160,7 @@ int stratum_submit_share_(char * jobid, char * extranonce2,
 }
 
 
-#define MAX_CRITICAL_RETRY_ATTEMPTS 5
+
 
 bool connect_to_stratum_server(char * stratum_url, uint16_t port, int * retry_attempts, int * retry_critical_attempts, int * sock)
 {
