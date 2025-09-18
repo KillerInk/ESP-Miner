@@ -13,6 +13,7 @@
 #define NONCE_SPACE 4294967296.0 // 2^32
 #define QUEUE_LOW_WATER_MARK 10  // Adjust based on requirements
 #define JOB_ARRAY_SIZE 128       // Size of job arrays
+static SemaphoreHandle_t xJobMutex;
 
 // Mining notifications
 mining_notify * mining_notification_current = NULL;
@@ -58,6 +59,7 @@ void asic_task_init(void)
     for (int i = 0; i < JOB_ARRAY_SIZE; i++) {
         active_jobs[i] = NULL;
     }
+    xJobMutex = xSemaphoreCreateRecursiveMutex();
 }
 
 void set_extranonce(char * _extranonce_str, int _extranonce_2_len)
@@ -149,7 +151,7 @@ void create_jobs_task(void * pvParameters)
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
         }
-
+        xSemaphoreTakeRecursive(xJobMutex, portMAX_DELAY);
         // Clean up active job
         if (active_job) {
             free(active_job->jobid);
@@ -167,12 +169,13 @@ void create_jobs_task(void * pvParameters)
 
         // Generate new work and send to ASIC
         active_job = generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty,
-                                   extranonce_str, extranonce_2_len,version_mask);
+                                   extranonce_str, extranonce_2_len, version_mask);
         if (active_job) {
             ASIC_send_work(active_job, active_jobs);
         } else {
             ESP_LOGE(TAG, "Failed to generate work for mining notification");
         }
+        xSemaphoreGiveRecursive(xJobMutex);
     }
 }
 
@@ -187,7 +190,7 @@ void ASIC_result_task(void * pvParameters)
         if (!asic_result) {
             continue;
         }
-
+        xSemaphoreTakeRecursive(xJobMutex, portMAX_DELAY);
         uint8_t job_id = asic_result->job_id;
         bm_job * aj = active_jobs[job_id];
 
@@ -197,7 +200,7 @@ void ASIC_result_task(void * pvParameters)
         }
 
         process_asic_result(asic_result, aj, job_id, SYSTEM_notify_found_nonce_callback, stratum_submit_share_callback);
-
+        xSemaphoreGiveRecursive(xJobMutex);
         update_hashrate(esp_timer_get_time());
     }
 }
