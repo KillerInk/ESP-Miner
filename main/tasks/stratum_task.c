@@ -56,14 +56,6 @@ uint16_t difficulty;
 TaskHandle_t create_jobs_task_handle;
 int authorize_message_id;
 
-/* Retry counters */
-typedef struct {
-    int normal;
-    int critical;
-} StratumRetry;
-
-static StratumRetry retry = {.normal = 0, .critical = 0};
-
 /* Reset share statistics and retry counters after a failover */
 static void reset_state_for_retry(void)
 {
@@ -75,9 +67,6 @@ static void reset_state_for_retry(void)
     SYSTEM_MODULE.shares_accepted = 0;
     SYSTEM_MODULE.shares_rejected = 0;
     SYSTEM_MODULE.work_received = 0;
-
-    retry.normal = 0;
-    retry.critical = 0;
 }
 
 /* Simple wrapper to avoid repetitive assignments */
@@ -99,14 +88,10 @@ int stratum_submit_share(char *jobid, char *extranonce2, uint32_t ntime,
 /* Helper for deciding whether to switch pools */
 static inline bool attempt_pool_switch(void)
 {
-    if (retry.normal < MAX_RETRY_ATTEMPTS) {
-        return false;          /* keep current pool */
-    }
-
-    POOL_MODULE.active_pool = (POOL_MODULE.active_pool == POOL_MAIN) ? POOL_FALLBACK : POOL_MAIN;
+    POOL_MODULE.active_pool = (POOL_MODULE.active_pool != POOL_MAIN) ? POOL_MAIN : POOL_FALLBACK;
     reset_state_for_retry();
     ESP_LOGI(TAG, "Switched active pool to %s",
-             POOL_MODULE.active_pool == POOL_MAIN ? "MAIN" : "FALLBACK");
+             (POOL_MODULE.active_pool == POOL_MAIN) ? "MAIN" : "FALLBACK");
     return true;
 }
 
@@ -135,12 +120,9 @@ void stratum_primary_heartbeat(void *pvParameters)
         }
 
         if (!connect_to_stratum_server(primary_stratum_url, primary_stratum_port,
-                                       &retry.normal, &retry.critical,
                                        &POOL_MODULE.pools[POOL_MAIN].sock))
             continue;
 
-        retry.normal = 0;
-        retry.critical = 0;
 
         int send_uid_local = 1;
         STRATUM_V1_subscribe(POOL_MODULE.pools[POOL_MAIN].sock, send_uid_local++, DEVICE_CONFIG.family.asic.name);
@@ -153,9 +135,10 @@ void stratum_primary_heartbeat(void *pvParameters)
 
         bool hb_ok = (bytes_received != -1 && strstr(recv_buffer, "mining.notify") != NULL);
         if (hb_ok) {
-            POOL_MODULE.active_pool = POOL_MAIN;
+            //handle_retry_or_fallback();
             ESP_LOGI(TAG, "Primary Pool is back online");
             stratum_close_connection(&POOL_MODULE.pools[POOL_MAIN].sock);
+            stratum_close_connection(&POOL_MODULE.pools[POOL_FALLBACK].sock);
             vTaskDelay(pdMS_TO_TICKS(5000));
             set_next_state(STRATUM_STATE_ERROR_RETRY); /* reconnect to primary */
         } else {
@@ -215,14 +198,10 @@ void do_connect(void)
     uint16_t port = POOL_MODULE.pools[POOL_MODULE.active_pool].port;
 
     if (!connect_to_stratum_server(stratum_url, port,
-                                   &retry.normal, &retry.critical,
                                    &POOL_MODULE.pools[POOL_MODULE.active_pool].sock)) {
         handle_retry_or_fallback();
         return;
     }
-
-    retry.normal = 0;
-    retry.critical = 0;
 
     send_uid = send_initial_messages(authorize_message_id,
                                      &POOL_MODULE.pools[POOL_MODULE.active_pool].sock,
@@ -238,7 +217,6 @@ void handle_process_shares(void)
         POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
     if (!line) {
         ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
-        retry.normal++;
         stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
         set_next_state(STRATUM_STATE_ERROR_RETRY);
         return;
@@ -315,7 +293,6 @@ void handle_process_shares(void)
         break;
 
     case STRATUM_RESULT_SETUP:
-        retry.normal = 0;
         if (stratum_api_v1_message.response_success) {
             ESP_LOGI(TAG, "setup message accepted");
             if (stratum_api_v1_message.message_id == authorize_message_id) {

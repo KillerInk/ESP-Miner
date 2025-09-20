@@ -24,7 +24,7 @@ typedef struct {
     uint16_t default_voltage_mv;
     const uint16_t* voltage_options;
     uint16_t hashrate_target;
-    uint16_t difficulty;
+    uint32_t difficulty;
     uint16_t core_count;
     uint16_t small_core_count;
     // test values

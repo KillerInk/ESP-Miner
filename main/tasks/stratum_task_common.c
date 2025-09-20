@@ -160,14 +160,13 @@ int stratum_submit_share_(char * jobid, char * extranonce2,
 
 
 
-bool connect_to_stratum_server(char * stratum_url, uint16_t port, int * retry_attempts, int * retry_critical_attempts, int * sock)
+bool connect_to_stratum_server(char * stratum_url, uint16_t port, int * sock)
 {
     struct hostent * dns_addr = gethostbyname(stratum_url);
     struct timeval tcp_snd_timeout = {.tv_sec = 5, .tv_usec = 0};
     struct timeval tcp_rcv_timeout = {.tv_sec = 60 * 10, .tv_usec = 0};
     char host_ip[20];
     if (dns_addr == NULL) {
-        retry_attempts++;
         vTaskDelay(pdMS_TO_TICKS(1000));
         return false;
     }
@@ -190,15 +189,9 @@ bool connect_to_stratum_server(char * stratum_url, uint16_t port, int * retry_at
         ESP_LOGE(TAG,
                  "Unable to create socket: errno %d",
                  errno);
-        if (++*retry_critical_attempts > MAX_CRITICAL_RETRY_ATTEMPTS) {
-            ESP_LOGE(TAG,
-                     "Max retry attempts reached, restarting...");
-            esp_restart();
-        }
         vTaskDelay(pdMS_TO_TICKS(5000));
         return false;
     }
-    *retry_critical_attempts = 0;
 
     ESP_LOGI(TAG,
              "Socket created, connecting to %s:%d",
@@ -207,7 +200,6 @@ bool connect_to_stratum_server(char * stratum_url, uint16_t port, int * retry_at
                       (struct sockaddr *) &dest_addr,
                       sizeof(struct sockaddr_in));
     if (err != 0) {
-        (*retry_attempts)++;
         ESP_LOGE(TAG,
                  "Socket unable to connect to %s:%d "
                  "(errno %d: %s)",

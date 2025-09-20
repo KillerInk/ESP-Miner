@@ -9,5 +9,5 @@ bool is_wifi_connected();
 void stratum_close_connection(int * sock);
 int stratum_submit_share_(char * jobid, char * extranonce2,
                          uint32_t ntime, uint32_t nonce, uint32_t version, int * sock,int send_uid);
-bool connect_to_stratum_server(char * stratum_url, uint16_t port, int * retry_attempts, int * retry_critical_attempts,int * sock);
+bool connect_to_stratum_server(char * stratum_url, uint16_t port,int * sock);
 #endif

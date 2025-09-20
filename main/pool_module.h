@@ -16,7 +16,7 @@ typedef struct
     char * pass;
 
     // Difficulty level set on the mining pool.
-    uint16_t difficulty;
+    uint32_t difficulty;
 
     // Flag indicating whether this pool supports extranonce subscription.
     bool extranonce_subscribe;
@@ -30,6 +30,7 @@ typedef struct
 typedef struct
 {
     PoolInfo pools[2];
+    
 
     // The average response time of the current (main or fallback) pool to requests.
     double response_time;
