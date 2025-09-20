@@ -140,7 +140,7 @@ void stratum_primary_heartbeat(void *pvParameters)
             stratum_close_connection(&POOL_MODULE.pools[POOL_MAIN].sock);
             stratum_close_connection(&POOL_MODULE.pools[POOL_FALLBACK].sock);
             vTaskDelay(pdMS_TO_TICKS(5000));
-            set_next_state(STRATUM_STATE_ERROR_RETRY); /* reconnect to primary */
+            //set_next_state(STRATUM_STATE_ERROR_RETRY); /* reconnect to primary */
         } else {
             shutdown(POOL_MODULE.pools[POOL_MAIN].sock, SHUT_RDWR);
             close(POOL_MODULE.pools[POOL_MAIN].sock);
