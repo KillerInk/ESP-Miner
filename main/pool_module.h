@@ -1,6 +1,8 @@
 #ifndef POOL_MODULE_H_
 #define POOL_MODULE_H_
 
+#include "stratum_v1_message.h"
+
 typedef struct
 {
     // The URL of the mining pool.
@@ -22,6 +24,8 @@ typedef struct
     bool extranonce_subscribe;
     // Socket file descriptor used to communicate with the pool.
     int sock;
+
+    StratumApiV1Message stratum_api_v1_message;
 } PoolInfo;
 
 #define POOL_MAIN 0

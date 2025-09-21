@@ -5,7 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/time.h>
-
+#include "mining_notify.h"
+#include "stratum_v1_message.h"
 
 #define MAX_MERKLE_BRANCHES 32
 #define HASH_SIZE 32
@@ -14,57 +15,13 @@
 #define MAX_REQUEST_IDS 1024
 #define MAX_EXTRANONCE_2_LEN 32
 
-typedef enum
-{
-    STRATUM_UNKNOWN,
-    MINING_NOTIFY,
-    MINING_SET_DIFFICULTY,
-    MINING_SET_VERSION_MASK,
-    MINING_SET_EXTRANONCE,
-    STRATUM_RESULT,
-    STRATUM_RESULT_SETUP,
-    STRATUM_RESULT_VERSION_MASK,
-    STRATUM_RESULT_SUBSCRIBE,
-    CLIENT_RECONNECT
-} stratum_method;
+
 
 static const int  STRATUM_ID_CONFIGURE    = 1;
 static const int  STRATUM_ID_SUBSCRIBE    = 2;
 
-typedef struct
-{
-    char *job_id;
-    char *prev_block_hash;
-    char *coinbase_1;
-    char *coinbase_2;
-    uint8_t *merkle_branches;
-    size_t n_merkle_branches;
-    uint32_t version;
-    uint32_t target;
-    uint32_t ntime;
-    uint32_t job_difficulty;
-} mining_notify;
 
-typedef struct
-{
-    char * extranonce_str;
-    int extranonce_2_len;
 
-    int64_t message_id;
-    // Indicates the type of request the message represents.
-    stratum_method method;
-
-    // mining.notify
-    int should_abandon_work;
-    mining_notify *mining_notification;
-    // mining.set_difficulty
-    uint32_t new_difficulty;
-    // mining.set_version_mask
-    uint32_t version_mask;
-    // result
-    bool response_success;
-    char * error_str;
-} StratumApiV1Message;
 
 typedef struct {
     int64_t timestamp_us;

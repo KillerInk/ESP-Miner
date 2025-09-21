@@ -36,22 +36,15 @@ typedef enum {
 static StratumState current_state = STRATUM_STATE_IDLE;
 
 /* Function prototypes */
-void do_connect(void);
-void handle_process_shares(void);
+void do_connect(PoolInfo * pool);
+void handle_process_shares(PoolInfo * pool);
 void handle_retry_or_fallback(void);
-
-/* Global state */
-static StratumApiV1Message stratum_api_v1_message = {};
-static char *primary_stratum_url;
-static uint16_t primary_stratum_port;
 
 void (*set_new_mining_notification_callback)(mining_notify *notify);
 void (*set_extranonce_callback)(char *extranonce_str, int extranonce_2_len);
 void (*set_version_mask_callback)(uint32_t _version_mask);
 
 int send_uid;
-bool extranonce_subscribe;
-uint16_t difficulty;
 
 TaskHandle_t create_jobs_task_handle;
 int authorize_message_id;
@@ -107,10 +100,9 @@ void handle_retry_or_fallback(void)
 /* Heartbeat thread for the primary pool */
 void stratum_primary_heartbeat(void *pvParameters)
 {
-    (void) pvParameters; /* unused */
 
     ESP_LOGI(TAG, "Starting heartbeat thread for primary pool: %s:%d",
-             primary_stratum_url, primary_stratum_port);
+             POOL_MODULE.pools[POOL_MAIN].url, POOL_MODULE.pools[POOL_MAIN].port);
     vTaskDelay(pdMS_TO_TICKS(10000));
 
     while (1) {
@@ -119,7 +111,7 @@ void stratum_primary_heartbeat(void *pvParameters)
             continue;
         }
 
-        if (!connect_to_stratum_server(primary_stratum_url, primary_stratum_port,
+        if (!connect_to_stratum_server(POOL_MODULE.pools[POOL_MAIN].url, POOL_MODULE.pools[POOL_MAIN].port,
                                        &POOL_MODULE.pools[POOL_MAIN].sock))
             continue;
 
@@ -152,11 +144,8 @@ void stratum_primary_heartbeat(void *pvParameters)
 /* Main Stratum task loop */
 void stratum_task(void *pvParameters)
 {
+    PoolInfo * pool = &POOL_MODULE.pools[POOL_MODULE.active_pool];
     /* Pull current pool configuration once at start */
-    primary_stratum_url = POOL_MODULE.pools[POOL_MODULE.active_pool].url;
-    primary_stratum_port = POOL_MODULE.pools[POOL_MODULE.active_pool].port;
-    extranonce_subscribe = POOL_MODULE.pools[POOL_MODULE.active_pool].extranonce_subscribe;
-    difficulty = POOL_MODULE.pools[POOL_MODULE.active_pool].difficulty;
 
     STRATUM_V1_initialize_buffer();
 
@@ -167,6 +156,7 @@ void stratum_task(void *pvParameters)
     ESP_LOGI(TAG, "Stratum task started");
 
     for (;;) {
+        pool = &POOL_MODULE.pools[POOL_MODULE.active_pool];
         switch (current_state) {
 
         case STRATUM_STATE_IDLE:
@@ -177,11 +167,11 @@ void stratum_task(void *pvParameters)
             /* fall through to CONNECTING */
 
         case STRATUM_STATE_CONNECTING:
-            do_connect();
+            do_connect(pool);
             break;
 
         case STRATUM_STATE_PROCESS_SHARES:
-            handle_process_shares(); /* unchanged logic */
+            handle_process_shares(pool); /* unchanged logic */
             break;
 
         case STRATUM_STATE_ERROR_RETRY:
@@ -192,122 +182,122 @@ void stratum_task(void *pvParameters)
 }
 
 /* Updated connect logic to use the new helper */
-void do_connect(void)
+void do_connect(PoolInfo * pool)
 {
-    char *stratum_url = POOL_MODULE.pools[POOL_MODULE.active_pool].url;
-    uint16_t port = POOL_MODULE.pools[POOL_MODULE.active_pool].port;
+    char *stratum_url = pool->url;
+    uint16_t port = pool->port;
 
     if (!connect_to_stratum_server(stratum_url, port,
-                                   &POOL_MODULE.pools[POOL_MODULE.active_pool].sock)) {
+                                   &pool->sock)) {
         handle_retry_or_fallback();
         return;
     }
 
     send_uid = send_initial_messages(authorize_message_id,
-                                     &POOL_MODULE.pools[POOL_MODULE.active_pool].sock,
-                                     stratum_api_v1_message.version_mask);
+                                     &pool->sock,
+                                     pool->stratum_api_v1_message.version_mask);
     set_next_state(STRATUM_STATE_PROCESS_SHARES);
 }
 
 /* Handle processing of shares */
-void handle_process_shares(void)
+void handle_process_shares(PoolInfo * pool)
 {
     /* Process a single JSON‑RPC line from the socket. */
     char *line = STRATUM_V1_receive_jsonrpc_line(
-        POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
+        pool->sock);
     if (!line) {
         ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
-        stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
+        stratum_close_connection(&pool->sock);
         set_next_state(STRATUM_STATE_ERROR_RETRY);
         return;
     }
 
     double response_time_ms = STRATUM_V1_get_response_time_ms(
-        stratum_api_v1_message.message_id);
+        pool->stratum_api_v1_message.message_id);
     if (response_time_ms >= 0) {
         ESP_LOGI(TAG, "Stratum response time: %.2f ms", response_time_ms);
         POOL_MODULE.response_time = response_time_ms;
     }
 
-    STRATUM_V1_parse(&stratum_api_v1_message, line);
+    STRATUM_V1_parse(&pool->stratum_api_v1_message, line);
     free(line);
 
     /* Handle parsed message immediately */
-    switch (stratum_api_v1_message.method) {
+    switch (pool->stratum_api_v1_message.method) {
     case MINING_NOTIFY:
-        SYSTEM_notify_new_ntime(stratum_api_v1_message.mining_notification->ntime);
-        stratum_api_v1_message.mining_notification->job_difficulty =
-            POOL_MODULE.pools[POOL_MODULE.active_pool].difficulty;
+        SYSTEM_notify_new_ntime(pool->stratum_api_v1_message.mining_notification->ntime);
+        pool->stratum_api_v1_message.mining_notification->job_difficulty =
+            pool->difficulty;
         set_new_mining_notification_callback(
-            stratum_api_v1_message.mining_notification);
+            pool->stratum_api_v1_message.mining_notification);
 
         if (create_jobs_task_handle != NULL) {
             xTaskNotifyGive(create_jobs_task_handle);
         }
-        decode_mining_notification(stratum_api_v1_message.mining_notification,
-                                   stratum_api_v1_message.extranonce_str,
-                                   stratum_api_v1_message.extranonce_2_len);
+        decode_mining_notification(pool->stratum_api_v1_message.mining_notification,
+                                   pool->stratum_api_v1_message.extranonce_str,
+                                   pool->stratum_api_v1_message.extranonce_2_len);
         break;
 
     case MINING_SET_DIFFICULTY:
         ESP_LOGI(TAG, "Set pool difficulty: %ld",
-                 stratum_api_v1_message.new_difficulty);
-        POOL_MODULE.pools[POOL_MODULE.active_pool].difficulty =
-            stratum_api_v1_message.new_difficulty;
+                 pool->stratum_api_v1_message.new_difficulty);
+        pool->difficulty =
+            pool->stratum_api_v1_message.new_difficulty;
         break;
 
     case MINING_SET_VERSION_MASK:
     case STRATUM_RESULT_VERSION_MASK:
         ESP_LOGI(TAG, "Set version mask: %08lx",
-                 stratum_api_v1_message.version_mask);
-        set_version_mask_callback(stratum_api_v1_message.version_mask);
+                 pool->stratum_api_v1_message.version_mask);
+        set_version_mask_callback(pool->stratum_api_v1_message.version_mask);
         break;
 
     case MINING_SET_EXTRANONCE:
     case STRATUM_RESULT_SUBSCRIBE:
-        if (stratum_api_v1_message.extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
-            stratum_api_v1_message.extranonce_2_len = MAX_EXTRANONCE_2_LEN;
+        if (pool->stratum_api_v1_message.extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
+            pool->stratum_api_v1_message.extranonce_2_len = MAX_EXTRANONCE_2_LEN;
         }
         ESP_LOGI(TAG, "Set extranonce: %s, extranonce_2_len: %d",
-                 stratum_api_v1_message.extranonce_str,
-                 stratum_api_v1_message.extranonce_2_len);
-        set_extranonce_callback(stratum_api_v1_message.extranonce_str,
-                                stratum_api_v1_message.extranonce_2_len);
+                 pool->stratum_api_v1_message.extranonce_str,
+                 pool->stratum_api_v1_message.extranonce_2_len);
+        set_extranonce_callback(pool->stratum_api_v1_message.extranonce_str,
+                                pool->stratum_api_v1_message.extranonce_2_len);
         break;
 
     case CLIENT_RECONNECT:
         ESP_LOGE(TAG, "Pool requested client reconnect...");
-        stratum_close_connection(&POOL_MODULE.pools[POOL_MODULE.active_pool].sock);
+        stratum_close_connection(&pool->sock);
         set_next_state(STRATUM_STATE_ERROR_RETRY);
         return;
 
     case STRATUM_RESULT:
-        if (stratum_api_v1_message.response_success) {
+        if (pool->stratum_api_v1_message.response_success) {
             ESP_LOGI(TAG, "message result accepted");
             SYSTEM_notify_accepted_share();
         } else {
             ESP_LOGW(TAG, "message result rejected: %s",
-                     stratum_api_v1_message.error_str);
-            SYSTEM_notify_rejected_share(stratum_api_v1_message.error_str);
+                     pool->stratum_api_v1_message.error_str);
+            SYSTEM_notify_rejected_share(pool->stratum_api_v1_message.error_str);
         }
         break;
 
     case STRATUM_RESULT_SETUP:
-        if (stratum_api_v1_message.response_success) {
+        if (pool->stratum_api_v1_message.response_success) {
             ESP_LOGI(TAG, "setup message accepted");
-            if (stratum_api_v1_message.message_id == authorize_message_id) {
+            if (pool->stratum_api_v1_message.message_id == authorize_message_id) {
                 STRATUM_V1_suggest_difficulty(
-                    POOL_MODULE.pools[POOL_MODULE.active_pool].sock,
-                    send_uid++, difficulty);
+                    pool->sock,
+                    send_uid++, pool->difficulty);
             }
-            if (extranonce_subscribe) {
+            if (pool->extranonce_subscribe) {
                 STRATUM_V1_extranonce_subscribe(
-                    POOL_MODULE.pools[POOL_MODULE.active_pool].sock,
+                    pool->sock,
                     send_uid++);
             }
         } else {
             ESP_LOGE(TAG, "setup message rejected: %s",
-                     stratum_api_v1_message.error_str);
+                     pool->stratum_api_v1_message.error_str);
         }
         break;
 
