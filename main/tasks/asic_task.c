@@ -25,7 +25,7 @@ bm_job * active_job = NULL;
 
 // Time tracking
 static long timegone = 1;
-static int hashrate_counter = 20;
+static int hashrate_counter = 40;
 int (*stratum_submit_share_callback)(char * jobid, char * extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version);
 void (*SYSTEM_notify_found_nonce_callback)(double found_diff, uint32_t target);
 
@@ -91,12 +91,26 @@ static void update_hashrate(long current_time)
 {
     float gh_hash = get_hashrate_cnt();
     if (gh_hash > 0) {
+        /* Convert to gigahashes per second */
         gh_hash = (gh_hash / (current_time - timegone)) * 1000000.0f;
+
+        /* Spike filtering – only apply when the last non‑spike value is >0 */
+        if (SYSTEM_MODULE.hashrate_no_error > 500.0f &&
+            gh_hash > 3.0f * SYSTEM_MODULE.hashrate_no_error) {
+            gh_hash = SYSTEM_MODULE.hashrate_no_error;   /* keep previous value */
+        }
     }
 
     float gh_err = get_hashrate_error_cnt();
     if (gh_err > 0) {
+        /* Convert to gigahashes per second */
         gh_err = (gh_err / (current_time - timegone)) * 1000000.0f;
+
+        /* Spike filtering – only apply when the last non‑spike value is >0 */
+        if (SYSTEM_MODULE.hashrate_error > 500.0f &&
+            gh_err > 3.0f * SYSTEM_MODULE.hashrate_error) {
+            gh_err = SYSTEM_MODULE.hashrate_error;   /* keep previous value */
+        }
     }
 
     SYSTEM_MODULE.hashrate_no_error = gh_hash;
@@ -105,7 +119,7 @@ static void update_hashrate(long current_time)
     if (--hashrate_counter == 0) {
         timegone = current_time;
         reset_counters();
-        hashrate_counter = 20;
+        hashrate_counter = 40;
     }
 }
 
@@ -202,5 +216,6 @@ void ASIC_result_task(void * pvParameters)
         process_asic_result(asic_result, aj, job_id, SYSTEM_notify_found_nonce_callback, stratum_submit_share_callback);
         xSemaphoreGiveRecursive(xJobMutex);
         update_hashrate(esp_timer_get_time());
+        vTaskDelay(5 / portTICK_PERIOD_MS);
     }
 }

@@ -105,23 +105,20 @@ void auto_tune_init()
 
 bool waitForStartUp(bool pid_control_fanspeed)
 {
-    return current_hashrate_auto > 0 && pid_control_fanspeed && waitCounter <= 0;
+    return current_hashrate_auto > 0 && waitCounter <= 0;
 }
 
 bool can_increase_values()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc < AUTO_TUNE.fan_limit &&
-           POWER_MANAGEMENT_MODULE.power < AUTO_TUNE.power_limit &&
+    return POWER_MANAGEMENT_MODULE.fan_perc < AUTO_TUNE.fan_limit && POWER_MANAGEMENT_MODULE.power < AUTO_TUNE.power_limit &&
            POWER_MANAGEMENT_MODULE.chip_temp_avg < AUTO_TUNE.max_temp_asic &&
            POWER_MANAGEMENT_MODULE.vr_temp < AUTO_TUNE.max_temp_vr;
 }
 
 bool limithit()
 {
-    return POWER_MANAGEMENT_MODULE.fan_perc > AUTO_TUNE.fan_limit ||
-           POWER_MANAGEMENT_MODULE.power > AUTO_TUNE.power_limit ||
+    return POWER_MANAGEMENT_MODULE.fan_perc > AUTO_TUNE.fan_limit || POWER_MANAGEMENT_MODULE.power > AUTO_TUNE.power_limit ||
            POWER_MANAGEMENT_MODULE.chip_temp_avg > AUTO_TUNE.max_temp_asic;
-           
 }
 
 bool critical_limithit()
@@ -136,8 +133,6 @@ bool hashrate_decreased()
 {
     return last_hashrate_auto > current_hashrate_auto;
 }
-
-
 
 bool hashrate_increased_since_last_set()
 {
@@ -172,10 +167,10 @@ static void enforce_voltage_frequency_ratio()
     double min_voltage = last_asic_frequency_auto * AUTO_TUNE.vf_ratio_min;
     double max_voltage = last_asic_frequency_auto * AUTO_TUNE.vf_ratio_max;
 
-    if (last_core_voltage_auto < min_voltage) {
+    if (last_core_voltage_auto <= min_voltage) {
         last_core_voltage_auto = min_voltage;
         lastVoltageSet = true;
-    } else if (last_core_voltage_auto > max_voltage) {
+    } else if (last_core_voltage_auto >= max_voltage) {
         last_core_voltage_auto = max_voltage;
         lastVoltageSet = false;
     }
@@ -183,10 +178,10 @@ static void enforce_voltage_frequency_ratio()
     double min_frequency = last_core_voltage_auto / AUTO_TUNE.vf_ratio_max;
     double max_frequency = last_core_voltage_auto / AUTO_TUNE.vf_ratio_min;
 
-    if (last_asic_frequency_auto < min_frequency) {
+    if (last_asic_frequency_auto <= min_frequency) {
         last_asic_frequency_auto = min_frequency;
         lastVoltageSet = false;
-    } else if (last_asic_frequency_auto > max_frequency) {
+    } else if (last_asic_frequency_auto >= max_frequency) {
         last_asic_frequency_auto = max_frequency;
         lastVoltageSet = true;
     }
@@ -200,7 +195,7 @@ void increase_values()
         last_core_voltage_auto += volt_step;
     }
 }
-    
+
 void respectLimits()
 {
     last_asic_frequency_auto = clamp(last_asic_frequency_auto, MIN_FREQ, AUTO_TUNE.max_frequency_asic);
@@ -216,13 +211,11 @@ void dowork()
     freq_step = AUTO_TUNE.autotune_step_frequency;
     volt_step = AUTO_TUNE.step_volt;
 
-    
-
     // Check if hashrate increased since last voltage/frequency set
     bool hashrate_increased = hashrate_increased_since_last_set();
 
     // If hashrate didn't increase, switch the setting
-    if (!hashrate_increased) 
+    if (!hashrate_increased)
         lastVoltageSet = !lastVoltageSet;
     if (critical_limithit()) {
         last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
@@ -230,13 +223,6 @@ void dowork()
     } else if (can_increase_values()) {
         increase_values();
     }
-
-    enforce_voltage_frequency_ratio();
-    respectLimits();
-    //ESP_LOGI(TAG, "Hashrate %f Voltage %f Frequency %f", avg_hashrate_auto, last_core_voltage_auto, last_asic_frequency_auto);
-    SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
-    AUTO_TUNE.voltage = last_core_voltage_auto;
-    AUTO_TUNE.frequency = last_asic_frequency_auto;
 }
 
 void auto_tune(bool pid_control_fanspeed)
@@ -281,6 +267,12 @@ void auto_tune(bool pid_control_fanspeed)
         }
         break;
     }
+    enforce_voltage_frequency_ratio();
+    respectLimits();
+    // ESP_LOGI(TAG, "Hashrate %f Voltage %f Frequency %f", avg_hashrate_auto, last_core_voltage_auto, last_asic_frequency_auto);
+    SYSTEM_MODULE.avg_hashrate = avg_hashrate_auto;
+    AUTO_TUNE.voltage = last_core_voltage_auto;
+    AUTO_TUNE.frequency = last_asic_frequency_auto;
     last_hashrate_auto = current_hashrate_auto;
 }
 
