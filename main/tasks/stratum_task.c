@@ -141,6 +141,10 @@ void stratum_primary_heartbeat(void *pvParameters)
     }
 }
 
+#define HEARTBEAT_TASK_STACK_SIZE  8192
+static StaticTask_t heartbeat_task_buffer;
+static StackType_t heartbeat_task_stack[HEARTBEAT_TASK_STACK_SIZE];
+
 /* Main Stratum task loop */
 void stratum_task(void *pvParameters)
 {
@@ -150,8 +154,8 @@ void stratum_task(void *pvParameters)
     STRATUM_V1_initialize_buffer();
 
     create_jobs_task_handle = xTaskGetHandle("stratum miner");
-    xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192,
-                pvParameters, 1, NULL);
+    xTaskCreateStatic(stratum_primary_heartbeat, "stratum primary heartbeat", HEARTBEAT_TASK_STACK_SIZE,
+                pvParameters, 1, heartbeat_task_stack, &heartbeat_task_buffer);
 
     ESP_LOGI(TAG, "Stratum task started");
 

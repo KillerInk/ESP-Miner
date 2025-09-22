@@ -37,6 +37,16 @@ StateModule STATE_MODULE;
 
 static const char * TAG = "bitaxe";
 
+#define DEFAULT_TASK_STACK_SIZE  8192
+static StaticTask_t create_jobs_task_buffer;
+static StackType_t create_jobs_task_stack[DEFAULT_TASK_STACK_SIZE];
+static StaticTask_t stratum_task_buffer;
+static StackType_t stratum_task_stack[DEFAULT_TASK_STACK_SIZE];
+static StaticTask_t ASIC_result_task_buffer;
+static StackType_t ASIC_result_task_stack[DEFAULT_TASK_STACK_SIZE];
+static StaticTask_t statistics_task_buffer;
+static StackType_t statistics_task_stack[DEFAULT_TASK_STACK_SIZE];
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "Welcome to the bitaxe - FOSS || GTFO!");
@@ -124,8 +134,8 @@ void app_main(void)
     SERIAL_clear_buffer();
 
     STATE_MODULE.ASIC_initalized = true;
-    xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
-    xTaskCreate(stratum_task, "stratum admin", 8192, NULL, 5, NULL);
-    xTaskCreate(ASIC_result_task, "asic result", 8192, NULL, 15, NULL);
-    xTaskCreate(statistics_task, "statistics", 8192, NULL, 3, NULL);
+    xTaskCreateStatic(create_jobs_task, "stratum miner", DEFAULT_TASK_STACK_SIZE, NULL, 10, create_jobs_task_stack, &create_jobs_task_buffer);
+    xTaskCreateStatic(stratum_task, "stratum admin", DEFAULT_TASK_STACK_SIZE, NULL, 5, stratum_task_stack,&stratum_task_buffer);
+    xTaskCreateStatic(ASIC_result_task, "asic result", DEFAULT_TASK_STACK_SIZE, NULL, 15, ASIC_result_task_stack,&ASIC_result_task_buffer);
+    xTaskCreateStatic(statistics_task, "statistics", DEFAULT_TASK_STACK_SIZE, NULL, 3, statistics_task_stack,&statistics_task_buffer);
 }
