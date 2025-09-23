@@ -280,7 +280,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
                     
                     POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
+                    enqueue_nvs_uint16(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
                     
                     char freq_str[32];
                     snprintf(freq_str, sizeof(freq_str), "%.2f", target_frequency);
@@ -304,7 +304,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
 
                 //ESP_LOGI(TAG, "Setting ASIC voltage to %d mV", target_voltage_mv);
 
-                nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, target_voltage_mv);
+                enqueue_nvs_uint16(NVS_CONFIG_ASIC_VOLTAGE, target_voltage_mv);
                 //ESP_LOGI(TAG, "Voltage successfully set to %d mV", target_voltage_mv);
 
                 char voltage_str[32];
@@ -323,7 +323,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     free(current_ssid);
                     return;
                 } else if (!current_ssid || strcmp(current_ssid, value) != 0) {
-                    nvs_config_set_string(NVS_CONFIG_WIFI_SSID, value);
+                    enqueue_nvs_string(NVS_CONFIG_WIFI_SSID, value);
                     //ESP_LOGI(TAG, "WiFi SSID set to: %s", value);
                     BAP_send_message(BAP_CMD_ACK, parameter, value);
                     if (current_ssid) free(current_ssid);
@@ -345,7 +345,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     free(current_pass);
                     return;
                 } else if (!current_pass || strcmp(current_pass, value) != 0) {
-                    nvs_config_set_string(NVS_CONFIG_WIFI_PASS, value);
+                    enqueue_nvs_string(NVS_CONFIG_WIFI_PASS, value);
                     //ESP_LOGI(TAG, "WiFi password set");
                     BAP_send_message(BAP_CMD_ACK, parameter, "password_set");
                     vTaskDelay(pdMS_TO_TICKS(100));
@@ -370,8 +370,8 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     return;
                 }
                 //ESP_LOGI(TAG, "Setting fan speed to %d%%", fan_speed);
-                nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, fan_speed);
+                enqueue_nvs_uint16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+                enqueue_nvs_uint16(NVS_CONFIG_FAN_SPEED, fan_speed);
             }
             break;
         case BAP_PARAM_AUTO_FAN_SPEED:
@@ -384,7 +384,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     return;
                 }
                 //ESP_LOGI(TAG, "Setting auto fan speed to %d", auto_fan_speed);
-                nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, auto_fan_speed);
+                enqueue_nvs_uint16(NVS_CONFIG_AUTO_FAN_SPEED, auto_fan_speed);
                 BAP_send_message(BAP_CMD_ACK, parameter, "auto_fan_speed_set");
                 return;
             }

@@ -87,4 +87,13 @@ bool nvs_config_get_bool(const char * key, const bool default_value);
 void nvs_config_set_bool(const char * key, const bool value);
 void nvs_config_commit(void);
 
+void enqueue_nvs_uint8(const char *key, uint8_t value);
+void enqueue_nvs_uint16(const char *key, uint16_t value);
+void enqueue_nvs_int32(const char *key, int32_t value);
+void enqueue_nvs_uint64(const char *key, uint64_t value);
+void enqueue_nvs_bool(const char *key, bool value);
+void enqueue_nvs_float(const char *key, float value);
+void enqueue_nvs_double(const char *key, double value);
+void enqueue_nvs_string(const char *key, const char *value);
+
 #endif // MAIN_NVS_CONFIG_H

@@ -58,7 +58,7 @@ void POWER_MANAGEMENT_init_frequency()
     if (frequency < 0) { // fallback if the float value is not yet set
         frequency = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY, CONFIG_ASIC_FREQUENCY);
 
-        nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
+        enqueue_nvs_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
     }
 
     ESP_LOGI(TAG, "ASIC Frequency: %g MHz", frequency);
@@ -121,12 +121,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             // Turn off core voltage
             VCORE_set_voltage(0.0f);
 
-            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, 50);
-            nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, 50);
-            nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-            nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-            nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+            enqueue_nvs_uint16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
+            enqueue_nvs_uint16(NVS_CONFIG_ASIC_FREQUENCY, 50);
+            enqueue_nvs_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, 50);
+            enqueue_nvs_uint16(NVS_CONFIG_FAN_SPEED, 100);
+            enqueue_nvs_uint16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+            enqueue_nvs_uint16(NVS_CONFIG_OVERHEAT_MODE, 1);
             exit(EXIT_FAILURE);
         }
 

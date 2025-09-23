@@ -99,11 +99,11 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
     // Update theme settings
     cJSON *item;
     if ((item = cJSON_GetObjectItem(root, "colorScheme")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_THEME_SCHEME, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_THEME_SCHEME, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "accentColors")) != NULL) {
         char *colors_str = cJSON_Print(item);
-        nvs_config_set_string(NVS_CONFIG_THEME_COLORS, colors_str);
+        enqueue_nvs_string(NVS_CONFIG_THEME_COLORS, colors_str);
         free(colors_str);
     }
 

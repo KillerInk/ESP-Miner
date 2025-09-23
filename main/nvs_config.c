@@ -2,12 +2,49 @@
 #include "esp_log.h"
 #include "nvs.h"
 #include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
 
 #define NVS_CONFIG_NAMESPACE "main"
 
 #define FLOAT_STR_LEN 32
 
 static const char * TAG = "nvs_config";
+
+// ---------------------------------------------------------------------------
+//  Queue Item Definition
+// ---------------------------------------------------------------------------
+typedef enum {
+    NVS_ITEM_TYPE_U8,
+    NVS_ITEM_TYPE_U16,
+    NVS_ITEM_TYPE_I32,
+    NVS_ITEM_TYPE_U64,
+    NVS_ITEM_TYPE_BOOL,
+    NVS_ITEM_TYPE_FLOAT,
+    NVS_ITEM_TYPE_DOUBLE,
+    NVS_ITEM_TYPE_STRING
+} nvs_item_type_t;
+
+typedef union {
+    uint8_t u8;
+    uint16_t u16;
+    int32_t  i32;
+    uint64_t u64;
+    bool     b;
+    float   f;
+    double  d;
+    char *  s;          // pointer to dynamically allocated string
+} nvs_value_u;
+
+typedef struct {
+    const char *key;
+    nvs_item_type_t type;
+    nvs_value_u val;
+} nvs_item_t;
+
+// Global queue handle
+static QueueHandle_t nvs_queue = NULL;
 
 char * nvs_config_get_string(const char * key, const char * default_value)
 {
@@ -289,3 +326,143 @@ void nvs_config_commit()
     }
     nvs_close(handle);
 }
+
+
+
+
+// ---------------------------------------------------------------------------
+//  Task that processes the queue
+// ---------------------------------------------------------------------------
+void nvs_write_task(void *pvParameters)
+{
+    (void) pvParameters;
+
+    nvs_item_t item;
+    for (;;) {
+        if (xQueueReceive(nvs_queue, &item, portMAX_DELAY) == pdPASS) {
+            switch (item.type) {
+                case NVS_ITEM_TYPE_U8:
+                    // Convert to u16 because no u8 setter
+                    nvs_config_set_u16(item.key, (uint16_t)item.val.u8);
+                    break;
+
+                case NVS_ITEM_TYPE_U16:
+                    nvs_config_set_u16(item.key, item.val.u16);
+                    break;
+
+                case NVS_ITEM_TYPE_I32:
+                    nvs_config_set_i32(item.key, item.val.i32);
+                    break;
+
+                case NVS_ITEM_TYPE_U64:
+                    nvs_config_set_u64(item.key, item.val.u64);
+                    break;
+
+                case NVS_ITEM_TYPE_BOOL:
+                    nvs_config_set_bool(item.key, item.val.b);
+                    break;
+
+                case NVS_ITEM_TYPE_FLOAT:
+                    nvs_config_set_float(item.key, item.val.f);
+                    break;
+
+                case NVS_ITEM_TYPE_DOUBLE:
+                    nvs_config_set_double(item.key, item.val.d);
+                    break;
+
+                case NVS_ITEM_TYPE_STRING:
+                    nvs_config_set_string(item.key, item.val.s);
+                    free(item.val.s);          // clean up allocated string
+                    break;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Queue and Task initialization helper
+// ---------------------------------------------------------------------------
+void init_and_start(void)
+{
+    // Create queue with a reasonable depth (e.g., 10 items)
+    nvs_queue = xQueueCreate(10, sizeof(nvs_item_t));
+    if (!nvs_queue) return;
+
+    // Start the background task
+    xTaskCreate(&nvs_write_task,
+                "NVS_Write_Task",
+                configMINIMAL_STACK_SIZE * 2,
+                NULL,
+                tskIDLE_PRIORITY + 1,
+                NULL);
+}
+
+// ---------------------------------------------------------------------------
+//  Helper functions that enqueue various types
+// ---------------------------------------------------------------------------
+void enqueue_nvs_uint8(const char *key, uint8_t value)
+{
+    if (!nvs_queue) init_and_start();
+    nvs_item_t item = { key, NVS_ITEM_TYPE_U8 };
+    item.val.u8 = value;
+    xQueueSendToBack(nvs_queue, &item, portMAX_DELAY);
+}
+
+void enqueue_nvs_uint16(const char *key, uint16_t value)
+{
+    if (!nvs_queue) init_and_start();
+    nvs_item_t item = { key, NVS_ITEM_TYPE_U16 };
+    item.val.u16 = value;
+    xQueueSendToBack(nvs_queue, &item, portMAX_DELAY);
+}
+
+void enqueue_nvs_int32(const char *key, int32_t value)
+{
+    if (!nvs_queue) init_and_start();
+    nvs_item_t item = { key, NVS_ITEM_TYPE_I32 };
+    item.val.i32 = value;
+    xQueueSendToBack(nvs_queue, &item, portMAX_DELAY);
+}
+
+void enqueue_nvs_uint64(const char *key, uint64_t value)
+{
+    if (!nvs_queue) init_and_start();
+    nvs_item_t item = { key, NVS_ITEM_TYPE_U64 };
+    item.val.u64 = value;
+    xQueueSendToBack(nvs_queue, &item, portMAX_DELAY);
+}
+
+void enqueue_nvs_bool(const char *key, bool value)
+{
+    if (!nvs_queue) init_and_start();
+    nvs_item_t item = { key, NVS_ITEM_TYPE_BOOL };
+    item.val.b = value;
+    xQueueSendToBack(nvs_queue, &item, portMAX_DELAY);
+}
+
+void enqueue_nvs_float(const char *key, float value)
+{
+    if (!nvs_queue) init_and_start();
+    nvs_item_t item = { key, NVS_ITEM_TYPE_FLOAT };
+    item.val.f = value;
+    xQueueSendToBack(nvs_queue, &item, portMAX_DELAY);
+}
+
+void enqueue_nvs_double(const char *key, double value)
+{
+    if (!nvs_queue) init_and_start();
+    nvs_item_t item = { key, NVS_ITEM_TYPE_DOUBLE };
+    item.val.d = value;
+    xQueueSendToBack(nvs_queue, &item, portMAX_DELAY);
+}
+
+void enqueue_nvs_string(const char *key, const char *value)
+{
+    if (!nvs_queue) init_and_start();
+    char *copy = strdup(value);   // allocate copy for queue
+    nvs_item_t item = { key, NVS_ITEM_TYPE_STRING };
+    item.val.s = copy;
+    xQueueSendToBack(nvs_queue, &item, portMAX_DELAY);
+}
+
+

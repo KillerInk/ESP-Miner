@@ -505,7 +505,7 @@ static void tests_done(bool test_result)
     if (test_result) {
         if (isFactoryTest) {
             ESP_LOGI(TAG, "Self-test flag cleared");
-            nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
+            enqueue_nvs_uint16(NVS_CONFIG_SELF_TEST, 0);
         }
         ESP_LOGI(TAG, "SELF-TEST PASS! -- Press RESET button to restart.");
         SELF_TEST_MODULE.result = "SELF-TEST PASS!";
@@ -524,7 +524,7 @@ static void tests_done(bool test_result)
                 // Wait here forever until reset_self_test() gives the longPressSemaphore
                 if (xSemaphoreTake(longPressSemaphore, portMAX_DELAY) == pdTRUE) {
                     ESP_LOGI(TAG, "Self-test flag cleared");
-                    nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
+                    enqueue_nvs_uint16(NVS_CONFIG_SELF_TEST, 0);
                     // flush all pending NVS writes
                     nvs_config_commit();
                     esp_restart();

@@ -263,7 +263,7 @@ static void _check_for_best_diff(double diff, uint32_t target)
     }
     best_nonce_diff = (uint64_t) diff;
 
-    nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, best_nonce_diff);
+    enqueue_nvs_uint64(NVS_CONFIG_BEST_DIFF, best_nonce_diff);
 
     // make the best_nonce_diff into a string
     suffixString((uint64_t) diff, SYSTEM_MODULE.best_diff_string, DIFF_STRING_SIZE, 0);
@@ -276,7 +276,7 @@ static esp_err_t ensure_overheat_mode_config() {
 
     if (overheat_mode == UINT16_MAX) {
         // Key doesn't exist or couldn't be read, set the default value
-        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+        enqueue_nvs_uint16(NVS_CONFIG_OVERHEAT_MODE, 0);
         ESP_LOGI(TAG, "Default value for overheat_mode set to 0");
     } else {
         // Key exists, log the current value

@@ -492,91 +492,91 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     }
 
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumURL"))) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_URL, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_STRATUM_URL, item->valuestring);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumURL"))) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_FALLBACK_STRATUM_URL, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "stratumExtranonceSubscribe")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "stratumSuggestedDifficulty")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_DIFFICULTY, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_STRATUM_DIFFICULTY, item->valueint);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumUser"))) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_USER, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_STRATUM_USER, item->valuestring);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumPassword"))) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_STRATUM_PASS, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "fallbackStratumExtranonceSubscribe")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "fallbackStratumSuggestedDifficulty")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, item->valueint);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumUser"))) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_FALLBACK_STRATUM_USER, item->valuestring);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumPassword"))) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "stratumPort")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_STRATUM_PORT, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "fallbackStratumPort")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_FALLBACK_STRATUM_PORT, item->valueint);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "ssid"))) {
-        nvs_config_set_string(NVS_CONFIG_WIFI_SSID, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_WIFI_SSID, item->valuestring);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "wifiPass"))) {
-        nvs_config_set_string(NVS_CONFIG_WIFI_PASS, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_WIFI_PASS, item->valuestring);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "hostname"))) {
-        nvs_config_set_string(NVS_CONFIG_HOSTNAME, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_HOSTNAME, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
-        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL && item->valuedouble > 0) {
         float frequency = item->valuedouble;
-        nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
+        enqueue_nvs_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
         // also store as u16 for backwards compatibility
-        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, (int) frequency);
+        enqueue_nvs_uint16(NVS_CONFIG_ASIC_FREQUENCY, (int) frequency);
     }
     if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+        enqueue_nvs_uint16(NVS_CONFIG_OVERHEAT_MODE, 0);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "display"))) {
-        nvs_config_set_string(NVS_CONFIG_DISPLAY, item->valuestring);
+        enqueue_nvs_string(NVS_CONFIG_DISPLAY, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "rotation")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_ROTATION, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_ROTATION, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "displayTimeout")) != NULL) {
         nvs_config_set_i32(NVS_CONFIG_DISPLAY_TIMEOUT, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "autofanspeed")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_AUTO_FAN_SPEED, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_FAN_SPEED, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "minFanSpeed")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_MIN_FAN_SPEED, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_MIN_FAN_SPEED, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "temptarget")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_TEMP_TARGET, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_TEMP_TARGET, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "statsFrequency")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STATISTICS_FREQUENCY, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_STATISTICS_FREQUENCY, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "overclockEnabled")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
+        enqueue_nvs_uint16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
     }
 
     cJSON_Delete(root);
@@ -1144,48 +1144,48 @@ esp_err_t POST_autotune_update(httpd_req_t * req)
     cJSON *item;
     if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_POWER_LIMIT)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.power_limit = item->valuedouble;
-        nvs_config_set_u16(NVS_CONFIG_KEY_POWER_LIMIT, (uint16_t)AUTO_TUNE.power_limit);
+        enqueue_nvs_uint16(NVS_CONFIG_KEY_POWER_LIMIT, (uint16_t)AUTO_TUNE.power_limit);
     }
     if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_FAN_LIMIT)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.fan_limit = item->valuedouble;
-        nvs_config_set_u16(NVS_CONFIG_KEY_FAN_LIMIT, (uint16_t)AUTO_TUNE.fan_limit);
+        enqueue_nvs_uint16(NVS_CONFIG_KEY_FAN_LIMIT, (uint16_t)AUTO_TUNE.fan_limit);
     }
     if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.max_voltage_asic = item->valuedouble;
-        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, (uint16_t)AUTO_TUNE.max_voltage_asic);
+        enqueue_nvs_uint16(NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, (uint16_t)AUTO_TUNE.max_voltage_asic);
     }
     if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.max_frequency_asic = item->valuedouble;
-        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, (uint16_t)AUTO_TUNE.max_frequency_asic);
+        enqueue_nvs_uint16(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, (uint16_t)AUTO_TUNE.max_frequency_asic);
     }
     if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_TEMP_ASIC)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.max_temp_asic = item->valuedouble;
-        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_TEMP_ASIC, (uint16_t)AUTO_TUNE.max_temp_asic);
+        enqueue_nvs_uint16(NVS_CONFIG_KEY_MAX_TEMP_ASIC, (uint16_t)AUTO_TUNE.max_temp_asic);
     }
         if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_AUTO_TUNE_ENABLE)) && cJSON_IsBool(item)) {
         AUTO_TUNE.auto_tune_hashrate = item->valueint;
-        nvs_config_set_bool(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, (bool)AUTO_TUNE.auto_tune_hashrate);
+        enqueue_nvs_bool(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, (bool)AUTO_TUNE.auto_tune_hashrate);
     }
     if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.overshot_power_limit = item->valuedouble;
-        nvs_config_set_double(NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT, AUTO_TUNE.overshot_power_limit);
+        enqueue_nvs_double(NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT, AUTO_TUNE.overshot_power_limit);
     }
     if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.overshot_fanspeed = (uint16_t)item->valuedouble;
-        nvs_config_set_u16(NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT, (uint16_t)AUTO_TUNE.overshot_fanspeed);
+        enqueue_nvs_uint16(NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT, (uint16_t)AUTO_TUNE.overshot_fanspeed);
     }
     if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_VF_RATIO_MAX)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.vf_ratio_max = item->valuedouble;
-        nvs_config_set_double(NVS_CONFIG_KEY_VF_RATIO_MAX, AUTO_TUNE.vf_ratio_max);
+        enqueue_nvs_double(NVS_CONFIG_KEY_VF_RATIO_MAX, AUTO_TUNE.vf_ratio_max);
     }
     if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_VF_RATIO_MIN)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.vf_ratio_min = item->valuedouble;
         ESP_LOGI(TAG, "vf_ratio_min %f", AUTO_TUNE.vf_ratio_min);
-        nvs_config_set_double(NVS_CONFIG_KEY_VF_RATIO_MIN, AUTO_TUNE.vf_ratio_min);
+        enqueue_nvs_double(NVS_CONFIG_KEY_VF_RATIO_MIN, AUTO_TUNE.vf_ratio_min);
     }
      if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_TEMP_VR)) && cJSON_IsNumber(item)) {
         AUTO_TUNE.max_temp_vr = (uint16_t)item->valueint;
-        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_TEMP_VR, (uint16_t)AUTO_TUNE.max_temp_vr);
+        enqueue_nvs_uint16(NVS_CONFIG_KEY_MAX_TEMP_VR, (uint16_t)AUTO_TUNE.max_temp_vr);
     }
 
     cJSON_Delete(root);
