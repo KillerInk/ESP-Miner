@@ -235,9 +235,9 @@ void handle_process_shares(PoolInfo * pool)
         set_new_mining_notification_callback(
             pool->stratum_api_v1_message.mining_notification);
 
-        if (create_jobs_task_handle != NULL) {
+        /*if (create_jobs_task_handle != NULL) {
             xTaskNotifyGive(create_jobs_task_handle);
-        }
+        }*/
         decode_mining_notification(pool->stratum_api_v1_message.mining_notification,
                                    pool->stratum_api_v1_message.extranonce_str,
                                    pool->stratum_api_v1_message.extranonce_2_len);
