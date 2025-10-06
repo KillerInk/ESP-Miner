@@ -67,6 +67,7 @@ void asic_task_set_version_mask(uint32_t _version_mask)
 {
     version_mask = _version_mask;
     new_version_mask = true;
+    ASIC_set_version_mask(version_mask);
 }
 
 bool cleanup()
@@ -112,8 +113,10 @@ void set_new_mining_notification(mining_notify * notification)
                                    extranonce_str, extranonce_2_len, version_mask);
         if (active_job) {
             xSemaphoreTakeRecursive(xJobMutex, portMAX_DELAY);
-            ASIC_set_difficulty(mining_notification_current->job_difficulty);
-            ASIC_set_version_mask(version_mask);
+            if(mining_notification_current->job_difficulty < 256)
+                ASIC_set_difficulty(256);
+            if(mining_notification_current->job_difficulty > 16384)
+                ASIC_set_difficulty(16384);
             ASIC_send_work(active_job, active_jobs);
             xSemaphoreGiveRecursive(xJobMutex);
         } else {
