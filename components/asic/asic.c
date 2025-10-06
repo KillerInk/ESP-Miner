@@ -20,13 +20,14 @@ typedef struct {
     uint8_t (*asic_init)(uint64_t frequency, uint16_t asic_count, uint16_t difficulty);
     void (*set_nonce_percent)(uint64_t frequency, uint16_t chain_chip_count);
     float (*get_timeout)(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll);
+    void (*set_difficulty)(uint32_t difficulty);
 } asic_methods_t;
 
 static asic_methods_t asic_methods[] = {
-    {BM1397_process_work, BM1397_set_max_baud, BM1397_send_work, BM1397_set_version_mask, BM1397_send_hash_frequency, BM1397_init, BM1397_set_nonce_percent, BM1397_get_timeout},
-    {BM1366_process_work, BM1366_set_max_baud, BM1366_send_work, BM1366_set_version_mask, BM1366_send_hash_frequency, BM1366_init, BM1366_set_nonce_percent, BM1366_get_timeout},
-    {BM1368_process_work, BM1368_set_max_baud, BM1368_send_work, BM1368_set_version_mask, BM1368_send_hash_frequency, BM1368_init, BM1368_set_nonce_percent, BM1368_get_timeout},
-    {BM1370_process_work, BM1370_set_max_baud, BM1370_send_work, BM1370_set_version_mask, BM1370_send_hash_frequency, BM1370_init, BM1370_set_nonce_percent, BM1370_get_timeout}
+    {BM1397_process_work, BM1397_set_max_baud, BM1397_send_work, BM1397_set_version_mask, BM1397_send_hash_frequency, BM1397_init, BM1397_set_nonce_percent, BM1397_get_timeout, BM1397_set_difficulty},
+    {BM1366_process_work, BM1366_set_max_baud, BM1366_send_work, BM1366_set_version_mask, BM1366_send_hash_frequency, BM1366_init, BM1366_set_nonce_percent, BM1366_get_timeout, BM1366_set_difficulty},
+    {BM1368_process_work, BM1368_set_max_baud, BM1368_send_work, BM1368_set_version_mask, BM1368_send_hash_frequency, BM1368_init, BM1368_set_nonce_percent, BM1368_get_timeout, BM1368_set_difficulty},
+    {BM1370_process_work, BM1370_set_max_baud, BM1370_send_work, BM1370_set_version_mask, BM1370_send_hash_frequency, BM1370_init, BM1370_set_nonce_percent, BM1370_get_timeout, BM1370_set_difficulty}
 };
 
 static asic_methods_t *current_asics;
@@ -81,5 +82,10 @@ double ASIC_get_asic_job_frequency_ms(uint32_t version_mask)
     if (asic_job_frequency_ms < 20) asic_job_frequency_ms = 20;
 
     return asic_job_frequency_ms;
+}
+
+void ASIC_set_difficulty(uint32_t difficulty)
+{
+    current_asics->set_difficulty(difficulty);
 }
 

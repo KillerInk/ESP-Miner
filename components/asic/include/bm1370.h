@@ -35,5 +35,6 @@ float get_hashrate_error_cnt();
 void reset_counters();
 void BM1370_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count);
 float BM1370_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll);
+void BM1370_set_difficulty(uint32_t difficulty);
 
 #endif /* BM1370_H_ */

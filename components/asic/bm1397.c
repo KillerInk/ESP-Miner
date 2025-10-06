@@ -241,6 +241,14 @@ float BM1397_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int vers
     return timeout_ms;
 }
 
+void BM1397_set_difficulty(uint32_t difficulty)
+{
+     //set difficulty mask
+    uint8_t difficulty_mask[6];
+    get_difficulty_mask(difficulty, difficulty_mask);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1397_SERIALTX_DEBUG);
+}
+
 uint8_t BM1397_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
 {
     // send the init command

@@ -32,5 +32,6 @@ void BM1366_send_hash_frequency(float frequency);
 task_result * BM1366_process_work(bm_job ** active_jobs);
 void BM1366_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count);
 float BM1366_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll);
+void BM1366_set_difficulty(uint32_t difficulty);
 
 #endif /* BM1366_H_ */

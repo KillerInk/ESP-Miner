@@ -69,6 +69,32 @@ void asic_task_set_version_mask(uint32_t _version_mask)
     new_version_mask = true;
 }
 
+bool cleanup()
+{
+    // Clear the current notification and update to new one
+        free_mining_notify(mining_notification_current);
+        mining_notification_current = mining_notification_new;
+        mining_notification_new = NULL;
+
+        // Validate current notification
+        if (!mining_notification_current) {
+            ESP_LOGE(TAG, "No mining notification available");
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            return false;
+        }
+
+        xSemaphoreTakeRecursive(xJobMutex, portMAX_DELAY);
+        if (jobs_queue) {
+            bm_job * item = NULL;
+            while (xQueueReceive(jobs_queue, &item, 0) == pdPASS) {
+                if (item != NULL)
+                    free_bm_job(item);
+            }
+        }
+        xSemaphoreGiveRecursive(xJobMutex);
+        return true;
+}
+
 /**
  * Set new mining notification
  *
@@ -78,6 +104,22 @@ void set_new_mining_notification(mining_notify * notification)
 {
     mining_notification_new = notification;
     new_work_recieved = true;
+    if (DEVICE_CONFIG.family.asic.id != BM1397) {
+        // Generate new work and send to ASIC
+        cleanup();
+        uint32_t extranonce_2 = 0;
+        active_job = generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty,
+                                   extranonce_str, extranonce_2_len, version_mask);
+        if (active_job) {
+            xSemaphoreTakeRecursive(xJobMutex, portMAX_DELAY);
+            ASIC_set_difficulty(mining_notification_current->job_difficulty);
+            ASIC_set_version_mask(version_mask);
+            ASIC_send_work(active_job, active_jobs);
+            xSemaphoreGiveRecursive(xJobMutex);
+        } else {
+            ESP_LOGE(TAG, "Failed to generate work for mining notification");
+        }
+    }
 }
 
 /**
@@ -110,6 +152,11 @@ static void update_hashrate(long current_time)
     SYSTEM_MODULE.hashrate_no_error = gh_hash;
     SYSTEM_MODULE.hashrate_error = gh_err;
 
+    if (DEVICE_CONFIG.family.asic.id != BM1397)
+    {
+        SYSTEM_MODULE.current_hashrate = gh_hash + gh_err;
+    }
+
     if (--hashrate_counter == 0) {
         timegone = current_time;
         reset_counters();
@@ -129,8 +176,7 @@ void send_job_task(void * p)
                 ASIC_send_work(dequeued_work, active_jobs);
                 xSemaphoreGiveRecursive(xJobMutex);
                 vTaskDelay(20);
-            } else
-            {
+            } else {
                 xSemaphoreGiveRecursive(xJobMutex);
                 vTaskDelay(100);
             }
@@ -138,6 +184,8 @@ void send_job_task(void * p)
             vTaskDelay(100);
     }
 }
+
+
 
 /**
  * Create jobs task for processing mining notifications
@@ -175,52 +223,20 @@ void create_jobs_task(void * pvParameters)
 
         uint32_t extranonce_2 = 0;
 
-        // Clear the current notification and update to new one
-        free_mining_notify(mining_notification_current);
-        mining_notification_current = mining_notification_new;
-        mining_notification_new = NULL;
-
-        // Validate current notification
-        if (!mining_notification_current) {
-            ESP_LOGE(TAG, "No mining notification available");
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+        if(!cleanup())
             continue;
-        }
-
-        xSemaphoreTakeRecursive(xJobMutex, portMAX_DELAY);
-        if (jobs_queue) {
-            bm_job *item = NULL;
-            while (xQueueReceive(jobs_queue, &item, 0) == pdPASS) {
-                if(item != NULL)
-                    free_bm_job(item);
+        while (!new_work_recieved) {
+            if (uxQueueMessagesWaiting(jobs_queue) < QUEUE_LOW_WATER_MARK) {
+                extranonce_2++;
+                bm_job * njob =
+                    generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty,
+                                    extranonce_str, extranonce_2_len, version_mask);
+                xQueueSend(jobs_queue, &njob, portMAX_DELAY);
+                // ESP_LOGI(TAG, "Generated work for extranonce2 %i", extranonce_2);
             }
+            vTaskDelay(50);
         }
-        xSemaphoreGiveRecursive(xJobMutex);
-
-        if (DEVICE_CONFIG.family.asic.id == BM1397) {
-            while (!new_work_recieved) {
-                if (uxQueueMessagesWaiting(jobs_queue) < QUEUE_LOW_WATER_MARK) {
-                    extranonce_2++;
-                    bm_job * njob =
-                        generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty,
-                                      extranonce_str, extranonce_2_len, version_mask);
-                    xQueueSend(jobs_queue, &njob, portMAX_DELAY);
-                    // ESP_LOGI(TAG, "Generated work for extranonce2 %i", extranonce_2);
-                }
-                vTaskDelay(50);
-            }
-        } else {
-            // Generate new work and send to ASIC
-            active_job = generate_work(mining_notification_current, extranonce_2, mining_notification_current->job_difficulty,
-                                       extranonce_str, extranonce_2_len, version_mask);
-            if (active_job) {
-                xSemaphoreTakeRecursive(xJobMutex, portMAX_DELAY);
-                ASIC_send_work(active_job, active_jobs);
-                xSemaphoreGiveRecursive(xJobMutex);
-            } else {
-                ESP_LOGE(TAG, "Failed to generate work for mining notification");
-            }
-        }
+        
     }
 }
 
@@ -231,8 +247,9 @@ void ASIC_result_task(void * pvParameters)
 {
     while (1) {
         task_result * asic_result = ASIC_process_work(active_jobs);
-
+        update_hashrate(esp_timer_get_time());
         if (!asic_result) {
+            vTaskDelay(5 / portTICK_PERIOD_MS);
             continue;
         }
         xSemaphoreTakeRecursive(xJobMutex, portMAX_DELAY);
@@ -246,7 +263,7 @@ void ASIC_result_task(void * pvParameters)
 
         process_asic_result(asic_result, aj, job_id, SYSTEM_notify_found_nonce_callback, stratum_submit_share_callback);
         xSemaphoreGiveRecursive(xJobMutex);
-        update_hashrate(esp_timer_get_time());
+        
         vTaskDelay(5 / portTICK_PERIOD_MS);
     }
 }
@@ -267,12 +284,13 @@ void asic_task_init(void)
         active_jobs[i] = NULL;
     }
     xJobMutex = xSemaphoreCreateRecursiveMutex();
-    xTaskCreateStatic(create_jobs_task, "stratum miner", DEFAULT_TASK_STACK_SIZE, NULL, 10, create_jobs_task_stack,
-                      &create_jobs_task_buffer);
+    
     xTaskCreateStatic(ASIC_result_task, "asic result", DEFAULT_TASK_STACK_SIZE, NULL, 15, ASIC_result_task_stack,
                       &ASIC_result_task_buffer);
     if (DEVICE_CONFIG.family.asic.id == BM1397) {
         jobs_queue = xQueueCreate(12, sizeof(bm_job *));
+        xTaskCreateStatic(create_jobs_task, "stratum miner", DEFAULT_TASK_STACK_SIZE, NULL, 10, create_jobs_task_stack,
+                      &create_jobs_task_buffer);
         xTaskCreateStatic(send_job_task, "asic send", DEFAULT_TASK_STACK_SIZE, NULL, 15, send_job_task_stack,
                           &send_job_task_buffer);
     }

@@ -1,5 +1,6 @@
 #include "asic_task_common.h"
 #include "esp_log.h"
+#include "device_config.h"
 #define TAG "asic_task_common"
 
 /**
@@ -27,7 +28,10 @@ void process_asic_result(task_result * asic_result,
                              asic_result->nonce, 
                              asic_result->rolled_version ^ active_job->version);
     }
-    SYSTEM_notify_found_nonce_callback(nonce_diff, active_job->target);
+    if (DEVICE_CONFIG.family.asic.id == BM1397)
+    {
+        SYSTEM_notify_found_nonce_callback(nonce_diff, active_job->target);
+    }
 }
 
 /**
