@@ -47,26 +47,35 @@ void create_jobs_task(void *pvParameters)
         }
 
         uint64_t extranonce_2 = 0;
-        while (GLOBAL_STATE->stratum_queue.count < 1 && GLOBAL_STATE->abandon_work == 0)
+        if(GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BM1370)
         {
-            if (should_generate_more_work(GLOBAL_STATE))
-            {
-                generate_work(GLOBAL_STATE, mining_notification, extranonce_2, difficulty);
-
-                // Increase extranonce_2 for the next job.
-                extranonce_2++;
-            }
-            else
-            {
-                // If no more work needed, wait a bit before checking again.
-                vTaskDelay(100 / portTICK_PERIOD_MS);
-            }
+            generate_work(GLOBAL_STATE, mining_notification, extranonce_2, difficulty);
+            xSemaphoreGive(GLOBAL_STATE->ASIC_TASK_MODULE.semaphore);
         }
+        else
+        {    
+            while (GLOBAL_STATE->stratum_queue.count < 1 && GLOBAL_STATE->abandon_work == 0)
+            {
+                if (should_generate_more_work(GLOBAL_STATE))
+                {
+                    generate_work(GLOBAL_STATE, mining_notification, extranonce_2, difficulty);
 
-        if (GLOBAL_STATE->abandon_work == 1)
-        {
-            GLOBAL_STATE->abandon_work = 0;
-            ASIC_jobs_queue_clear(&GLOBAL_STATE->ASIC_jobs_queue);
+                    // Increase extranonce_2 for the next job.
+                    extranonce_2++;
+                }
+                else
+                {
+                    // If no more work needed, wait a bit before checking again.
+                    vTaskDelay(100 / portTICK_PERIOD_MS);
+                }
+            }
+
+            if (GLOBAL_STATE->abandon_work == 1)
+            {
+                GLOBAL_STATE->abandon_work = 0;
+                ASIC_jobs_queue_clear(&GLOBAL_STATE->ASIC_jobs_queue);
+                
+            }
             xSemaphoreGive(GLOBAL_STATE->ASIC_TASK_MODULE.semaphore);
         }
 
