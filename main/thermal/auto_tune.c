@@ -39,8 +39,6 @@ bool history_initialized = false;
 bool lastVoltageSet = false;
 const int waitTime = 30;
 int waitCounter = 0;
-float freq_step;
-float volt_step;
 GlobalState * GLOBAL_STATE;
 
 #define MIN_FREQ 400
@@ -160,11 +158,10 @@ static inline float clamp(float val, float min, float max)
 void increase_values()
 {
     if (!lastVoltageSet) {
-        last_asic_frequency_auto += freq_step;
+        last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency;;
     } else {
-        last_core_voltage_auto += volt_step;
+        last_core_voltage_auto += AUTO_TUNE.step_volt;
     }
-    //enforce_voltage_frequency_ratio();
 }
 
 void respectLimits()
@@ -177,26 +174,45 @@ void respectLimits()
     }
 }
 
+bool check_dead_cores()
+{
+    int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    int domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
+    bool core_died = false;
+    for(int i = 0; i < asic_count; i++) {
+        float avg_hash = 0;
+        for(int d = 0; d < domains; d++) {
+            avg_hash += GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][d].hashrate;
+        }
+        avg_hash /= domains;
+        for(int d = 0; d < domains; d++) {
+            if(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][d].hashrate <= avg_hash * 0.7f)
+                core_died = true;
+        }
+    }
+    if(core_died)
+    {
+        last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
+        last_core_voltage_auto += AUTO_TUNE.step_volt;
+        lastVoltageSet = true;
+        ESP_LOGI(TAG,"Core died, increase voltage");
+    }
+    return core_died;
+}
+
 void dowork()
 {
-    freq_step = AUTO_TUNE.autotune_step_frequency;
-    volt_step = AUTO_TUNE.step_volt;
-
-    // Update hashrate history with current value
-    
-
-    // Check if hashrate increased since last voltage/frequency set
-    bool error_increased = error_increased_since_last_set();
-
-    // If hashrate didn't increase, switch the setting
-    if (error_increased) {
-        lastVoltageSet = !lastVoltageSet;
-    }
-
     if (critical_limithit()) {
         last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
         last_core_voltage_auto -= AUTO_TUNE.step_volt;
-    } else if (can_increase_values()) {
+    } else if (!check_dead_cores() && can_increase_values()) {
+        // Check if error increased since last voltage/frequency set
+        bool error_increased = error_increased_since_last_set();
+
+        // If error did increase, switch the setting
+        if (error_increased) {
+            lastVoltageSet = !lastVoltageSet;
+        }
         increase_values();
     }
 
