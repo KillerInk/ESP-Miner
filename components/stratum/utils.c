@@ -230,10 +230,25 @@ void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits)
     }
 }
 
-float hashCounterToGhs(uint32_t duration_ms, uint32_t counter)
+float hashCounterToGhs(uint64_t duration_us, uint32_t counter)
 {
-    if (duration_ms == 0) return 0.0f;
-    float seconds = duration_ms / 1000.0;
+    if (duration_us == 0) return 0.0f;
+    float seconds = duration_us / 1000000.0;
     float hashrate = counter / seconds * (float)HASH_CNT_LSB; // Make sure it stays in float
     return hashrate / 1e9f; // Convert to Gh/s
+}
+
+void url_decode(char *dst, const char *src) {
+    while (*src) {
+        if ((*src == '%') && src[1] && src[2]) {
+            *dst++ = (hex_val_table[(unsigned char)src[1]] << 4) | hex_val_table[(unsigned char)src[2]];
+            src += 3;
+        } else if (*src == '+') {
+            *dst++ = ' ';
+            src++;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
 }

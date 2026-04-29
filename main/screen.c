@@ -28,6 +28,7 @@ typedef enum {
 } screen_t;
 
 #define SCREEN_UPDATE_MS 500
+#define BUTTON_WAKE_MS 5000
 
 #define SCR_CAROUSEL_START SCR_URLS
 
@@ -104,8 +105,6 @@ static uint64_t current_work_received;
 static int8_t current_rssi_value;
 static int current_block_height;
 
-static bool self_test_finished;
-
 static screen_t get_current_screen() {
     lv_obj_t * active_screen = lv_screen_active();
     for (screen_t scr = 0; scr < MAX_SCREENS; scr++) {
@@ -133,10 +132,7 @@ static lv_obj_t * create_scr_self_test() {
 
     self_test_message_label = lv_label_create(scr);
     self_test_result_label = lv_label_create(scr);
-
     self_test_finished_label = lv_label_create(scr);
-    lv_obj_set_width(self_test_finished_label, LV_HOR_RES);
-    lv_label_set_long_mode(self_test_finished_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     return scr;
 }
@@ -374,6 +370,10 @@ static void scr_create_overlay()
 
 static bool screen_show(screen_t screen)
 {
+    if (!lvgl_port_lock(0)) {
+        return false;
+    }
+
     if (SCR_CAROUSEL_START > screen) {
         lv_display_trigger_activity(NULL);
     }
@@ -384,15 +384,17 @@ static bool screen_show(screen_t screen)
         lv_obj_t * scr = screens[screen];
 
         is_valid = lv_obj_is_valid(scr);
-        if (is_valid && lvgl_port_lock(0)) {
+        if (is_valid) {
             bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
             lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
-            lvgl_port_unlock();
         }
 
         current_screen_time_ms = 0;
         current_screen_delay_ms = delays_ms[screen];
     }
+
+    lvgl_port_unlock();
+
     return is_valid;
 }
 
@@ -411,33 +413,44 @@ void screen_next()
 
 static void screen_update_cb(lv_timer_t * timer)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT);
 
-    if (0 > display_timeout_config) {
+    uint32_t inactive_time = lv_display_get_inactive_time(NULL);
+    screen_t current_screen = get_current_screen();
+
+    if (module->identify_mode_time_ms > 0) {
+        module->identify_mode_time_ms -= SCREEN_UPDATE_MS;
+    }
+    bool is_identify_mode = module->identify_mode_time_ms > 0;
+
+    bool enable_display = false;
+    if (display_timeout_config < 0) {
         // display always on
-        display_on(true);
-    } else if (0 == display_timeout_config) {
-        // display off
-        display_on(false);
+        enable_display = true;
+    } else if (display_timeout_config == 0) {
+        // display off, except pre-carousel screens or button press
+        if (current_screen < SCR_CAROUSEL_START || inactive_time < BUTTON_WAKE_MS) {
+            enable_display = true;
+        }
     } else {
         // display timeout
         const uint32_t display_timeout = display_timeout_config * 60 * 1000;
 
-        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen()) &&
-             lv_obj_has_flag(identify_image, LV_OBJ_FLAG_HIDDEN)) {
-            display_on(false);
-        } else {
-            display_on(true);
+        if (inactive_time < display_timeout || current_screen < SCR_CAROUSEL_START || is_identify_mode) {
+            enable_display = true;
         }
     }
+
+    display_on(enable_display);
 
     if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
         SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
         
         lv_label_set_text(self_test_message_label, self_test->message);
         
-        if (self_test->is_finished && !self_test_finished) {
-            self_test_finished = true;
+        if (self_test->is_finished) {
             lv_label_set_text(self_test_result_label, self_test->result);
             lv_label_set_text(self_test_finished_label, self_test->finished);
         }
@@ -446,13 +459,6 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    if (module->identify_mode_time_ms > 0) {
-        module->identify_mode_time_ms -= SCREEN_UPDATE_MS;
-    }
-
-    bool is_identify_mode = module->identify_mode_time_ms > 0;
     if (is_identify_mode == lv_obj_has_flag(identify_image, LV_OBJ_FLAG_HIDDEN)) {
         lv_obj_set_flag(identify_image, LV_OBJ_FLAG_HIDDEN, !is_identify_mode);
         lv_obj_set_style_bg_opa(lv_layer_top(), is_identify_mode ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_MAIN);
@@ -533,7 +539,7 @@ static void screen_update_cb(lv_timer_t * timer)
     current_hashrate = module->current_hashrate;
 
     if (current_difficulty != module->best_session_nonce_diff) {
-        if (module->block_found) {
+        if (module->show_new_block) {
             lv_obj_set_width(stats_difficulty_label, LV_HOR_RES);
             lv_label_set_long_mode(stats_difficulty_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
             lv_label_set_text_fmt(stats_difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", module->best_session_diff_string);
@@ -545,7 +551,11 @@ static void screen_update_cb(lv_timer_t * timer)
 
     if (current_chip_temp != power_management->chip_temp_avg) {
         if (power_management->chip_temp_avg > 0) {
-            lv_label_set_text_fmt(stats_temp_label, "Temp: %.1f°C", power_management->chip_temp_avg);    
+            if (power_management->chip_temp2_avg > 0) {
+                lv_label_set_text_fmt(stats_temp_label, "Temp: %.1f°C/%.1f°C", power_management->chip_temp_avg, power_management->chip_temp2_avg);
+            } else {
+                lv_label_set_text_fmt(stats_temp_label, "Temp: %.1f°C", power_management->chip_temp_avg);
+            }
         }
         current_chip_temp = power_management->chip_temp_avg;
     }
@@ -559,7 +569,7 @@ static void screen_update_cb(lv_timer_t * timer)
         lv_label_set_text_fmt(mining_network_difficulty_label, "Difficulty: %s", GLOBAL_STATE->network_diff_string);
     }
 
-    if (GLOBAL_STATE->scriptsig != NULL && strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
+    if (strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
         lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->scriptsig);
     }
 
@@ -609,10 +619,10 @@ static void screen_update_cb(lv_timer_t * timer)
         current_shares_rejected = shares_rejected;
         current_work_received = work_received;
     } else {
-        lv_label_set_text(notification_label, "");
+        lv_label_set_text(notification_label, module->mining_paused ? "▐▐" : "");
     }
 
-    if (module->block_found) {
+    if (module->show_new_block) {
         if (get_current_screen() != SCR_STATS) {
             screen_show(SCR_STATS);
         }
@@ -651,13 +661,13 @@ static void uptime_update_cb(lv_timer_t * timer)
         uptime_seconds %= 60;
 
         if (days > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lud %luh %lum %lus", days, hours, minutes, uptime_seconds);
         } else if (hours > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %luh %lum %lus", hours, minutes, uptime_seconds);
         } else if (minutes > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lum %lus", minutes, uptime_seconds);
         } else {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lus", uptime_seconds);
         }
 
         if (strcmp(lv_label_get_text(wifi_uptime_label), uptime) != 0) {

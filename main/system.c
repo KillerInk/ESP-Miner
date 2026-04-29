@@ -30,6 +30,8 @@
 #include "vcore.h"
 #include "thermal.h"
 #include "utils.h"
+#include "self_test.h"
+#include "filesystem.h"
 
 static const char * TAG = "system";
 
@@ -47,8 +49,9 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->best_session_nonce_diff = 0;
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
-    module->block_found = false;
-    
+    module->block_found = 0;
+    module->show_new_block = false;
+
     // Initialize network address strings
     strcpy(module->ip_addr_str, "");
     strcpy(module->ipv6_addr_str, "");
@@ -86,6 +89,10 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->pool_extranonce_subscribe = nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE);
     module->fallback_pool_extranonce_subscribe = nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
 
+    // set the pool decode coinbase
+    module->pool_decode_coinbase_tx = nvs_config_get_bool(NVS_CONFIG_STRATUM_DECODE_COINBASE_TX);
+    module->fallback_pool_decode_coinbase_tx = nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX);
+
     // use fallback stratum
     module->use_fallback_stratum = nvs_config_get_bool(NVS_CONFIG_USE_FALLBACK_STRATUM);
 
@@ -99,6 +106,8 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
     ESP_LOGI(TAG, "Initial overheat_mode value: %d", module->overheat_mode);
 
+    module->mining_paused = false;
+
     //Initialize power_fault fault mode
     module->power_fault = 0;
 
@@ -108,6 +117,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 
     // Initialize mutexes
     pthread_mutex_init(&GLOBAL_STATE->valid_jobs_lock, NULL);
+    GLOBAL_STATE->stratum_mux = (portMUX_TYPE)portMUX_INITIALIZER_UNLOCKED;
 }
 
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {
@@ -156,24 +166,80 @@ void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {
 }
 
 esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
-    
-    ESP_RETURN_ON_ERROR(gpio_install_isr_service(0), TAG, "Error installing ISR service");
+    esp_err_t ret = gpio_install_isr_service(0);
+    if (ret != ESP_OK) {
+        self_test_show_message(GLOBAL_STATE, "ISR:FAIL");
+        ESP_LOGE(TAG, "Error installing ISR service");
+        return ret;
+    }
+
+    ret = display_init(GLOBAL_STATE);
+    if (ret != ESP_OK) {
+        self_test_show_message(GLOBAL_STATE, "DISPLAY:FAIL");
+        ESP_LOGE(TAG, "Display init failed");
+        return ret;
+    }
+
+    if (!GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
+        ret = input_init(screen_button_press, toggle_wifi_softap);
+    } else {
+        ret = input_init(NULL, self_test_reset);
+    }
+    if (ret != ESP_OK) {
+        self_test_show_message(GLOBAL_STATE, "INPUT:FAIL");
+        ESP_LOGE(TAG, "Input init failed");
+        return ret;
+    }
+
+    ret = screen_start(GLOBAL_STATE);
+    if (ret != ESP_OK) {
+        self_test_show_message(GLOBAL_STATE, "SCREEN:FAIL");
+        ESP_LOGE(TAG, "Screen start failed");
+        return ret;
+    }
+
+    ret = ensure_overheat_mode_config();
+    if (ret != ESP_OK) {
+        self_test_show_message(GLOBAL_STATE, "CONFIG:FAIL");
+        ESP_LOGE(TAG, "Failed to ensure overheat_mode config");
+        return ret;
+    }
+
+    ret = filesystem_init(GLOBAL_STATE);
+    if (ret != ESP_OK) {
+        self_test_show_message(GLOBAL_STATE, "FILESYS:FAIL");
+        ESP_LOGE(TAG, "Filesystem init failed");
+        if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
+            return ret;
+        }
+    }
 
     // Initialize the core voltage regulator
-    ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
+    ret = VCORE_init(GLOBAL_STATE);
+    if (ret != ESP_OK) {
+        self_test_show_message(GLOBAL_STATE, "VCORE:FAIL");
+        ESP_LOGE(TAG, "VCORE init failed");
+        return ret;
+    }
 
-    ESP_RETURN_ON_ERROR(Thermal_init(&GLOBAL_STATE->DEVICE_CONFIG), TAG, "Thermal init failed!");
+    // For self-test, we set a stable known voltage before ASIC initialization
+    if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
+        vTaskDelay(500 / portTICK_PERIOD_MS);
 
-    vTaskDelay(500 / portTICK_PERIOD_MS);
+        ret = VCORE_set_voltage(GLOBAL_STATE, 1.150);
+        if (ret != ESP_OK) {
+            self_test_show_message(GLOBAL_STATE, "VCORE:FAIL");
+            ESP_LOGE(TAG, "VCORE set failed");
+            return ret;
+        }
+    }
 
-    // Ensure overheat_mode config exists
-    ESP_RETURN_ON_ERROR(ensure_overheat_mode_config(), TAG, "Failed to ensure overheat_mode config");
-
-    ESP_RETURN_ON_ERROR(display_init(GLOBAL_STATE), TAG, "Display init failed!");
-
-    ESP_RETURN_ON_ERROR(input_init(screen_button_press, toggle_wifi_softap), TAG, "Input init failed!");
-
-    ESP_RETURN_ON_ERROR(screen_start(GLOBAL_STATE), TAG, "Screen start failed!");
+    ret = Thermal_init(&GLOBAL_STATE->DEVICE_CONFIG);
+    if (ret != ESP_OK) {
+        self_test_show_message(GLOBAL_STATE, "THERMAL:FAIL");
+        ESP_LOGE(TAG, "Thermal init failed");
+        return ret;
+    }
 
     return ESP_OK;
 }
@@ -246,8 +312,9 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t 
 
     double network_diff = networkDifficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
     if (diff >= network_diff) {
-        module->block_found = true;
-        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f >= %f", diff, network_diff);
+        module->block_found++;
+        module->show_new_block = true;
+        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f >= %f (count: %d)", diff, network_diff, module->block_found);
     }
 
     if ((uint64_t) diff <= module->best_nonce_diff) {
@@ -260,7 +327,7 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t 
     // make the best_nonce_diff into a string
     suffixString((uint64_t) diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
 
-    ESP_LOGI(TAG, "Network diff: %f", network_diff);
+    ESP_LOGI(TAG, "New best difficulty: %s", module->best_diff_string);
 }
 
 static esp_err_t ensure_overheat_mode_config() {

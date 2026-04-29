@@ -59,7 +59,9 @@ Available API endpoints:
 * `/api/system/asic` Get ASIC settings information
 * `/api/system/statistics` Get system statistics (data logging should be activated)
 * `/api/system/statistics/dashboard` Get system statistics for dashboard
+* `/api/system/scoreboard` Get top 20 highest difficulty shares
 * `/api/system/wifi/scan` Scan for available Wi-Fi networks
+* `/api/system/logs` Download system logs
 * `/api/system/autotune` Get Autotune settings information
 
 **POST**
@@ -92,9 +94,18 @@ curl http://YOUR-BITAXE-IP/api/system/statistics/dashboard
 # Get available Wi-Fi networks
 curl http://YOUR-BITAXE-IP/api/system/wifi/scan
 
+# Download system logs
+curl http://YOUR-BITAXE-IP/api/system/logs
+
 
 # Restart the system
 curl -X POST http://YOUR-BITAXE-IP/api/system/restart
+
+# Pause mining
+curl -X POST http://YOUR-BITAXE-IP/api/system/pause
+
+# Resume mining
+curl -X POST http://YOUR-BITAXE-IP/api/system/resume
 
 # Let the device say Hi!
 curl -X POST http://YOUR-BITAXE-IP/api/system/identify
@@ -129,6 +140,37 @@ In the event that the admin web front end is inaccessible, for example because o
 ### Unlock Settings
 
 In order to unlock the Input fields for ASIC Frequency and ASIC Core Voltage you need to append `?oc` to the end of the settings tab URL in your browser. Be aware that without additional cooling overclocking can overheat and/or damage your Bitaxe.
+
+## Development using esp-miner/devcontainer
+
+This configuration allows you to edit locally and compile the source code using a docker container so you don't have to install the ESP-IDF toolchain and other supporting software on your computer to compile the firmware.
+
+### Prerequisites
+
+- Docker server
+
+### Local PC Setup
+
+These instructions will assume an installation to your home directory.
+```
+cd ~
+git clone https://github.com/bitaxeorg/ESP-MINER.git
+cd ESP-MINER
+git checkout <the branch you want>
+# The next step builds the docker container that will compile the source code
+# This will take several minutes to finish
+docker build -t espminer-build .devcontainer
+```
+### Building
+
+```
+cd ~/ESP-MINER
+docker run --rm -it -v $PWD:/workspace espminer-build /bin/bash
+git config --global --add safe.directory /workspace    # set git permissions or build will fail; only done once
+cd /workspace
+idf.py build
+```	
+Once the build is done exit out of the docker session and flash the new firmware.
 
 ## Development
 

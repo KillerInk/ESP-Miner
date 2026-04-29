@@ -18,6 +18,7 @@ typedef enum {
     NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE,
     NVS_CONFIG_STRATUM_TLS,
     NVS_CONFIG_STRATUM_CERT,
+    NVS_CONFIG_STRATUM_DECODE_COINBASE_TX,
     NVS_CONFIG_FALLBACK_STRATUM_URL,
     NVS_CONFIG_FALLBACK_STRATUM_PORT,
     NVS_CONFIG_FALLBACK_STRATUM_USER,
@@ -26,6 +27,7 @@ typedef enum {
     NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE,
     NVS_CONFIG_FALLBACK_STRATUM_TLS,
     NVS_CONFIG_FALLBACK_STRATUM_CERT,
+    NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX,
     NVS_CONFIG_USE_FALLBACK_STRATUM,
     
     NVS_CONFIG_ASIC_FREQUENCY,
@@ -51,6 +53,7 @@ typedef enum {
     NVS_CONFIG_SWARM,
     NVS_CONFIG_THEME_SCHEME,
     NVS_CONFIG_THEME_COLORS,
+    NVS_CONFIG_SCOREBOARD,
     
     NVS_CONFIG_BOARD_VERSION,
     NVS_CONFIG_DEVICE_MODEL,
@@ -71,7 +74,7 @@ typedef enum {
     NVS_CONFIG_TMP1075,
     NVS_CONFIG_POWER_CONSUMPTION_TARGET,
     //all after that get not read when looping through the settings,but is still avail due nvs
-    NVS_CONFIG_COUNT,
+    
 
     NVS_CONFIG_KEY_POWER_LIMIT,
     NVS_CONFIG_KEY_FAN_LIMIT,
@@ -82,7 +85,7 @@ typedef enum {
     NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT,
     NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT,
     NVS_CONFIG_KEY_MAX_TEMP_VR,
-    NVS_ALL_CONFIG_COUNT
+    NVS_CONFIG_COUNT
     
 } NvsConfigKey;
 
@@ -108,7 +111,8 @@ typedef struct {
     //max key char length 15!
     const char *nvs_key_name;
     ConfigType type;
-    ConfigValue value;
+    ConfigValue *value;
+    int array_size; // Numbered entries
     ConfigValue default_value;
     const char *rest_name;
     int min;
@@ -117,8 +121,10 @@ typedef struct {
 
 esp_err_t nvs_config_init(void);
 
-char * nvs_config_get_string(NvsConfigKey key);
+char *nvs_config_get_string(NvsConfigKey key);
+char *nvs_config_get_string_indexed(NvsConfigKey key, int index);
 void nvs_config_set_string(NvsConfigKey key, const char * value);
+void nvs_config_set_string_indexed(NvsConfigKey key, int index, const char *value);
 uint16_t nvs_config_get_u16(NvsConfigKey key);
 void nvs_config_set_u16(NvsConfigKey key, uint16_t value);
 int32_t nvs_config_get_i32(NvsConfigKey key);

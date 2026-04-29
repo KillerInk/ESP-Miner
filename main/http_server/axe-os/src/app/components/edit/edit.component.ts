@@ -26,9 +26,6 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   public form!: FormGroup;
 
-  public firmwareUpdateProgress: number | null = null;
-  public websiteUpdateProgress: number | null = null;
-
   public savedChanges: boolean = false;
   public settingsUnlocked: boolean = false;
 
@@ -162,7 +159,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
             Validators.max(this.displayTimeoutMaxValue)
           ]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
-          frequency: [info.frequencySet, [Validators.required]],
+          frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
           minfanspeed: [info.minFanSpeed, [Validators.required]],
           manualFanSpeed: [info.manualFanSpeed, [Validators.required]],

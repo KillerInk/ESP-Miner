@@ -1,9 +1,10 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, ValidatorFn, ValidationErrors, AbstractControl } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ValidatorFn, ValidationErrors, AbstractControl, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
+import { Observable } from 'rxjs';
 
 type PoolType = 'stratum' | 'fallbackStratum';
 
@@ -65,6 +66,7 @@ export class PoolComponent implements OnInit {
           stratumPassword: ['*****', [Validators.required]],
           stratumTLS: [info.stratumTLS || 0],
           stratumCert: [info.stratumCert],
+          stratumDecodeCoinbase: [info.stratumDecodeCoinbase == true, [Validators.required]],
           fallbackStratumURL: [info.fallbackStratumURL, [
             Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
           ]],
@@ -78,6 +80,7 @@ export class PoolComponent implements OnInit {
           fallbackStratumSuggestedDifficulty: [info.fallbackStratumSuggestedDifficulty, [Validators.required]],
           fallbackStratumTLS: [info.fallbackStratumTLS || 0],
           fallbackStratumCert: [info.fallbackStratumCert],
+          fallbackStratumDecodeCoinbase: [info.fallbackStratumDecodeCoinbase == true, [Validators.required]],
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
           fallbackStratumPassword: ['*****', [Validators.required]]
         });

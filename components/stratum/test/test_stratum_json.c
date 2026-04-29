@@ -65,7 +65,16 @@ TEST_CASE("Parse stratum set_difficulty params", "[mining.set_difficulty]")
     StratumApiV1Message stratum_api_v1_message = {};
     STRATUM_V1_parse(&stratum_api_v1_message, json_string);
     TEST_ASSERT_EQUAL(MINING_SET_DIFFICULTY, stratum_api_v1_message.method);
-    TEST_ASSERT_EQUAL(1638, stratum_api_v1_message.new_difficulty);
+    TEST_ASSERT_EQUAL_DOUBLE(1638.0, stratum_api_v1_message.new_difficulty);
+}
+
+TEST_CASE("Parse stratum set_difficulty params with fractional", "[mining.set_difficulty]")
+{
+    const char *json_string = "{\"id\":null,\"method\":\"mining.set_difficulty\",\"params\":[100.5]}";
+    StratumApiV1Message stratum_api_v1_message = {};
+    STRATUM_V1_parse(&stratum_api_v1_message, json_string);
+    TEST_ASSERT_EQUAL(MINING_SET_DIFFICULTY, stratum_api_v1_message.method);
+    TEST_ASSERT_EQUAL_DOUBLE(100.5, stratum_api_v1_message.new_difficulty);
 }
 
 TEST_CASE("Parse stratum notify params", "[mining.notify]")
@@ -88,22 +97,15 @@ TEST_CASE("Parse stratum notify params", "[mining.notify]")
     TEST_ASSERT_EQUAL_UINT32(0x64495522, stratum_api_v1_message.mining_notification->ntime);
 }
 
-// 'private' function
-// TEST_CASE("Test mining.subcribe result parsing", "[mining.subscribe]")
-// {
-//     const char * json_string = "{\"result\":["
-//         "[[\"mining.set_difficulty\",\"731ec5e0649606ff\"],"
-//         "[\"mining.notify\",\"731ec5e0649606ff\"]],"
-//         "\"e9695791\",4],"
-//         "\"id\":1,\"error\":null}";
+TEST_CASE("Test mining.subcribe result parsing", "[mining.subscribe]")
+{
+    StratumApiV1Message stratum_api_v1_message = {};
+    const char * json_string = "{\"result\":[[[\"mining.notify\",\"695482c0\"]],\"4de05269\",8],\"id\":2,\"error\":null}";
 
-//     char * extranonce = NULL;
-//     int extranonce2_len = 0;
-//     int result = _parse_stratum_subscribe_result_message(json_string, &extranonce, &extranonce2_len);
-//     TEST_ASSERT_EQUAL(result, 0);
-//     TEST_ASSERT_EQUAL_STRING(extranonce, "e9695791");
-//     TEST_ASSERT_EQUAL_INT(extranonce2_len, 4);
-// }
+    STRATUM_V1_parse(&stratum_api_v1_message, json_string);
+    TEST_ASSERT_EQUAL_STRING("4de05269", stratum_api_v1_message.extranonce_str);
+    TEST_ASSERT_EQUAL_INT(8, stratum_api_v1_message.extranonce_2_len);
+}
 
 TEST_CASE("Parse stratum mining.set_version_mask params", "[stratum]")
 {
@@ -180,4 +182,37 @@ TEST_CASE("Parse stratum result alternative error", "[stratum]")
     TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
     TEST_ASSERT_EQUAL_STRING("Above target 2", stratum_api_v1_message.error_str);
+}
+
+TEST_CASE("Parse stratum result with error string (Stale)", "[stratum]")
+{
+    StratumApiV1Message stratum_api_v1_message = {};
+    const char *json_string = "{\"result\":false,\"error\":\"Stale\",\"id\":618}";
+    STRATUM_V1_parse(&stratum_api_v1_message, json_string);
+    TEST_ASSERT_EQUAL(618, stratum_api_v1_message.message_id);
+    TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
+    TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
+    TEST_ASSERT_EQUAL_STRING("Stale", stratum_api_v1_message.error_str);
+}
+
+TEST_CASE("Parse stratum result with null result and error string", "[stratum]")
+{
+    StratumApiV1Message stratum_api_v1_message = {};
+    const char *json_string = "{\"result\":null,\"error\":\"Stale\",\"id\":618}";
+    STRATUM_V1_parse(&stratum_api_v1_message, json_string);
+    TEST_ASSERT_EQUAL(618, stratum_api_v1_message.message_id);
+    TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
+    TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
+    TEST_ASSERT_EQUAL_STRING("Stale", stratum_api_v1_message.error_str);
+}
+
+TEST_CASE("Parse stratum error array format", "[stratum]")
+{
+    StratumApiV1Message stratum_api_v1_message = {};
+    const char *json_string = "{\"id\":4,\"result\":null,\"error\":[21,\"Job not found\",\"\"]}";
+    STRATUM_V1_parse(&stratum_api_v1_message, json_string);
+    TEST_ASSERT_EQUAL(4, stratum_api_v1_message.message_id);
+    TEST_ASSERT_EQUAL(STRATUM_RESULT_SETUP, stratum_api_v1_message.method);
+    TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
+    TEST_ASSERT_EQUAL_STRING("Job not found", stratum_api_v1_message.error_str);
 }
