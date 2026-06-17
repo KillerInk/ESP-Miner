@@ -7,7 +7,6 @@
 #include "stratum_api.h"
 #include "cJSON.h"
 #include "esp_log.h"
-#include "esp_ota_ops.h"
 #include "esp_app_desc.h"
 #include "esp_transport.h"
 #include "esp_transport_ssl.h"
@@ -15,6 +14,7 @@
 #include "esp_crt_bundle.h"
 #include "utils.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -28,7 +28,7 @@ static const char * TAG = "stratum_api";
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
 
-static RequestTiming request_timings[MAX_REQUEST_IDS];
+static RequestTiming *request_timings = NULL;
 
 static RequestTiming* get_request_timing(int request_id) {
     if (request_id < 0) return NULL;
@@ -92,6 +92,9 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert)
 
 void STRATUM_V1_initialize_buffer()
 {
+    // Free any existing buffer (may be non-NULL if a previous V1 task was running)
+    free(json_rpc_buffer);
+
     json_rpc_buffer = malloc(BUFFER_SIZE);
     json_rpc_buffer_size = BUFFER_SIZE;
     if (json_rpc_buffer == NULL) {
@@ -99,6 +102,14 @@ void STRATUM_V1_initialize_buffer()
         exit(1);
     }
     memset(json_rpc_buffer, 0, BUFFER_SIZE);
+
+    if (request_timings == NULL) {
+        request_timings = heap_caps_malloc(sizeof(RequestTiming) * MAX_REQUEST_IDS, MALLOC_CAP_SPIRAM);
+        if (request_timings == NULL) {
+            printf("Error: Failed to allocate memory for request_timings\n");
+            exit(1);
+        }
+    }
 
     for (int i = 0; i < MAX_REQUEST_IDS; i++) {
         request_timings[i].timestamp_us = 0;
@@ -109,6 +120,11 @@ void STRATUM_V1_initialize_buffer()
 void cleanup_stratum_buffer()
 {
     free(json_rpc_buffer);
+    json_rpc_buffer = NULL;
+    if (request_timings) {
+        free(request_timings);
+        request_timings = NULL;
+    }
 }
 
 static void realloc_json_buffer(size_t len)
@@ -265,8 +281,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         cJSON * error_json = cJSON_GetObjectItem(json, "error");
         cJSON * reject_reason_json = cJSON_GetObjectItem(json, "reject-reason");
 
-        // if the result is null, then it's a fail
-        if (result_json == NULL) {
+        // if the result is null and there is no error, then it's an unknown fail
+        if ((result_json == NULL || cJSON_IsNull(result_json)) && (error_json == NULL || cJSON_IsNull(error_json))) {
             message->response_success = false;
             message->error_str = strdup("unknown");
             
@@ -288,6 +304,11 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 }
             } else if (cJSON_IsString(error_json)) {
                 message->error_str = strdup(cJSON_GetStringValue(error_json));
+            } else if (cJSON_IsObject(error_json)) {
+                cJSON * error_msg = cJSON_GetObjectItem(error_json, "message");
+                if (cJSON_IsString(error_msg)) {
+                    message->error_str = strdup(cJSON_GetStringValue(error_msg));
+                }
             }
             if (message->error_str == NULL) {
                 message->error_str = strdup("unknown");
