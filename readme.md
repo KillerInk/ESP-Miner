@@ -316,10 +316,66 @@ git submodule update --init --recursive
 
 At the root of the repository, run:
 ```
-idf.py build && ./merge_bin.sh ./esp-miner-merged.bin
+idf.py build
 ```
 
-Note: the merge_bin.sh script is a custom script that merges the bootloader, partition table, and the application binary into a single file.
+This automatically builds the Axe-OS frontend, embeds it into the firmware, and produces `build/esp-miner.bin`.
+
+To create a merged flashable binary, use one of these methods:
+
+**CMake targets (recommended):**
+
+```
+# Default merged binary (bootloader + partition + firmware + OTA)
+# Use this when you plan to flash config separately with bitaxetool
+idf.py merge_bin_target
+```
+
+```
+# Merged binary including a config file baked in
+# Generates config.bin from the specified .cvs file automatically.
+# Choose your hardware config with -DMERGE_CONFIG_CVS:
+idf.py -DMERGE_CONFIG_CVS=config-401.cvs merge_bin_target_with_config
+idf.py -DMERGE_CONFIG_CVS=config-402.cvs merge_bin_target_with_config
+idf.py -DMERGE_CONFIG_CVS=config-custom.cvs merge_bin_target_with_config
+# Default is config-401.cvs if not specified.
+```
+
+```
+# Update-only binary (firmware + OTA in hex format)
+# For OTA updates via /api/system/OTA endpoint — does not include bootloader or partitions
+idf.py merge_bin_target_update
+```
+
+```
+# Generate merged binaries for all config-*.bin files in project root
+# Produces one merged binary per config file (e.g. config-401-merged.bin)
+idf.py merge_bin_target_all_configs
+```
+
+Output files:
+- `esp-miner-merged.bin` — no config baked in
+- `esp-miner-merged-with-config.bin` — includes config.bin (generated from selected .cvs) at 0x9000
+- `esp-miner-update.bin` — firmware + OTA only, hex format (for OTA updates)
+- `config-XXX-merged.bin` — one per `config-XXX.bin` found (factory-style images)
+
+**Flash the merged binaries:**
+
+```
+# Flash merged binary directly (includes all components at correct offsets)
+esptool.py --chip esp32s3 write_flash 0x0 esp-miner-merged.bin
+
+# Or use bitaxetool with a config file (overwrites the baked-in config)
+bitaxetool --config ./config-401.cvs --firmware ./esp-miner-merged.bin
+```
+
+**Shell script (legacy):**
+```
+./merge_bin.sh ./esp-miner-merged.bin
+./merge_bin.sh -c ./esp-miner-merged.bin  # with config.bin
+```
+
+Note: the merge_bin tools combine the bootloader, partition table, application binary, and OTA data into a single file that can be flashed to the device at 0x0.
 
 Note: if using VSCode, you may have to configure the settings.json file to match your esp hardware version. For example, if your bitaxe has something other than an esp32-s3, you will need to change the version in the `.vscode/settings.json` file.
 
