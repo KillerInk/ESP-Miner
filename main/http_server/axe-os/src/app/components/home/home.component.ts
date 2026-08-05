@@ -744,6 +744,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           stats.statistics.forEach((element: number[]) => {
             switch (chartLabelValue(chartY1DataLabel)) {
               case eChartLabel.asicVoltage:
+            case eChartLabel.asicVoltageSet:
               case eChartLabel.voltage:
               case eChartLabel.current:
                 element[idxChartY1Data] = element[idxChartY1Data] / 1000;
@@ -753,6 +754,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             }
             switch (chartLabelValue(chartY2DataLabel)) {
               case eChartLabel.asicVoltage:
+            case eChartLabel.asicVoltageSet:
               case eChartLabel.voltage:
               case eChartLabel.current:
                 element[idxChartY2Data] = element[idxChartY2Data] / 1000;
@@ -891,6 +893,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.activePoolProtocol = 'SV1';
         }
         this.responseTime = info.responseTime;
+        info.coreVoltageSet = info.coreVoltageSet / 1000;
 
         this.activePoolUserAddressPart = this.getAddressPart(this.activePoolUser);
         this.activePoolUserSuffixPart = this.getSuffixPart(this.activePoolUser);
@@ -956,6 +959,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         formatted.temp = parseFloat(formatted.temp.toFixed(1));
         formatted.temp2 = parseFloat(formatted.temp2.toFixed(1));
         formatted.responseTime = parseFloat(formatted.responseTime.toFixed(1));
+        info.frequency = parseFloat(info.frequency.toFixed(2));
 
         return formatted;
       }),
@@ -1316,6 +1320,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.asicTemp2:        return this.maxTemp;
       case eChartLabel.vrTemp:           return this.maxTemp + 25;
       case eChartLabel.asicVoltage:      return info.coreVoltage;
+      case eChartLabel.asicVoltageSet:   return info.coreVoltageSet;
       case eChartLabel.voltage:          return info.nominalVoltage + .5;
       case eChartLabel.power:            return this.maxPower;
       case eChartLabel.current:          return this.maxPower / info.coreVoltage;
@@ -1323,6 +1328,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fanRpm:           return 7000;
       case eChartLabel.fan2Rpm:          return 7000;
       case eChartLabel.responseTime:     return 50;
+      case eChartLabel.frequency:        return 0;
       default:                           return 0;
     }
   }
@@ -1338,6 +1344,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.asicTemp2:          return info.temp2;
       case eChartLabel.vrTemp:             return info.vrTemp;
       case eChartLabel.asicVoltage:        return info.coreVoltageActual;
+      case eChartLabel.asicVoltageSet:     return info.coreVoltageSet;
       case eChartLabel.voltage:            return info.voltage;
       case eChartLabel.power:              return info.power;
       case eChartLabel.current:            return info.current;
@@ -1347,6 +1354,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.wifiRssi:           return info.wifiRSSI;
       case eChartLabel.freeHeap:           return info.freeHeap;
       case eChartLabel.responseTime:       return info.responseTime;
+      case eChartLabel.frequency:          return info.frequency;
       default:                             return 0.0;
     }
   }
@@ -1362,7 +1370,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.asicTemp2:
       case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};
       case eChartLabel.asicVoltage:
-      case eChartLabel.voltage:          return {suffix: ' V', precision: 1};
+      case eChartLabel.voltage:
+      case eChartLabel.asicVoltageSet:   return {suffix: ' V', precision: 3};
       case eChartLabel.power:            return {suffix: ' W', precision: 1};
       case eChartLabel.current:          return {suffix: ' A', precision: 1};
       case eChartLabel.fanSpeed:         return {suffix: ' %', precision: 1};
@@ -1371,6 +1380,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
       case eChartLabel.freeHeap:         return {suffix: ' B', precision: 0};
       case eChartLabel.responseTime:     return {suffix: ' ms', precision: 1};
+      case eChartLabel.frequency:        return {suffix: ' MHz', precision: 1};
       default:                           return {suffix: '', precision: 0};
     }
   }

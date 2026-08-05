@@ -8,6 +8,7 @@ export enum eChartLabel {
     errorPercentage = 'Error %',
     vrTemp = 'VR Temp',
     asicVoltage = 'ASIC Voltage',
+    asicVoltageSet = 'ASIC Voltage Set',
     voltage = 'Voltage',
     power = 'Power',
     current = 'Current',
@@ -17,6 +18,7 @@ export enum eChartLabel {
     wifiRssi = 'Wi-Fi RSSI',
     freeHeap = 'Free Heap',
     responseTime = 'Response Time',
+    frequency = 'Frequency',
     none = 'None'
 }
 

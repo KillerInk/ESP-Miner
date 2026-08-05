@@ -108,6 +108,16 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_SELF_TEST_TEMP_WARMUP]                 = {.nvs_key_name = "selftest_warm",   .type = TYPE_U16,   .default_value = {.u16 = 55}},
     [NVS_CONFIG_SELF_TEST_TEMP_MAX]                    = {.nvs_key_name = "selftest_max",    .type = TYPE_U16,   .default_value = {.u16 = 70}},
     [NVS_CONFIG_SELF_TEST_FAN_SPEED]                   = {.nvs_key_name = "selftest_fan",    .type = TYPE_U16,   .default_value = {.u16 = 1000}},
+
+    [NVS_CONFIG_KEY_POWER_LIMIT]                       = {.nvs_key_name = "power_limit",     .type = TYPE_U16,   .default_value = {.u16 = 20}},
+    [NVS_CONFIG_KEY_FAN_LIMIT]                         = {.nvs_key_name = "fan_limit",       .type = TYPE_U16,   .default_value = {.u16 = 75},},
+    [NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC]                  = {.nvs_key_name = "max_volt_asic",   .type = TYPE_U16,   .default_value = {.u16 = 1400},},
+    [NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC]                = {.nvs_key_name = "max_freq_asic",   .type = TYPE_U16,   .default_value = {.u16 = 1000},},
+    [NVS_CONFIG_KEY_MAX_TEMP_ASIC]                     = {.nvs_key_name = "max_temp_asic",   .type = TYPE_U16,   .default_value = {.u16 = 61},},
+    [NVS_CONFIG_KEY_AUTO_TUNE_ENABLE]                  = {.nvs_key_name = "auto_tune",       .type = TYPE_BOOL,  .default_value = {.b   = false}},
+    [NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT]              = {.nvs_key_name = "osh_pow_limit",   .type = TYPE_FLOAT, .default_value = {.f   = 0.2f},},
+    [NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT]                = {.nvs_key_name = "osh_fan_limit",   .type = TYPE_U16,   .default_value = {.u16 = 10},},
+    [NVS_CONFIG_KEY_MAX_TEMP_VR]                       = {.nvs_key_name = "max_temp_vr",     .type = TYPE_U16,   .default_value = {.u16 = 85},}
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)

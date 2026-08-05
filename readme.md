@@ -65,6 +65,7 @@ Available API endpoints:
 * `/api/system/scoreboard` Get top 20 highest difficulty shares
 * `/api/system/wifi/scan` Scan for available Wi-Fi networks
 * `/api/system/logs` Download system logs
+* `/api/system/autotune` Get Autotune settings information
 
 **POST**
 
@@ -72,6 +73,7 @@ Available API endpoints:
 * `/api/system/identify` Identify the device
 * `/api/system/OTA` Update system firmware
 * `/api/system/OTAWWW` Update AxeOS
+* `/api/system/autotune` Update Autotune settings
 
 **PATCH**
 
