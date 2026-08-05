@@ -361,13 +361,54 @@ Output files:
 
 **Flash the merged binaries:**
 
+⚠️ **Warning:** Flashing a merged binary at 0x0 with esptool will erase everything up to the end of the binary (~0xf12000), wiping your NVS config and OTA partitions.
+
 ```
-# Flash merged binary directly (includes all components at correct offsets)
+# Flash merged binary directly (erases everything up to 0xf12000)
 esptool.py --chip esp32s3 write_flash 0x0 esp-miner-merged.bin
 
 # Or use bitaxetool with a config file (overwrites the baked-in config)
 bitaxetool --config ./config-401.cvs --firmware ./esp-miner-merged.bin
 ```
+
+**Flash targets (recommended — preserves config where possible):**
+
+These targets write individual components so each partition only erases its own area.
+
+```
+# Factory flash: full erase + write all partitions (first installation)
+idf.py flash_factory
+```
+
+```
+# Update flash: writes bootloader + firmware + OTA, preserves NVS config at 0x9000
+idf.py flash_update_keep_config
+```
+
+```
+# Flash with config: includes config from selected .cvs, preserves OTA/www partitions
+idf.py -DMERGE_CONFIG_CVS=config-401.cvs flash_with_config
+```
+
+```
+# Config only: erase + write NVS config from selected .cvs
+idf.py -DMERGE_CONFIG_CVS=config-401.cvs flash_config_only
+```
+
+```
+# App only: erase + write firmware, keeps bootloader, partition, config intact
+idf.py flash_app_only
+```
+
+**Erase range summary:**
+
+| Target | Erases | Preserves |
+|--------|--------|-----------|
+| `flash_factory` | Everything | Nothing |
+| `flash_update_keep_config` | Bootloader, firmware, OTA | NVS config |
+| `flash_with_config` | Bootloader, firmware, OTA | OTA/www partitions |
+| `flash_config_only` | NVS config (0x9000-0x10000) | Everything else |
+| `flash_app_only` | Firmware (0x10000-0x500000) | Bootloader, config, OTA |
 
 **Shell script (legacy):**
 ```

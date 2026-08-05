@@ -73,6 +73,73 @@ add_custom_target(
     COMMENT "Creating update binary: esp-miner-update.bin"
 )
 
+# Flash targets with selective erase ranges
+# NOTE: These write individual components instead of a merged binary so esptool
+# only erases the specific partition areas being updated, not the entire chip.
+
+# Full chip erase + flash (factory reset, first installation)
+# Erases everything: bootloader, partitions, config, firmware, OTA
+add_custom_target(
+    flash_factory
+    COMMAND ${PYTHON} -m esptool --chip esp32s3 erase_flash
+    COMMAND ${PYTHON} -m esptool --chip esp32s3 write_flash
+        0x0 build/bootloader/bootloader.bin
+        0x8000 build/partition_table/partition-table.bin
+        0x10000 build/esp-miner.bin
+        0xf10000 build/ota_data_initial.bin
+    WORKING_DIRECTORY ${PROJECT_DIR}
+    DEPENDS app
+    COMMENT "Factory flash: full erase + write all partitions"
+)
+
+# Update flash: writes bootloader + firmware + OTA, keeps NVS config intact
+# Each write_flash only erases its own partition range.
+add_custom_target(
+    flash_update_keep_config
+    COMMAND ${PYTHON} -m esptool --chip esp32s3 write_flash
+        0x0 build/bootloader/bootloader.bin
+        0x8000 build/partition_table/partition-table.bin
+        0x10000 build/esp-miner.bin
+        0xf10000 build/ota_data_initial.bin
+    WORKING_DIRECTORY ${PROJECT_DIR}
+    DEPENDS app
+    COMMENT "Update flash: writes firmware only, preserves NVS config at 0x9000"
+)
+
+# Flash with config: includes config.bin, keeps other partitions (OTA, www)
+add_custom_target(
+    flash_with_config
+    COMMAND ${PYTHON} -m esptool --chip esp32s3 write_flash
+        0x0 build/bootloader/bootloader.bin
+        0x8000 build/partition_table/partition-table.bin
+        0x9000 ${CONFIG_BIN_OUTPUT}
+        0x10000 build/esp-miner.bin
+        0xf10000 build/ota_data_initial.bin
+    WORKING_DIRECTORY ${PROJECT_DIR}
+    DEPENDS app ${CONFIG_BIN_OUTPUT}
+    COMMENT "Flash with config: writes all including config from ${MERGE_CONFIG_CVS}, preserves OTA/www"
+)
+
+# Erase only NVS config partition (0x9000 - 0x10000, 24KB) then write config
+add_custom_target(
+    flash_config_only
+    COMMAND ${PYTHON} -m esptool --chip esp32s3 erase_region 0x9000 0x7000
+    COMMAND ${PYTHON} -m esptool --chip esp32s3 write_flash 0x9000 ${CONFIG_BIN_OUTPUT}
+    WORKING_DIRECTORY ${PROJECT_DIR}
+    DEPENDS ${CONFIG_BIN_OUTPUT}
+    COMMENT "Config only: erase + write NVS config from ${MERGE_CONFIG_CVS}"
+)
+
+# Erase factory app only (0x10000 - 0x500000) then write firmware
+add_custom_target(
+    flash_app_only
+    COMMAND ${PYTHON} -m esptool --chip esp32s3 erase_region 0x10000 0x400000
+    COMMAND ${PYTHON} -m esptool --chip esp32s3 write_flash 0x10000 build/esp-miner.bin
+    WORKING_DIRECTORY ${PROJECT_DIR}
+    DEPENDS app
+    COMMENT "App only: erase + write firmware, keeps bootloader, partition, config intact"
+)
+
 # Generate merged binaries for all config-*.bin files (like merge_bin_all.sh -c)
 file(GLOB CONFIG_BINS "${PROJECT_DIR}/config-*.bin")
 if(CONFIG_BINS)
