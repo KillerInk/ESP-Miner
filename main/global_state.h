@@ -10,7 +10,6 @@
 #include "power_management_task.h"
 #include "hashrate_monitor_task.h"
 #include "coinbase_decoder.h"
-#include "work_queue.h"
 #include "device_config.h"
 #include "display.h"
 #include "scoreboard.h"
@@ -18,11 +17,6 @@
 #include "system.h"
 
 typedef struct bm_job bm_job;
-typedef struct sv2_conn sv2_conn;
-typedef struct sv2_noise_ctx sv2_noise_ctx;
-
-#define STRATUM_USER CONFIG_STRATUM_USER
-#define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
 
 typedef struct PoolConfig
 {
@@ -38,13 +32,17 @@ typedef struct PoolConfig
     bool decode_coinbase_tx;
     uint16_t sv2_channel_type;
     char * sv2_authority_pubkey;
+    bool sv2_require_auth;
 } PoolConfig;
 
-#define HISTORY_LENGTH 100
 #define DIFF_STRING_SIZE 10
 #define MAX_BLOCK_SIGNALS 8
 #define MAX_BLOCK_SIGNAL_LEN 16
 #define MAX_POOLS 8
+
+// Job id slots tracked per ASIC. Job ids are 7-bit (0..127) on all supported
+// BM13xx parts, so both the active_jobs and valid_jobs tables are sized to 128.
+#define MAX_ASIC_JOBS 128
 
 typedef struct RejectedReasonStat
 {
@@ -68,7 +66,7 @@ typedef struct SystemModule
     float hashrate_10m;
     float hashrate_1h;
     float error_percentage;
-    int64_t start_time;
+    int64_t start_time_us;
     uint64_t shares_accepted;
     uint64_t shares_rejected;
     uint16_t shares_pending;
@@ -99,6 +97,7 @@ typedef struct SystemModule
     uint16_t response_share_batch;
     float process_time;
     float cpu_usage;
+    double pool_difficulty;
     char pool_connection_info[64];
     bool overheat_mode;
     bool mining_paused;
@@ -115,6 +114,7 @@ typedef struct SystemModule
     char * version;
     char * axeOSVersion;
     Scoreboard scoreboard;
+    uint64_t uptime_seconds;
     cached_partition_t cached_partitions[3];
     int cached_partitions_count;
     char mdns_hostname[64];
@@ -133,6 +133,7 @@ typedef struct SelfTestNonceMeasurement
 typedef struct SelfTestModule
 {
     bool is_active;
+    bool is_factory;
     bool is_finished;
     SelfTestNonceMeasurement nonce_measurement;
     const char *message;
@@ -147,15 +148,14 @@ typedef struct AsicTaskModule
     // it also may return a previous nonce under some circumstances
     // so we keep a list of jobs indexed by the job id
     bm_job **active_jobs;
-    // Current job to be processed (replaces ASIC_jobs_queue)
-    bm_job *current_job;
-    //semaphone
-    SemaphoreHandle_t semaphore;
+    uint8_t *valid_jobs;
+    pthread_mutex_t valid_jobs_lock;
 } AsicTaskModule;
 
 typedef struct GlobalState
 {
-    work_queue stratum_queue;
+    TaskHandle_t create_jobs_task_handle;
+    volatile uint8_t active_job_slot_idx;
 
     SystemModule SYSTEM_MODULE;
     DeviceConfig DEVICE_CONFIG;
@@ -165,27 +165,8 @@ typedef struct GlobalState
     SelfTestModule SELF_TEST_MODULE;
     HashrateMonitorModule HASHRATE_MONITOR_MODULE;
 
-    char * extranonce_str;
-    int extranonce_2_len;
-
-    uint8_t * valid_jobs;
-    pthread_mutex_t valid_jobs_lock;
-
-    double pool_difficulty;
-    bool new_set_mining_difficulty_msg;
-    uint32_t version_mask;
-    bool new_stratum_version_rolling_msg;
-
     esp_transport_handle_t transport;
-    portMUX_TYPE stratum_mux;
-    
-    // A message ID that must be unique per request that expects a response.
-    // For requests not expecting a response (called notifications), this is null.
-    int send_uid;
-
-    stratum_protocol_t stratum_protocol;
-    struct sv2_conn *sv2_conn;
-    struct sv2_noise_ctx *sv2_noise_ctx;
+    pthread_mutex_t transport_mutex;
 
     bool ASIC_initalized;
     bool psram_is_available;

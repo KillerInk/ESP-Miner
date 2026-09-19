@@ -146,6 +146,9 @@ components:
           type: string
           description: SV2 authority public key for certificate verification (base58-encoded)
           pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+        stratumV2RequireAuth:
+          type: boolean
+          description: Refuse to connect unless the SV2 server certificate is verified against the authority pubkey
         id:
           type: integer
           description: Pool NVS slot index (0 to 7)
@@ -324,6 +327,7 @@ components:
         - overclockEnabled
         - primaryPoolIndex
         - secondaryPoolIndex
+        - useFallbackStratum
         - pools
         - poolConnectionInfo
         - poolDifficulty
@@ -351,6 +355,7 @@ components:
         - temp
         - temp2
         - uptimeSeconds
+        - useNTP
         - version
         - axeOSVersion
         - voltage
@@ -364,10 +369,8 @@ components:
         - networkDifficulty
         - blockSignals
         - blockFound
-        - coinbaseOutputs
         - coinbaseValueTotalSatoshis
         - coinbaseValueUserSatoshis
-        - hashrateMonitor
         - miningPaused
         - statsLimit
         - partitions
@@ -588,6 +591,15 @@ components:
         sharesRejected:
           type: number
           description: Number of rejected shares
+        totalUptimeSeconds:
+          type: number
+          description: Total uptime in seconds
+        totalHashes:
+          type: number
+          description: Total hashes done by the device
+        totalLog2Work:
+          type: number
+          description: Log2 of total hashes
         sharesPending:
           type: number
           description: Shares submitted but not yet resolved by the pool (SV2; 0 for SV1). Rises while the pool batches/buffers acks, drops to 0 once it catches up.
@@ -652,6 +664,9 @@ components:
         uptimeSeconds:
           type: number
           description: System uptime in seconds
+        useFallbackStratum:
+          type: integer
+          description: Whether fallback stratum is selected as primary preference (0=no, 1=yes)
         version:
           type: string
           description: Firmware version
@@ -742,7 +757,9 @@ components:
           description: List of available app partitions and their firmware versions
           items:
             $ref: '#/components/schemas/SystemPartition'
-
+        useNTP:
+          type: boolean
+          description: Whether NTP time sync is enabled
     SystemASIC:
       type: object
       required:
@@ -762,6 +779,7 @@ components:
             - BM1366
             - BM1368
             - BM1370
+            - BM1373
             - BM1397
           examples:
             - "BM1366"
@@ -1045,7 +1063,7 @@ components:
           enum: [0, 1]
           examples:
             - 1
-        fanspeed:
+        manualFanSpeed:
           type: integer
           description: Manual fan speed percentage when autofanspeed is disabled
           minimum: 0
