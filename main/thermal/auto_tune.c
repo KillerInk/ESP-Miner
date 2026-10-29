@@ -1,18 +1,27 @@
 #include "auto_tune.h"
 #include "PID.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "global_state.h"
 #include "nvs_config.h"
 #include <float.h>
 #include <math.h>
-#define POLL_RATE 1000
+
+// Tuning decisions run at 1 Hz regardless of the caller's tick rate: the
+// power management task calls auto_tune() at its 100 ms tick, and tuning
+// faster than 1 Hz would shrink the hashrate history below its 30-second
+// window and reprogram the ASIC faster than the (10-minute) hashrate
+// averages can respond.
+#define TUNE_PERIOD_MS 1000
+// Sleep before the warmup ramp, in 1 Hz tune ticks (=> seconds).
+#define WARMUP_DELAY_S 45
 
 static const char * TAG = "auto_tune";
 
 auto_tune_settings AUTO_TUNE = {
     .power_limit = 20,
     .fan_limit = 75,
-    .step_volt = 0.1,
+    .step_volt = 1.0, // mV per 1 s tune tick (1 mV/s, as before the 1 Hz conversion)
     .step_freq_rampup = 0.5,
     .step_freq = 0.2,
     .autotune_step_frequency = 0,
@@ -40,6 +49,7 @@ bool lastVoltageSet = false;
 const int waitTime = 30;
 int waitCounter = 0;
 GlobalState * GLOBAL_STATE;
+static int64_t last_tune_run_us = 0;
 
 #define MIN_FREQ 400
 #define MIN_VOLTAGE 1000
@@ -92,7 +102,8 @@ void auto_tune_init(GlobalState * _GLOBAL_STATE)
     update_hashrate_history(last_hashrate_auto);
 
     state = sleep_before_warmup;
-    waitCounter = 45 * 1000 / POLL_RATE;
+    waitCounter = WARMUP_DELAY_S; // 1 Hz tune ticks => seconds
+    last_tune_run_us = esp_timer_get_time();
 }
 
 bool waitForStartUp()
@@ -169,8 +180,16 @@ void respectLimits()
     last_asic_frequency_auto = clamp(last_asic_frequency_auto, MIN_FREQ, AUTO_TUNE.max_frequency_asic);
     last_core_voltage_auto = clamp(last_core_voltage_auto, MIN_VOLTAGE, AUTO_TUNE.max_voltage_asic);
 
-    if (last_asic_frequency_auto == MIN_FREQ || last_core_voltage_auto == MIN_VOLTAGE) {
-        lastVoltageSet = true; // Assuming default voltage set to be initial value
+    // Pick which knob the next increase uses from the MAX clamps: a knob
+    // pinned at its maximum can't be climbed, so use the other one. The
+    // hashrate toggle in dowork() only decides while both knobs still have
+    // headroom.
+    if (last_asic_frequency_auto >= AUTO_TUNE.max_frequency_asic &&
+        last_core_voltage_auto < AUTO_TUNE.max_voltage_asic) {
+        lastVoltageSet = true;
+    } else if (last_core_voltage_auto >= AUTO_TUNE.max_voltage_asic &&
+        last_asic_frequency_auto < AUTO_TUNE.max_frequency_asic) {
+        lastVoltageSet = false;
     }
 }
 
@@ -225,18 +244,29 @@ void dowork()
 
 void auto_tune()
 {
+    // Tune at 1 Hz (see TUNE_PERIOD_MS); the caller ticks faster.
+    int64_t now_us = esp_timer_get_time();
+    if (now_us - last_tune_run_us < (int64_t) TUNE_PERIOD_MS * 1000) {
+        return;
+    }
+    last_tune_run_us = now_us;
+
+    // The autotune limits must never hold the miner below what the user
+    // configured on the fan page: take the higher of the autotune page's
+    // limit and the live fan setting, recomputed each tick so lowering the
+    // manual fan speed (or PID target temperature) lowers the limit again.
     bool pid_active = nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED);
     if(!pid_active)
     {
         int manspeed = nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED);
-        if(manspeed > AUTO_TUNE.fan_limit)
-            AUTO_TUNE.fan_limit = manspeed + 1;
+        uint16_t page_limit = nvs_config_get_u16(NVS_CONFIG_KEY_FAN_LIMIT);
+        AUTO_TUNE.fan_limit = (manspeed + 1 > page_limit) ? (uint16_t) (manspeed + 1) : page_limit;
     }
     else
     {
         int targettemp = nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET);
-        if(targettemp > AUTO_TUNE.max_temp_asic)
-            AUTO_TUNE.max_temp_asic = targettemp + 1;
+        uint16_t page_limit = nvs_config_get_u16(NVS_CONFIG_KEY_MAX_TEMP_ASIC);
+        AUTO_TUNE.max_temp_asic = (targettemp + 1 > page_limit) ? (uint8_t) (targettemp + 1) : page_limit;
     }
     current_hashrate_auto = GLOBAL_STATE->SYSTEM_MODULE.hashrate_10m;
     update_hashrate_history(current_hashrate_auto);
