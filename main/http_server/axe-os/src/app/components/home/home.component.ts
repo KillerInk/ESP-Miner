@@ -1668,6 +1668,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       case 'vrTemp':           return this.maxTemp + 25;
       case 'asicVoltage':      return info.coreVoltage;
       case 'asicVoltageSet':   return info.coreVoltage;
+      case 'frequency':
+      case 'frequencySet':     return this.maxFrequency;
       case 'voltage':          return info.nominalVoltage + .5;
       case 'power':            return this.maxPower;
       case 'current':          return this.maxPower / info.coreVoltage;
@@ -1694,6 +1696,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       case 'vrTemp':             return info.vrTemp;
       case 'asicVoltage':        return info.coreVoltageActual;
       case 'asicVoltageSet':     return info.coreVoltageSet;
+      case 'frequency':          return info.frequency;
+      case 'frequencySet':       return info.actualFrequency;
       case 'voltage':            return info.voltage;
       case 'power':              return info.power;
       case 'current':            return info.current;
@@ -1721,6 +1725,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       case 'vrTemp':           return {suffix: ' °C', precision: 1};
       case 'asicVoltage':
       case 'asicVoltageSet':   return {suffix: ' V', precision: 1};
+      case 'frequency':
+      case 'frequencySet':     return {suffix: ' MHz', precision: 1};
       case 'voltage':          return {suffix: ' V', precision: 1};
       case 'power':            return {suffix: ' W', precision: 1};
       case 'current':          return {suffix: ' A', precision: 1};

@@ -30,6 +30,7 @@ typedef enum
     SRC_RESPONSE_TIME_MIN,
     SRC_RESPONSE_TIME_MAX,
     SRC_FREQUENCY,
+    SRC_FREQUENCY_SET,
     SRC_NONE // last
 } DataSource;
 

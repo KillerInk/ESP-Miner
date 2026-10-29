@@ -9,6 +9,8 @@ export const CHART_LABELS = {
   vrTemp: 'VR Temp',
   asicVoltage: 'ASIC Voltage',
   asicVoltageSet: 'ASIC Voltage Set',
+  frequency: 'ASIC Frequency',
+  frequencySet: 'ASIC Frequency Set',
   voltage: 'Voltage',
   power: 'Power',
   current: 'Current',
@@ -38,7 +40,8 @@ export interface ChartUnitGroup {
 export const ChartUnitGroups: ChartUnitGroup[] = [
   { name: 'Hashrate (H/s)', value: 'hashrate', labels: ['hashrate', 'hashrate_1m', 'hashrate_10m', 'hashrate_1h'] },
   { name: 'Temperature (°C)', value: 'temperature', labels: ['asicTemp', 'asicTemp2', 'vrTemp'] },
-  { name: 'Voltage (V)', value: 'voltage', labels: ['asicVoltage', 'voltage'] },
+  { name: 'Voltage (V)', value: 'voltage', labels: ['asicVoltage', 'asicVoltageSet', 'voltage'] },
+  { name: 'Frequency (MHz)', value: 'frequency', labels: ['frequency', 'frequencySet'] },
   { name: 'Power (W)', value: 'power', labels: ['power'] },
   { name: 'Current (A)', value: 'current', labels: ['current'] },
   { name: 'Fan Speed (RPM)', value: 'rpm', labels: ['fanRpm', 'fan2Rpm'] },

@@ -39,6 +39,7 @@ const char * const STATS_LABELS[SRC_NONE] = {
     [SRC_RESPONSE_TIME_MIN] = "responseTimeMin",
     [SRC_RESPONSE_TIME_MAX] = "responseTimeMax",
     [SRC_FREQUENCY] = "frequency",
+[SRC_FREQUENCY_SET] = "frequencySet",
 };
 
 static StatisticsDataPtr statisticsBuffer;
@@ -232,6 +233,7 @@ void statistics_task(void * pvParameters)
                 snprintf(statsData.tokens[SRC_WIFI_RSSI], STATS_TOKEN_LEN, "%d", (int)wifiRSSI);
                 snprintf(statsData.tokens[SRC_FREE_HEAP], STATS_TOKEN_LEN, "%" PRIu32, esp_get_free_heap_size());
                 snprintf(statsData.tokens[SRC_FREQUENCY], STATS_TOKEN_LEN, "%.2f", power_management->frequency_value);
+    snprintf(statsData.tokens[SRC_FREQUENCY_SET], STATS_TOKEN_LEN, "%.2f", power_management->actual_frequency);
 
                 uint64_t current_shares = sys_module->shares_accepted + sys_module->shares_rejected;
                 if (current_shares != last_shares_count && sys_module->response_time > 0.0f) {

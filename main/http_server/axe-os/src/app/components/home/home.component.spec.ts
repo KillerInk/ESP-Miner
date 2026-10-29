@@ -105,6 +105,7 @@ const mockSystemInfo: ISystemInfo = {
   nominalVoltage: 5.0,
   actualFrequency: 600,
   coreVoltageActual: 1.2,
+  coreVoltageSet: 1.2,
   current: 0,
   coreVoltage: 0,
   maxPower: 20,
