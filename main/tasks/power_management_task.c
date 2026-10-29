@@ -123,6 +123,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     vTaskDelay(500 / portTICK_PERIOD_MS);
     auto_tune_init(GLOBAL_STATE);
     float last_core_voltage = 0.0;
+    bool vcore_readback_pending = false;
 
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
@@ -138,6 +139,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         Power_get_output(GLOBAL_STATE, &power_management->power, &power_management->current);
         power_management->core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
+        if (vcore_readback_pending) {
+            power_management->core_voltage_set = power_management->core_voltage;
+            vcore_readback_pending = false;
+        }
 
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
         power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
@@ -255,9 +260,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "set vcore voltage from %fmV to %fmV", last_core_voltage, core_voltage);
-            VCORE_set_voltage(GLOBAL_STATE, (double) core_voltage / 1000.0);
-            last_core_voltage = core_voltage;
-            power_management->core_voltage_set = core_voltage;
+            if (VCORE_set_voltage(GLOBAL_STATE, (double) core_voltage / 1000.0) == ESP_OK) {
+                last_core_voltage = core_voltage;
+                vcore_readback_pending = true;
+            } else {
+                ESP_LOGE(TAG, "Failed to set vcore voltage to %fmV", core_voltage);
+            }
         }
 
         if (asic_frequency != last_asic_frequency) {

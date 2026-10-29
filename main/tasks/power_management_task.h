@@ -18,7 +18,7 @@ typedef struct
     float power;
     float current;
     float core_voltage;
-    float core_voltage_set;
+    float core_voltage_set; // mV actually applied on the core rail (read back after VCORE_set_voltage)
 } PowerManagementModule;
 
 void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE);
