@@ -69,7 +69,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_DISPLAY]                               = {.nvs_key_name = "display",         .type = TYPE_STR,   .default_value = {.str = DEFAULT_DISPLAY},                             .rest_name = "display",                            .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_ROTATION]                              = {.nvs_key_name = "rotation",        .type = TYPE_U16,                                                                          .rest_name = "rotation",                           .min = 0,  .max = 270},
     [NVS_CONFIG_INVERT_SCREEN]                         = {.nvs_key_name = "invertscreen",    .type = TYPE_BOOL,                                                                         .rest_name = "invertscreen",                       .min = 0,  .max = 1},
-    [NVS_CONFIG_DISPLAY_OFFSET]                        = {.nvs_key_name = "displayOffset",   .type = TYPE_U16,   .default_value = {.u16 = LCD_SH1107_PARAM_DEFAULT_DISP_OFFSET },       .rest_name = "displayOffset",                      .min = 0,  .max = UINT8_MAX},
+    [NVS_CONFIG_DISPLAY_OFFSET]                        = {.nvs_key_name = "displayOffset",   .type = TYPE_U16,                                                                          .rest_name = "displayOffset",                      .min = 0,  .max = UINT8_MAX},
     [NVS_CONFIG_DISPLAY_TIMEOUT]                       = {.nvs_key_name = "displayTimeout",  .type = TYPE_I32,   .default_value = {.i32 = -1},                                          .rest_name = "displayTimeout",                     .min = -1, .max = UINT16_MAX},
 
     [NVS_CONFIG_AUTO_FAN_SPEED]                        = {.nvs_key_name = "autofanspeed",    .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "autofanspeed",                       .min = 0,  .max = 1},
@@ -123,7 +123,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_KEY_AUTO_TUNE_ENABLE]                  = {.nvs_key_name = "auto_tune",       .type = TYPE_BOOL,  .default_value = {.b   = false}},
     [NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT]              = {.nvs_key_name = "osh_pow_limit",   .type = TYPE_FLOAT, .default_value = {.f   = 0.2f},},
     [NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT]                = {.nvs_key_name = "osh_fan_limit",   .type = TYPE_U16,   .default_value = {.u16 = 10},},
-    [NVS_CONFIG_KEY_MAX_TEMP_VR]                       = {.nvs_key_name = "max_temp_vr",     .type = TYPE_U16,   .default_value = {.u16 = 85},}
+    [NVS_CONFIG_KEY_MAX_TEMP_VR]                       = {.nvs_key_name = "max_temp_vr",     .type = TYPE_U16,   .default_value = {.u16 = 85},},
     [NVS_CONFIG_TPS546_PHASE]                          = {.nvs_key_name = "tps546_phase",    .type = TYPE_U16},
     [NVS_CONFIG_TPS546_VIN_ON]                         = {.nvs_key_name = "tps546_vin_on",   .type = TYPE_FLOAT},
     [NVS_CONFIG_TPS546_VIN_OFF]                        = {.nvs_key_name = "tps546_vin_off",  .type = TYPE_FLOAT},
@@ -546,7 +546,7 @@ esp_err_t nvs_config_init(void)
     TaskHandle_t task_handle;
 
     // nvs_task heap _must_ be internal memory
-    BaseType_t task_result = xTaskCreate(nvs_task, "nvs_task", 8192, NULL, 5, &task_handle); 
+    BaseType_t task_result = xTaskCreate(nvs_task, "nvs_task", 8192, NULL, 4, &task_handle); 
     if (task_result != pdPASS) {
         ESP_LOGE(TAG, "Failed to create nvs_task");
 
@@ -892,4 +892,3 @@ bool nvs_config_has_key(NvsConfigKey key)
     xSemaphoreGive(nvs_cache_mutex);
     return result;
 }
-

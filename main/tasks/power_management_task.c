@@ -11,6 +11,7 @@
 #include "utils.h"
 #include "asic_init.h"
 #include "asic_reset.h"
+#include "difficulty_controller.h"
 #include "driver/uart.h"
 
 #define POLL_RATE 100
@@ -24,7 +25,6 @@
 
 #define TPS546_THROTTLE_TEMP 105.0
 #define TPS546_MAX_TEMP 145.0
-#define POLL_RATE 1000
 
 #define ASIC_REDUCTION 100.0
 
@@ -257,7 +257,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             ESP_LOGI(TAG, "set vcore voltage from %fmV to %fmV", last_core_voltage, core_voltage);
             VCORE_set_voltage(GLOBAL_STATE, (double) core_voltage / 1000.0);
             last_core_voltage = core_voltage;
-            power_management->core_voltage = core_voltage;
+            power_management->core_voltage_set = core_voltage;
         }
 
         if (asic_frequency != last_asic_frequency) {
@@ -268,6 +268,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
             ASIC_set_frequency(GLOBAL_STATE);
             ASIC_set_nonce_space(GLOBAL_STATE);
+            difficulty_controller_update(GLOBAL_STATE);
             
             last_asic_frequency = asic_frequency;
         }

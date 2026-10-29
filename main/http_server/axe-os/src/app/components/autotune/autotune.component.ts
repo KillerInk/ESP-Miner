@@ -1,12 +1,16 @@
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { SliderComponent } from 'src/app/components/slider/slider.component';
+import { CheckboxComponent } from 'src/app/components/checkbox/checkbox.component';
+import { TooltipTextIconComponent } from 'src/app/components/tooltip-text-icon/tooltip-text-icon.component';
 
 import { LoadingService } from 'src/app/services/loading.service';
 
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin } from 'rxjs';
-import { AutotuneSettings, SystemInfo } from 'src/app/generated/models';
+import { SystemInfo } from 'src/app/generated/models';
 import { SystemApiService } from 'src/app/services/system.service';
 
 interface SliderConfig {
@@ -22,7 +26,8 @@ interface SliderConfig {
 @Component({
   selector: 'autotune',
   templateUrl: './autotune.component.html',
-  standalone: false
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, SliderComponent, CheckboxComponent, TooltipTextIconComponent]
 })
 export class AutotuneComponent implements OnInit {
   public autotuneForm!: FormGroup;

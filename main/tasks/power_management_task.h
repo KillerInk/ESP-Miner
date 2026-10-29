@@ -18,6 +18,7 @@ typedef struct
     float power;
     float current;
     float core_voltage;
+    float core_voltage_set;
 } PowerManagementModule;
 
 void POWER_MANAGEMENT_init_frequency(GlobalState * GLOBAL_STATE);
