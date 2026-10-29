@@ -14,6 +14,8 @@ extern const char *FREQUENCY_TRANSITION_TAG;
  * for different ASIC types.
  * 
  * @param frequency The frequency to set in MHz
+ * @return The actually applied (PLL-computed) frequency, or -1.0f if the
+ *         registers could not be written to the ASIC
  */
 typedef float (*set_hash_frequency_fn)(float frequency);
 

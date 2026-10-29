@@ -20,8 +20,12 @@ void do_frequency_transition(GlobalState * GLOBAL_STATE, set_hash_frequency_fn s
     }
 
     if (fabs(target_frequency - current_frequency) < STEP_SIZE) {
-        current_frequency = target_frequency;
-        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = set_frequency_fn(current_frequency);
+        float applied = set_frequency_fn(target_frequency);
+        if (applied < 0.0f) {
+            ESP_LOGE(TAG, "ASIC frequency write failed, keeping %g MHz", current_frequency);
+            return;
+        }
+        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = applied;
         return;
     }
 
@@ -38,15 +42,24 @@ void do_frequency_transition(GlobalState * GLOBAL_STATE, set_hash_frequency_fn s
             current_step += signum;
 
             current_frequency = current_step * STEP_SIZE;
-            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = set_frequency_fn(current_frequency);
+            float applied = set_frequency_fn(current_frequency);
+            if (applied < 0.0f) {
+                ESP_LOGE(TAG, "ASIC frequency write failed at %g MHz, aborting ramp", current_frequency);
+                return;
+            }
+            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = applied;
             
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
     }
     
     if (fabs(current_frequency - target_frequency) > EPSILON) {
-        current_frequency = target_frequency;
-        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = set_frequency_fn(current_frequency);
+        float applied = set_frequency_fn(target_frequency);
+        if (applied < 0.0f) {
+            ESP_LOGE(TAG, "ASIC frequency write failed, keeping %g MHz", current_frequency);
+            return;
+        }
+        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = applied;
     }
     
     ESP_LOGI(TAG, "Successfully transitioned to %g MHz", target_frequency);

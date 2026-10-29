@@ -82,14 +82,14 @@ static uint16_t address_interval;
 /// @param header
 /// @param data
 /// @param len
-static void _send_BM1397(uint8_t header, uint8_t *data, uint8_t data_len, bool debug)
+static bool _send_BM1397(uint8_t header, uint8_t *data, uint8_t data_len, bool debug)
 {
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
     if (total_length > 160) {
         ESP_LOGE(TAG, "Packet length %d exceeds maximum buffer size", total_length);
-        return;
+        return false;
     }
 
     uint8_t buf[160];
@@ -120,7 +120,11 @@ static void _send_BM1397(uint8_t header, uint8_t *data, uint8_t data_len, bool d
     }
 
     // send serial data
-    SERIAL_send(buf, total_length, debug);
+    if (SERIAL_send(buf, total_length, debug) == 0) {
+        ESP_LOGE(TAG, "Failed to send data to BM1397");
+        return false;
+    }
+    return true;
 }
 
 static void _send_read_address(void)
@@ -161,18 +165,24 @@ float BM1397_send_hash_frequency(float target_freq)
     uint8_t freqbuf[6] = {0x00, 0x08, vdo_scale, fb_divider, refdiv, postdiv};  // freqbuf - pll0_parameter
     uint8_t prefreq1[6] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; // prefreq - pll0_divider
 
+    bool success = true;
     for (int i = 0; i < 2; i++)
     {
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, BM1397_SERIALTX_DEBUG);
+        success = _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, BM1397_SERIALTX_DEBUG) && success;
     }
     for (int i = 0; i < 2; i++)
     {
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, BM1397_SERIALTX_DEBUG);
+        success = _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, BM1397_SERIALTX_DEBUG) && success;
     }
 
     vTaskDelay(10 / portTICK_PERIOD_MS);
+
+    if (!success) {
+        ESP_LOGE(TAG, "Failed to write frequency registers, keeping previous frequency");
+        return -1.0f;
+    }
 
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
 

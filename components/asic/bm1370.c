@@ -82,7 +82,7 @@ static task_result result;
 
 static uint16_t address_interval;
 
-static void _send_BM1370(uint8_t header, const uint8_t * data, uint8_t data_len, bool debug);
+static bool _send_BM1370(uint8_t header, const uint8_t * data, uint8_t data_len, bool debug);
 
 static void BM1370_write_clock_delay_ctrl(uint8_t chip_addr, uint8_t header)
 {
@@ -105,14 +105,14 @@ static void BM1370_write_io_driver_strength(uint8_t chip_addr, uint8_t header, u
 /// @param header
 /// @param data
 /// @param len
-static void _send_BM1370(uint8_t header, const uint8_t * data, uint8_t data_len, bool debug)
+static bool _send_BM1370(uint8_t header, const uint8_t * data, uint8_t data_len, bool debug)
 {
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     const uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
     if (total_length > 128) {
         ESP_LOGE(TAG, "Packet length %d exceeds maximum buffer size", total_length);
-        return;
+        return false;
     }
 
     uint8_t buf[128];
@@ -142,7 +142,9 @@ static void _send_BM1370(uint8_t header, const uint8_t * data, uint8_t data_len,
     // send serial data
     if (SERIAL_send(buf, total_length, debug) == 0) {
         ESP_LOGE(TAG, "Failed to send data to BM1370");
+        return false;
     }
+    return true;
 }
 
 static void _send_chain_inactive(void)
@@ -205,7 +207,12 @@ float BM1370_send_hash_frequency(float target_freq)
     uint8_t postdiv = (((postdiv1 - 1) & 0xf) << 4) | ((postdiv2 - 1) & 0xf);
     uint8_t freqbuf[6] = {0x00, 0x08, vdo_scale, fb_divider, refdiv, postdiv};
 
-    _send_BM1370(TYPE_CMD | GROUP_ALL | CMD_WRITE, freqbuf, 6, BM1370_SERIALTX_DEBUG);
+    bool success = _send_BM1370(TYPE_CMD | GROUP_ALL | CMD_WRITE, freqbuf, 6, BM1370_SERIALTX_DEBUG);
+
+    if (!success) {
+        ESP_LOGE(TAG, "Failed to write frequency registers, keeping previous frequency");
+        return -1.0f;
+    }
 
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
 

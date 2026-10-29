@@ -274,7 +274,8 @@ float BM1373_send_hash_frequency(float target_freq)
 
     if (!success) {
         frequency_write_failed = true;
-        ESP_LOGE(TAG, "Failed to program one or more ASIC PLLs");
+        ESP_LOGE(TAG, "Failed to program one or more ASIC PLLs, keeping previous frequency");
+        return -1.0f;
     }
 
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
