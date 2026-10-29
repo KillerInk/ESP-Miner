@@ -1,14 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideToastr } from 'ngx-toastr';
 
 import { AutotuneComponent } from './autotune.component';
 
-describe('SettingsComponent', () => {
+describe('AutotuneComponent', () => {
   let component: AutotuneComponent;
   let fixture: ComponentFixture<AutotuneComponent>;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [AutotuneComponent]
+      imports: [AutotuneComponent],
+      providers: [provideHttpClient(), provideToastr()]
     });
     fixture = TestBed.createComponent(AutotuneComponent);
     component = fixture.componentInstance;
